@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import MapProbe from '../features/map/MapProbe';
+import MapApp from '../features/map/MapApp';
 ---
 <Layout>
-    <MapProbe client:only="react"><p slot="fallback">Karte wird gestartet … JavaScript muss aktiviert sein.</p></MapProbe>
+    <MapApp client:only="react"><p slot="fallback">Karte wird gestartet … JavaScript muss aktiviert sein.</p></MapApp>
 </Layout>

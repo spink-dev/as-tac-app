@@ -17,7 +17,7 @@ interface Package {
     featureCount: number;
 }
 
-export default function MapProbe() {
+export default function MapApp() {
     const container = useRef<HTMLDivElement>(null);
     const map = useRef<LibreMap | null>(null);
     const marker = useRef<maplibregl.Marker | null>(null);
@@ -33,7 +33,6 @@ export default function MapProbe() {
     const [area, setArea] = useState<Package | null>(null);
     const [mapReady, setMapReady] = useState(false);
     const [mapError, setMapError] = useState('');
-    const [loadMs, setLoadMs] = useState<number | null>(null);
     const [online, setOnline] = useState(true);
     const [offline, setOffline] = useState<OfflineStatus>({ ready: false });
     const [offlineText, setOfflineText] = useState('Offline-Paket noch nicht geprüft.');
@@ -65,10 +64,8 @@ export default function MapProbe() {
     useEffect(() => {
         let disposed = false;
         const abort = new AbortController();
-        const started = performance.now();
         setMapReady(false);
         setMapError('');
-        setLoadMs(null);
         async function init() {
             try {
                 const response = await fetch(`/maps/${areaId}.json`, { signal: abort.signal });
@@ -145,7 +142,7 @@ export default function MapProbe() {
                         }
                         const areaLabel = document.createElement('span');
                         areaLabel.className = 'map-label';
-                        areaLabel.textContent = `◇ Testgebiet ${pkg.name}`;
+                        areaLabel.textContent = `◇ ${pkg.name}`;
                         new maplibregl.Marker({ element: areaLabel, anchor: 'bottom' })
                             .setLngLat([(pkg.bounds[0] + pkg.bounds[2]) / 2, (pkg.bounds[1] + pkg.bounds[3]) / 2]).addTo(instance);
                         const placeLabels = () => {
@@ -174,7 +171,6 @@ export default function MapProbe() {
                         instance.addLayer({ id: 'accuracy-line', type: 'line', source: 'accuracy',
                             paint: { 'line-color': '#176b89', 'line-width': 2 } });
                         setMapReady(true);
-                        setLoadMs(Math.round(performance.now() - started));
                     } catch (error) {
                         if (!disposed) {
                             setMapError(String(error));
@@ -342,18 +338,17 @@ export default function MapProbe() {
         }
     }
 
-    return <main className="probe">
-        <header><div><span className="eyebrow">AS-TAC / MOBILER PRÜFSTAND</span><h1>Karte im Gelände.</h1></div>
+    return <main className="app-shell">
+        <header><div><span className="eyebrow">AS-TAC</span><h1>Karte</h1></div>
             <span className="connection">{online ? 'Netz verfügbar' : 'Ohne Netz'}</span></header>
         <section className="map-wrap" aria-label="Offline-Karte">
-            <div ref={container} className="map" />
+            <div ref={container} className="map" aria-busy={!mapReady} />
             <div className="map-caption">{area?.name ?? 'Karte wird geladen …'}<span>OSM · lokales Gebiet</span></div>
             {mapError && <p className="map-error" role="alert">{mapError}</p>}
         </section>
         <aside className="panel">
-            <section><label htmlFor="area">Vorbereitetes Gebiet</label><select id="area" value={areaId} onChange={(event) => setAreaId(event.target.value)}><option value="mahlwinkel">Mahlwinkel · Airsoft-Feld</option><option value="benglen">Zürich · Benglen</option></select><span className="eyebrow">01 / OFFLINE</span><h2>{offline.ready ? 'Bereit für den Netztest' : 'Karte vorbereiten'}</h2>
+            <section><label htmlFor="area">Vorbereitetes Gebiet</label><select id="area" value={areaId} onChange={(event) => setAreaId(event.target.value)}><option value="mahlwinkel">Mahlwinkel · Airsoft-Feld</option><option value="benglen">Zürich · Benglen</option></select><h2>{offline.ready ? 'Offline verfügbar' : 'Karte vorbereiten'}</h2>
                 <p role="status">{offlineText}</p>
-                <p className="muted">Einmal online vollständig laden. Danach App schliessen, Flugmodus einschalten und erneut öffnen.</p>
                 <div className="actions"><button onClick={async () => {
                     const status = await verifyOffline();
                     setOffline(status);
@@ -372,7 +367,7 @@ export default function MapProbe() {
                     setOfflineText(status.ready ? 'Offline bereit · Dateien geprüft' : (status.error ?? 'Reparatur fehlgeschlagen.'));
                 }}>Offline-Paket reparieren</button>}
             </section>
-            <section><span className="eyebrow">02 / EIGENE POSITION</span><h2>{stale ? 'Letzte bekannte Position' : 'Standort auf dem Gerät'}</h2>
+            <section><h2>{stale ? 'Letzte bekannte Position' : 'Standort auf dem Gerät'}</h2>
                 <p role="status">{gps}</p>
                 {fix && <p className="coordinates">{fix.latitude.toFixed(6)}, {fix.longitude.toFixed(6)}<br />
                     ± {Math.round(fix.accuracy)} m · Fix vor {Math.max(0, Math.floor((now - fix.timestamp) / 1000))} s{stale ? ' · VERALTET' : ''}</p>}
@@ -387,15 +382,11 @@ export default function MapProbe() {
                     }}>{follow ? 'Folgen pausieren' : 'Position folgen'}</button>}</div>
                 <p className="muted">Keine Übertragung oder Speicherung der Position. GPS benötigt Freigabe; ein Fix ohne Internet ist nicht garantiert. Nur Vordergrundbetrieb.</p>
             </section>
-            <details><summary>Prüfdaten & Credits</summary>
-                <p>Kartenstart: {loadMs === null ? 'ausstehend' : `${loadMs} ms`} · {mapReady ? 'Renderer bereit' : 'Renderer wartet'}</p>
-                <p>Paket: {area ? `${area.featureCount} Objekte · ${Math.round(area.byteSize / 1024)} KiB GeoJSON` : 'ausstehend'}<br />Datenstand: {area?.dataTimestamp}</p>
-                <p>App-Paket: {offline.bytes ? `${Math.round(offline.bytes / 1024)} KiB` : 'ungeprüft'} · Build {offline.version ?? 'Entwicklung'}</p>
-                <p>Labels und Symbole: lokale Systemschrift, keine Font-/Sprite-Downloads.</p>
+            <details><summary>Über & Quellen</summary>
+                <p>{area?.name} · Datenstand: {area?.dataTimestamp}</p>
                 <p>© OpenStreetMap contributors · ODbL 1.0. <a href="/licenses/ODbL-1.0.txt">Lokaler Lizenztext</a></p>
-                <p>Danke an <a href="https://github.com/rwolffgang/FieldMaps">FieldMaps / @rwolffgang</a> für die Offline-/GPS-Referenz. Kein Referenzcode kopiert.</p>
+                <p>Danke an <a href="https://github.com/rwolffgang/FieldMaps">FieldMaps / @rwolffgang</a> für die Offline-/GPS-Referenz.</p>
                 <p><a href="/licenses/CREDITS.md">Herkunft</a> · <a href="/licenses/dependencies.txt">Bibliothekslizenzen</a></p>
-                <p>AST-001: Technischer Prüfstand. Reale iOS-/Android-Abnahme noch offen.</p>
             </details>
         </aside>
     </main>;

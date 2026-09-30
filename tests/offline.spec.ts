@@ -26,8 +26,7 @@ test('production shell, both maps and local labels survive offline new-page star
     await page.goto('/');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await expect(page.locator('.map-label:visible').first()).toBeVisible();
-    await page.getByText('Prüfdaten & Credits').click();
-    await expect(page.getByText(/Renderer bereit/)).toBeVisible();
+    await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
     await context.setOffline(true);
     await page.close();
     const offlinePage = await context.newPage();
@@ -98,7 +97,7 @@ test('removed cached resource invalidates offline readiness', async ({ page, con
     });
     await page.getByRole('button', { name: 'Dateien prüfen' }).click();
     await expect(page.getByText(/Ressource fehlt/)).toBeVisible();
-    await expect(page.getByText('Bereit für den Netztest')).toHaveCount(0);
+    await expect(page.getByText('Offline verfügbar')).toHaveCount(0);
     await context.setOffline(false);
     await page.getByRole('button', { name: 'Offline-Paket reparieren' }).click();
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
@@ -119,9 +118,7 @@ test('browser process restarts offline using its persisted profile', async () =>
         await coldPage.goto('http://localhost:4000/');
         await expect(coldPage.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
         await expect(coldPage.locator('.map-label:visible').first()).toBeVisible();
-        await coldPage.getByText('Prüfdaten & Credits').click();
-        await expect(coldPage.getByText(/Renderer bereit/)).toBeVisible();
-        console.log('Desktop Chromium cold start:', await coldPage.getByText(/Kartenstart:/).innerText());
+        await expect(coldPage.locator('.map')).toHaveAttribute('aria-busy', 'false');
     } finally {
         await context.close();
         await rm(profile, { recursive: true, force: true });
@@ -154,7 +151,6 @@ test('offline terrain does not require GeoJSON fetches from the map worker', asy
     await page.reload();
     await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
     await expect(page.locator('.map-label:visible').first()).toBeVisible();
-    await page.getByText('Prüfdaten & Credits').click();
-    await expect(page.getByText(/Renderer bereit/)).toBeVisible();
+    await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
     await expect(page.locator('.map-error')).toHaveCount(0);
 });

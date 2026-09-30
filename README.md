@@ -1,6 +1,6 @@
 # as-tac
 
-Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Der erste technische Prüfstand **AST-001** ist implementiert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
+Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Die Kartenfunktionalität aus **AST-001** ist integriert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
 
 **Stand 2026-10-01:** Produktions-Browsertests vorhanden; reale Abnahme auf iPhone 16 Pro und Samsung Galaxy A24 noch ausstehend. Editor, Planpakete und Online-Kollaboration sind noch nicht implementiert.
 
@@ -53,13 +53,13 @@ Eigene kleine Gebiete lassen sich bereits zur Build-Zeit vorbereiten:
 MAP_BOUNDS='[8.52,47.36,8.55,47.38]' MAP_NAME='Zürich Zentrum' npm run map:fetch -- zuerich-zentrum
 ```
 
-Die neue ID anschliessend zur Gebietsauswahl in `src/features/map/MapProbe.tsx` hinzufügen. Die UI bietet derzeit ausschliesslich Mahlwinkel und Zürich/Benglen. Freie Gebietsauswahl mit Download/Quota/Abbruch folgt in AST-004. Der Downloader bezieht ausgewählte OSM-Objektklassen über Overpass, keine Standard-OSM-Tiles. Metadaten/Hashes stehen neben den GeoJSON-Dateien.
+Die neue ID anschliessend zur Gebietsauswahl in `src/features/map/MapApp.tsx` hinzufügen. Die UI bietet derzeit ausschliesslich Mahlwinkel und Zürich/Benglen. Freie Gebietsauswahl mit Download/Quota/Abbruch folgt in AST-004. Der Downloader bezieht ausgewählte OSM-Objektklassen über Overpass, keine Standard-OSM-Tiles. Metadaten/Hashes stehen neben den GeoJSON-Dateien.
 
 ## Projektwissen
 
 - Dauerhafter Kontext: Vault `projects/as-tac/README.md`.
 - [Specs](specs/001-foundation/README.md), [Plan](specs/001-foundation/plan.md), [Aufgaben](specs/001-foundation/tasks.md).
 - [Credits und Herkunft](CREDITS.md), auch offline in der App verfügbar.
-- Lokales Git-Repository auf `feature/ast-001-mobile-proof`; Remote `origin`: `git@github.com:spink-dev/as-tac-app.git`.
+- Die separate Prüfstand-Oberfläche bleibt auf `feature/ast-001-mobile-proof`; `main` enthält die Karten-App ohne Testanweisungen und Messwert-Panel. Remote `origin`: `git@github.com:spink-dev/as-tac-app.git`.
 
 Danke an **[FieldMaps](https://github.com/rwolffgang/FieldMaps) von [@rwolffgang](https://github.com/rwolffgang)** für die technische Referenz und Erlaubnis zur Wiederverwendung. Mahlwinkel-Gebietsgrenzen übernommen, kein Referenzcode oder Event-Asset kopiert. Karten: **© OpenStreetMap contributors**, ODbL 1.0.
