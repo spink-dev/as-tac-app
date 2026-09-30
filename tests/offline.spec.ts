@@ -127,3 +127,34 @@ test('browser process restarts offline using its persisted profile', async () =>
         await rm(profile, { recursive: true, force: true });
     }
 });
+
+test('offline terrain does not require GeoJSON fetches from the map worker', async ({ page, context }) => {
+    await page.goto('/');
+    await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
+    await context.addInitScript(() => {
+        const NativeWorker = window.Worker;
+        window.Worker = class extends NativeWorker {
+            constructor(url: string | URL, options?: WorkerOptions) {
+                const source = `
+                    const originalFetch = self.fetch;
+                    self.fetch = (input, options) => {
+                        if (String(input?.url ?? input).includes('.geojson')) {
+                            return Promise.reject(new TypeError('Simulated offline worker fetch failure'));
+                        }
+                        return originalFetch(input, options);
+                    };
+                    await import(${JSON.stringify(new URL(url, location.href).href)});
+                `;
+                super(URL.createObjectURL(new Blob([source], { type: 'text/javascript' })),
+                    { ...options, type: 'module' });
+            }
+        };
+    });
+    await context.setOffline(true);
+    await page.reload();
+    await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
+    await expect(page.locator('.map-label:visible').first()).toBeVisible();
+    await page.getByText('Prüfdaten & Credits').click();
+    await expect(page.getByText(/Renderer bereit/)).toBeVisible();
+    await expect(page.locator('.map-error')).toHaveCount(0);
+});
