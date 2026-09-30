@@ -18,10 +18,12 @@ async function inventory(directory, prefix = '') {
 await copyFile('CREDITS.md', 'dist/licenses/CREDITS.md');
 await readFile('dist/licenses/ODbL-1.0.txt');
 await readFile('dist/licenses/dependencies.txt');
-for (const id of ['mahlwinkel', 'benglen']) {
+const areas = JSON.parse(await readFile('src/config/maps.json', 'utf8'));
+for (const { id, name, bounds } of areas) {
     const map = JSON.parse(await readFile(`dist/maps/${id}.json`, 'utf8'));
     const data = await readFile(`dist/maps/${id}.geojson`);
-    if (data.length !== map.byteSize || createHash('sha256').update(data).digest('hex') !== map.sha256) {
+    if (map.id !== id || map.name !== name || JSON.stringify(map.bounds) !== JSON.stringify(bounds)
+        || data.length !== map.byteSize || createHash('sha256').update(data).digest('hex') !== map.sha256) {
         throw new Error(`Kartenmanifest und Daten stimmen nicht überein: ${id}`);
     }
 }

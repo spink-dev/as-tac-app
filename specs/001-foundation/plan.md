@@ -1,6 +1,6 @@
 # Umsetzungsplan
 
-2026-10-01 · Status: AST-001 implementiert, reale Geräteabnahme offen.
+2026-10-01 · Status: AST-002 implementiert; reale AST-001-Geräteabnahme weiterhin offen.
 
 ## Reihenfolge
 
@@ -41,6 +41,6 @@ Ordner erst bei Bedarf anlegen. Keine vollständige Framework-/Store-Portierung 
 
 ## Entwicklungsstart
 
-Lokales Git-Repository für AST-001 eingerichtet; Remote/Hosting bleiben eine getrennte Wahl. Lockfile respektieren. `npm run check`, `npm run build` und `npm test` sind für AST-001 vorhanden. Vor Veröffentlichung keine Beispiel-Domain/CSP und unbeabsichtigten externen Font-/Style-Abhängigkeiten übernehmen.
+Lokales Git-Repository für AST-001 eingerichtet; Remote ist `spink-dev/as-tac-app`; `main` ist Produktion (`test-prod.as-tac.dev`), `testing` ist Preview (`test.as-tac.dev`). Die Hosting-Anbindung der Preview ist noch nicht verifiziert. Lockfile respektieren. `npm run check`, `npm run build` und `npm test` sind für AST-001 vorhanden. Vor Veröffentlichung keine Beispiel-Domain/CSP und unbeabsichtigten externen Font-/Style-Abhängigkeiten übernehmen.
 
 Fortschritt ausschliesslich anhand der Fertigkriterien in `tasks.md` markieren. Offene Produktfragen stehen im Vault; die dortigen Defaults erlauben einen unmittelbaren Start mit AST-001.

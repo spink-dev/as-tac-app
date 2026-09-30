@@ -1,14 +1,11 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import osmtogeojson from 'osmtogeojson';
 
 // A small, reproducible demo area, not an event map. No tile-server downloads.
 const id = process.argv[2] ?? 'benglen';
-const presets = {
-    benglen: { name: 'Zürich · Benglen', bounds: [8.62, 47.349, 8.652, 47.373] },
-    mahlwinkel: { name: 'Mahlwinkel · Airsoft-Feld', bounds: [11.809, 52.376, 11.84, 52.3855] },
-};
-const preset = presets[id];
+const areas = JSON.parse(await readFile('src/config/maps.json', 'utf8'));
+const preset = areas.find((area) => area.id === id);
 const bounds = process.env.MAP_BOUNDS ? JSON.parse(process.env.MAP_BOUNDS) : preset?.bounds;
 if (!/^[a-z0-9-]+$/.test(id) || !Array.isArray(bounds) || bounds.length !== 4
     || !bounds.every(Number.isFinite) || bounds[0] >= bounds[2] || bounds[1] >= bounds[3]

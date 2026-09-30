@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect, chromium } from '@playwright/test';
@@ -153,4 +153,63 @@ test('offline terrain does not require GeoJSON fetches from the map worker', asy
     await expect(page.locator('.map-label:visible').first()).toBeVisible();
     await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
     await expect(page.locator('.map-error')).toHaveCount(0);
+});
+
+
+test('app updates wait for consent and a broken update preserves the offline version', async ({ page, context }) => {
+    const workerPath = join(process.cwd(), 'dist/sw.js');
+    const original = await readFile(workerPath, 'utf8');
+    const manifest = JSON.parse(original.split('\n')[0].slice('const MANIFEST = '.length, -1));
+    await page.goto('/');
+    await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
+    await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
+    try {
+        const next = { ...manifest, version: 'test-valid-update' };
+        await writeFile(workerPath, original.replace(original.split('\n')[0], `const MANIFEST = ${JSON.stringify(next)};`));
+        await page.evaluate(async () => {
+            await (await navigator.serviceWorker.getRegistration())?.update();
+        });
+        await expect(page.getByRole('button', { name: 'Update installieren und neu starten' })).toBeVisible();
+        await expect(page.getByLabel('Vorbereitetes Gebiet')).toHaveValue('benglen');
+        await expect.poll(() => page.evaluate(async () => {
+            const channel = new MessageChannel();
+            const message = new Promise<string>((resolve) => {
+                channel.port1.onmessage = (event) => resolve(event.data.version);
+            });
+            navigator.serviceWorker.controller!.postMessage({ type: 'VERIFY' }, [channel.port2]);
+            return message;
+        })).toBe(manifest.version);
+        await page.getByRole('button', { name: 'Update installieren und neu starten' }).click();
+        await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
+        await expect(page.getByLabel('Vorbereitetes Gebiet')).toHaveValue('mahlwinkel');
+        await expect(page.getByRole('button', { name: 'Update installieren und neu starten' })).toHaveCount(0);
+
+        const broken = { ...next, version: 'test-broken-update',
+            resources: next.resources.map((resource: { url: string; sha256: string }) =>
+                resource.url === '/maps/benglen.geojson' ? { ...resource, sha256: 'invalid' } : resource) };
+        await writeFile(workerPath, original.replace(original.split('\n')[0], `const MANIFEST = ${JSON.stringify(broken)};`));
+        await page.evaluate(async () => {
+            const registration = (await navigator.serviceWorker.getRegistration())!;
+            const failed = new Promise<void>((resolve) => {
+                registration.addEventListener('updatefound', () => {
+                    const worker = registration.installing!;
+                    worker.addEventListener('statechange', () => {
+                        if (worker.state === 'redundant') {
+                            resolve();
+                        }
+                    });
+                }, { once: true });
+            });
+            await registration.update();
+            await failed;
+        });
+        await context.setOffline(true);
+        await page.reload();
+        await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
+        await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
+        await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
+        await expect(page.locator('.map-error')).toHaveCount(0);
+    } finally {
+        await writeFile(workerPath, original);
+    }
 });

@@ -1,11 +1,11 @@
 # Geordnete Arbeitspakete
 
-AST-001 implementiert, reale Geräteabnahme offen · 2026-10-01. Nach jedem Paket Ergebnis, Prüfkommando und verbleibende Grenzen kurz dokumentieren. Priorität P0 bis zum vollständigen Nutzerauftrag, P1 für spätere Erweiterungen.
+AST-002 implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nach jedem Paket Ergebnis, Prüfkommando und verbleibende Grenzen kurz dokumentieren. Priorität P0 bis zum vollständigen Nutzerauftrag, P1 für spätere Erweiterungen.
 
 | ID | Prio / Phase | Aufgabe | Abhängigkeit | Fertigkriterium |
 | --- | --- | --- | --- | --- |
 | AST-001 | P0 / M0 | Offline-/GPS-/Renderer-Spike — Implementierung vorhanden, Feldnachweis offen | — | Ein lokales Gebiet, Labels/Icons, Flugmodus-Kaltstart und GPS auf iOS/Android; Messbericht und Renderer-/Paket-ADR |
-| AST-002 | P0 / M1 | App-Grundstruktur, Versionskontrolle und Prüfkommandos | 001 | Astro/React-App, Manifest, kontrollierter Service Worker, lokale Ressourcen; Build/Checks dokumentiert |
+| AST-002 | P0 / M1 | App-Grundstruktur, Versionskontrolle und Prüfkommandos — implementiert | 001 | Astro/React-App, Manifest, kontrollierter Service Worker, lokale Ressourcen; Build/Checks dokumentiert |
 | AST-003 | P0 / M1 | Domäne, Commands, lokale Speicherung | 002 | WGS84-Schema, Transaktionen, Autosave-Status, Undo/Redo und Migrationstests |
 | AST-004 | P0 / M1 | Gebietspakete verwalten | 003 | Import/Download, Grösse/Quota, Hashprüfung, atomarer Wechsel, Attribution; Abbruch erhält gültigen Stand |
 | AST-005 | P0 / M1 | Karteneditor und präzise Ergänzungen | 003, 004 | Punkte, Linien, Flächen/Kreise, Text, Freihand, Attribute, Koordinaten und Messung; Desktop/Touch geprüft |
@@ -37,3 +37,9 @@ AST-001 implementiert, reale Geräteabnahme offen · 2026-10-01. Nach jedem Pake
 React-/MapLibre-Prüfstand, Mahlwinkel und Zürich/Benglen, Offline-Cache mit Ressourcenprüfung und GPS-Anzeige implementiert. [ADR](adr-001-offline-renderer.md) und [Nachweisprotokoll](evidence/ast-001-mobile.md) dokumentieren die Abnahmegrenze. AST-002-Grundlagen (Git, Manifest, Build-/Check-Kommandos) wurden nur soweit für diesen Nachweis erforderlich vorgezogen. M0 bleibt bis zur realen iPhone-16-Pro-/Galaxy-A24-Prüfung offen.
 
 AST-004 erhält zusätzlich eine freie Gebietsauswahl als Nutzerwunsch vom 2026-10-01; nicht auf zwei Demo-Gebiete beschränken.
+
+## AST-002 — abgeschlossen auf Implementierungsebene
+
+App ohne Prüfstand-Oberfläche, getrennte Karten-/GPS-/Offline-Module, gemeinsame Gebietskonfiguration, deutsche Sprachdatei und vorhandene Build-/Check-Kommandos. Kontrolliertes Update und Erhalt der gültigen Offline-Version bei fehlerhaftem Update sind automatisiert geprüft. [Nachweis](evidence/ast-002-foundation.md).
+
+Fortsetzung trotz noch offener AST-001-Geräteabnahme ausdrücklich vom Nutzer beauftragt; daraus folgt keine bestandene M0-Abnahme. Nächster Auftrag ist AST-003, nicht bereits freie Gebietsauswahl oder Online-Kollaboration. Feature-Stände werden zunächst nach `testing` (`test.as-tac.dev`) übernommen; `main` gehört zu `test-prod.as-tac.dev`.

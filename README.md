@@ -2,7 +2,7 @@
 
 Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Die Kartenfunktionalität aus **AST-001** ist integriert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
 
-**Stand 2026-10-01:** Produktions-Browsertests vorhanden; reale Abnahme auf iPhone 16 Pro und Samsung Galaxy A24 noch ausstehend. Editor, Planpakete und Online-Kollaboration sind noch nicht implementiert.
+**Stand 2026-10-01:** AST-002-App-Grundstruktur implementiert; Produktions-Browsertests vorhanden; reale Abnahme auf iPhone 16 Pro und Samsung Galaxy A24 noch ausstehend. Editor, Planpakete und Online-Kollaboration sind noch nicht implementiert.
 
 ## Starten
 
@@ -24,7 +24,7 @@ npm test
 
 Tests starten ihren eigenen Produktions-Preview auf Port 4000. Eine laufende manuelle Preview davor mit `npx astro preview stop` beenden. `npm run build` vor den Tests ausführen.
 
-Für Telefone muss `dist/` über vertrauenswürdiges HTTPS erreichbar sein. Eine unverschlüsselte LAN-IP unterstützt den benötigten GPS-/Service-Worker-Kontext nicht. Hosting wurde noch nicht gewählt oder veröffentlicht. Dockerfile liefert den statischen Build über Nginx/Port 80; davor ist für Telefone HTTPS nötig (Docker noch nicht getestet).
+Für Telefone muss `dist/` über vertrauenswürdiges HTTPS erreichbar sein. Eine unverschlüsselte LAN-IP unterstützt den benötigten GPS-/Service-Worker-Kontext nicht. Branch-/URL-Zuordnung siehe unten; die konkrete Hosting-Konfiguration liegt ausserhalb dieses Repository-Standes. Dockerfile liefert den statischen Build über Nginx/Port 80; davor ist für Telefone HTTPS nötig (Docker noch nicht getestet).
 
 ## Offline und GPS testen
 
@@ -53,7 +53,7 @@ Eigene kleine Gebiete lassen sich bereits zur Build-Zeit vorbereiten:
 MAP_BOUNDS='[8.52,47.36,8.55,47.38]' MAP_NAME='Zürich Zentrum' npm run map:fetch -- zuerich-zentrum
 ```
 
-Die neue ID anschliessend zur Gebietsauswahl in `src/features/map/MapApp.tsx` hinzufügen. Die UI bietet derzeit ausschliesslich Mahlwinkel und Zürich/Benglen. Freie Gebietsauswahl mit Download/Quota/Abbruch folgt in AST-004. Der Downloader bezieht ausgewählte OSM-Objektklassen über Overpass, keine Standard-OSM-Tiles. Metadaten/Hashes stehen neben den GeoJSON-Dateien.
+Das neue Gebiet mit ID, Name und Bounds in `src/config/maps.json` aufnehmen. Diese Datei steuert Auswahl, Downloader-Presets und Build-Prüfung gemeinsam. Die UI bietet derzeit ausschliesslich Mahlwinkel und Zürich/Benglen. Freie Gebietsauswahl mit Download/Quota/Abbruch folgt in AST-004. Der Downloader bezieht ausgewählte OSM-Objektklassen über Overpass, keine Standard-OSM-Tiles. Metadaten/Hashes stehen neben den GeoJSON-Dateien.
 
 ## Projektwissen
 
@@ -63,3 +63,28 @@ Die neue ID anschliessend zur Gebietsauswahl in `src/features/map/MapApp.tsx` hi
 - Die separate Prüfstand-Oberfläche bleibt auf `feature/ast-001-mobile-proof`; `main` enthält die Karten-App ohne Testanweisungen und Messwert-Panel. Remote `origin`: `git@github.com:spink-dev/as-tac-app.git`.
 
 Danke an **[FieldMaps](https://github.com/rwolffgang/FieldMaps) von [@rwolffgang](https://github.com/rwolffgang)** für die technische Referenz und Erlaubnis zur Wiederverwendung. Mahlwinkel-Gebietsgrenzen übernommen, kein Referenzcode oder Event-Asset kopiert. Karten: **© OpenStreetMap contributors**, ODbL 1.0.
+
+## App-Grundstruktur (AST-002)
+
+- `src/app/App.tsx`: zusammenhängende React-App innerhalb der Astro-Einstiegsseite.
+- `src/features/map/MapView.tsx`: MapLibre-Lifecycle, lokale Kartendaten, Labels und Positionsebene.
+- `src/core/location/useLocation.ts`: GPS-Freigabe, Fix/Alter/Fehler und Aufräumen; ohne Karten- oder Netzabhängigkeit.
+- `src/core/useOfflineApp.ts`: Registrierung, Cache-Prüfung, Speicheranfrage und bewusster Update-Neustart.
+- `src/core/offline.ts` und `src/core/service-worker.js`: Nachrichtenaustausch und versionierter Cache.
+- `src/config/maps.json`: gemeinsame Konfiguration vorbereiteter Gebiete.
+- `src/i18n/de.ts`: deutsche App-Texte; weitere Sprache noch nicht implementiert.
+
+Der Service Worker aktiviert Updates erst auf ausdrücklichen Klick. Ein fehlerhaftes Ressourcenpaket ersetzt keine gültige Version. Alte Caches bleiben für offene Tabs erhalten; Bereinigung und dynamische Gebietspakete folgen in AST-004. Keine Projektpersistenz oder Editor-Funktion in AST-002 vorgezogen.
+
+## Branches und Deployment
+
+| Branch | Zweck | Ziel-URL |
+| --- | --- | --- |
+| `main` | aktuelle Produktion der neu entwickelten App | `https://test-prod.as-tac.dev` |
+| `testing` | Integration und Preview vor Übernahme nach main | `https://test.as-tac.dev` |
+| `feature/*` | einzelne Umsetzungsschritte | keine feste URL |
+| `feature/ast-001-mobile-proof` | archivierter mobiler Prüfstand | keine Produktionszuordnung |
+
+Die URL-Zuordnung ist die Vorgabe des Nutzers. `testing` wird als Git-Deploy-Quelle bereitgestellt; Hosting-Provider, Domain-/TLS-Anbindung und automatische Deploy-Trigger sind hier nicht eingerichtet oder verifiziert. Beide Umgebungen verwenden denselben Build-Befehl `npm ci && npm run build` und das Verzeichnis `dist/`. Beim Docker-Build wird dieses Verzeichnis über Port 80 ausgeliefert; HTTPS übernimmt der Host/Proxy. Die Origins besitzen getrennte Offline-Caches und Standortfreigaben.
+
+[AST-002-Nachweis](specs/001-foundation/evidence/ast-002-foundation.md). Nächster Umsetzungsschritt: **AST-003 — Domäne, Commands und lokale Speicherung**.

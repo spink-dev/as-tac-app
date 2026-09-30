@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import MapApp from '../features/map/MapApp';
+import App from '../app/App';
 ---
 <Layout>
-    <MapApp client:only="react"><p slot="fallback">Karte wird gestartet … JavaScript muss aktiviert sein.</p></MapApp>
+    <App client:only="react"><p slot="fallback">Karte wird gestartet … JavaScript muss aktiviert sein.</p></App>
 </Layout>

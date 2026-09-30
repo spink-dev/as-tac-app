@@ -1,0 +1,12 @@
+[
+    {
+        "id": "mahlwinkel",
+        "name": "Mahlwinkel · Airsoft-Feld",
+        "bounds": [11.809, 52.376, 11.84, 52.3855]
+    },
+    {
+        "id": "benglen",
+        "name": "Zürich · Benglen",
+        "bounds": [8.62, 47.349, 8.652, 47.373]
+    }
+]
