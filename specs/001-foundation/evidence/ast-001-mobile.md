@@ -60,3 +60,11 @@ Noch nicht verifiziert: reale Sensoren/Flugmodus auf Telefonen, installierter St
 Zürich/Uetliberg wurde durch Benglen ersetzt: Bounds `[8.62, 47.349, 8.652, 47.373]`, etwa 2.4 × 2.7 km um Benglen mit Umgebung. Die oben protokollierten ursprünglichen Build-Messwerte bleiben historisch; der aktualisierte Build wird separat geprüft.
 
 Benglen-Build `eac0df3579dfa101`: 19 Ressourcen, 3797684 Bytes. Check ohne Diagnosen, Build erfolgreich, vorhandene 6 Tests bestanden (5.2 s). Offline-Prozessneustart: 282 ms auf Desktop Chromium; weiterhin keine reale Telefonmessung.
+
+## Gemeldeter mobiler Offline-Fehler und Korrektur
+
+Nutzerbericht am 2026-10-01 mit iOS-Screenshot: Offline-Dateiprüfung erfolgreich, GPS/Labels sichtbar, Basiskarte leer; MapLibre meldet `AJAXError: Load failed (0)` für `/maps/benglen.geojson`. OS-/Browser-Version und Safari-/Standalone-Modus sind nicht bestätigt. Dieser Bericht ist kein bestandener Offline-Kartennachweis.
+
+Bisher lud MapLibre die GeoJSON-URL im eigenen Worker, während die Seite dieselbe Datei nochmals für Labels lud. Der neue Regressionstest blockiert gezielt GeoJSON-Fetches im Kartenworker bei gesperrtem Netz: alter Code reproduziert den Kartenfehler trotz sichtbarer Labels; korrigierter Code besteht. Die Seite lädt die Daten jetzt einmal über ihren Service-Worker-kontrollierten Fetch und übergibt das GeoJSON-Objekt an MapLibre. Damit entfällt der zusätzliche Worker-Download. Die genaue iOS-interne Ursache wurde nicht per Geräte-Debugger untersucht.
+
+Check ohne Diagnosen, Build `5077d1a5a0d204b5` erfolgreich, **7 Tests bestanden** (5.4 s). Keine erneute reale iPhone-Abnahme durchgeführt. Nach Veröffentlichung online das App-Update installieren, Offline-Dateiprüfung abwarten und den Flugmodus-Kaltstart erneut testen.

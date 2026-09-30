@@ -76,6 +76,13 @@ export default function MapProbe() {
                     throw new Error('Kartenmanifest fehlt.');
                 }
                 const pkg: Package = await response.json();
+                // Load through the controlled page, not the map worker: offline
+                // worker requests can bypass the service-worker cache on mobile.
+                const dataResponse = await fetch(pkg.file, { signal: abort.signal });
+                if (!dataResponse.ok) {
+                    throw new Error('Gebietsdaten fehlen.');
+                }
+                const data: GeoJSON.FeatureCollection = await dataResponse.json();
                 if (disposed || !container.current) {
                     return;
                 }
@@ -87,7 +94,7 @@ export default function MapProbe() {
                     style: {
                         version: 8,
                         sources: {
-                            terrain: { type: 'geojson', data: pkg.file,
+                            terrain: { type: 'geojson', data,
                                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>' },
                         },
                         layers: [
@@ -112,13 +119,8 @@ export default function MapProbe() {
                 instance.on('error', (event) => {
                     setMapError(`Kartenfehler: ${event.error.message}`);
                 });
-                instance.on('load', async () => {
+                instance.on('load', () => {
                     try {
-                        const dataResponse = await fetch(pkg.file, { signal: abort.signal });
-                        if (!dataResponse.ok) {
-                            throw new Error('Gebietsdaten fehlen.');
-                        }
-                        const data: GeoJSON.FeatureCollection = await dataResponse.json();
                         if (disposed) {
                             return;
                         }
