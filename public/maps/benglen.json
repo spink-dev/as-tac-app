@@ -1,0 +1,18 @@
+{
+  "id": "benglen",
+  "name": "Zürich · Benglen",
+  "bounds": [
+    8.62,
+    47.349,
+    8.652,
+    47.373
+  ],
+  "dataTimestamp": "2026-09-30T23:19:20Z",
+  "source": "https://overpass-api.de/api/interpreter",
+  "attribution": "© OpenStreetMap contributors",
+  "license": "ODbL 1.0",
+  "file": "/maps/benglen.geojson",
+  "byteSize": 1584568,
+  "sha256": "a67fc3fb75116d44b6bb202cd64665751d383fe2942ff61a24fda1dbf06ae15d",
+  "featureCount": 4086
+}

@@ -1,0 +1,40 @@
+:root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #253d32; background: #f6f5ed; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, summary, a { -webkit-tap-highlight-color: transparent; }
+button { min-height: 48px; padding: 10px 14px; border: 1px solid #acb8ad; background: #fffef8; border-radius: 6px; color: #253d32; font: inherit; cursor: pointer; }
+button:hover { background: #e6ecdf; }
+button.primary { background: #253d32; color: white; border-color: #253d32; }
+:focus-visible { outline: 3px solid #147b9f; outline-offset: 3px; }
+header { grid-area: header; display: flex; align-items: center; justify-content: space-between; padding: 20px 28px; gap: 16px; }
+h1 { font-size: clamp(24px, 3vw, 36px); letter-spacing: -.04em; margin: 4px 0 0; }
+h2 { font-size: 21px; margin: 8px 0 12px; }
+p { font-size: 14px; line-height: 1.55; margin: 10px 0; }
+a { color: #146480; }
+.eyebrow { font-size: 10px; font-weight: 750; letter-spacing: .15em; }
+.connection { font-size: 12px; white-space: nowrap; border: 1px solid #acb8ad; padding: 8px 12px; border-radius: 20px; }
+.probe { height: 100dvh; display: grid; grid-template-areas: 'header header' 'map panel'; grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto minmax(0, 1fr); padding-top: env(safe-area-inset-top); }
+.map-wrap { grid-area: map; position: relative; min-height: 320px; border-top: 1px solid #cbd2c6; }
+.map { width: 100%; height: 100%; }
+.map-caption { position: absolute; left: 16px; top: 16px; padding: 12px 16px; background: #fffef5ed; border: 1px solid #cbd2c6; border-radius: 6px; font-weight: 650; pointer-events: none; max-width: calc(100% - 80px); }
+.map-caption span { display: block; font-weight: 400; font-size: 11px; margin-top: 4px; }
+.panel { grid-area: panel; padding: 24px; overflow: auto; border-left: 1px solid #cbd2c6; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.panel section + section, details { border-top: 1px solid #cbd2c6; padding-top: 24px; margin-top: 24px; }
+.muted { color: #586358; font-size: 12px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.coordinates { font-variant-numeric: tabular-nums; font-weight: 600; }
+summary { cursor: pointer; min-height: 48px; font-weight: 600; }
+.map-label { display: block; background: #fffef0eb; color: #273b2b; padding: 3px 6px; border-radius: 3px; font: 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 180px; text-align: center; }
+.gps-dot { width: 20px; height: 20px; background: #176b89; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 0 2px #176b89; }
+.gps-dot.stale { background: #707070; box-shadow: 0 0 0 2px #707070; border-style: dashed; }
+.map-error { position: absolute; left: 16px; bottom: 50px; right: 16px; background: #fff1e5; color: #7e2d16; padding: 12px; }
+.maplibregl-ctrl-group button { width: 48px; height: 48px; }
+@media (max-width: 760px) {
+    .probe { height: auto; min-height: 100dvh; display: flex; flex-direction: column; }
+    header { padding: 16px; }
+    .map-wrap { height: 55dvh; min-height: 340px; }
+    .panel { padding: 22px 18px max(24px, env(safe-area-inset-bottom)); border-left: 0; }
+}
+
+select { width: 100%; min-height: 48px; font: inherit; color: inherit; background: #fffef8; border: 1px solid #acb8ad; border-radius: 6px; margin: 8px 0 24px; padding: 10px; }
+label { font-size: 13px; font-weight: 600; }
