@@ -1,3 +1,4 @@
+import type { MapPackage } from '../packages/maps';
 import { ProjectError, validateProject, type Project } from './model';
 
 export const DATABASE_NAME = 'as-tac-projects';
@@ -39,11 +40,16 @@ export class ProjectDatabase {
     }
 
     static async open(name = DATABASE_NAME): Promise<ProjectDatabase> {
-        const opening = indexedDB.open(name, 1);
+        const opening = indexedDB.open(name, 2);
         opening.onupgradeneeded = () => {
             const db = opening.result;
-            db.createObjectStore('projects', { keyPath: 'project.id' });
-            db.createObjectStore('backups', { keyPath: 'id' });
+            if (!db.objectStoreNames.contains('projects')) {
+                db.createObjectStore('projects', { keyPath: 'project.id' });
+                db.createObjectStore('backups', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('maps')) {
+                db.createObjectStore('maps', { keyPath: 'id' });
+            }
         };
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
             let blocked = false;
@@ -66,6 +72,49 @@ export class ProjectDatabase {
 
     close() {
         this.database.close();
+    }
+
+    async listMaps(): Promise<{ id: string; name: string; bounds: number[]; byteSize: number }[]> {
+        const packages: MapPackage[] = await request(this.database.transaction('maps').objectStore('maps').getAll());
+        return packages.map(({ id, name, bounds, byteSize }) => ({ id, name, bounds, byteSize }));
+    }
+    async loadMap(id: string): Promise<unknown> {
+        return request(this.database.transaction('maps').objectStore('maps').get(id));
+    }
+    async installMap(pkg: MapPackage, signal: AbortSignal): Promise<void> {
+        signal.throwIfAborted();
+        const tx = this.database.transaction('maps', 'readwrite');
+        const done = completed(tx);
+        const abort = () => tx.abort();
+        signal.addEventListener('abort', abort, { once: true });
+        try {
+            tx.objectStore('maps').add(pkg);
+            await done;
+        } finally {
+            signal.removeEventListener('abort', abort);
+        }
+    }
+    async removeMap(id: string): Promise<void> {
+        const tx = this.database.transaction(['maps', 'projects'], 'readwrite');
+        const done = completed(tx);
+        try {
+            const projects: SavedProject[] = await request(tx.objectStore('projects').getAll());
+            if (projects.some((record) => record.project?.mapPackageId === id)) {
+                throw new Error('referenced');
+            }
+            tx.objectStore('maps').delete(id);
+            await done;
+        } catch (error) {
+            try {
+                tx.abort();
+            } catch {
+                // Already aborted.
+            }
+            await done.catch(() => {
+                // Keep the original error.
+            });
+            throw error;
+        }
     }
 
     async list(): Promise<ProjectSummary[]> {
@@ -95,9 +144,12 @@ export class ProjectDatabase {
     async save(project: Project, expectedRevision: number): Promise<SavedProject> {
         validateProject(project);
         const copy = structuredClone(project);
-        const tx = this.database.transaction('projects', 'readwrite');
+        const tx = this.database.transaction(['projects', 'maps'], 'readwrite');
         const done = completed(tx);
         try {
+            if (copy.mapPackageId.startsWith('local-') && !await request(tx.objectStore('maps').get(copy.mapPackageId))) {
+                throw new ProjectError('missing');
+            }
             const store = tx.objectStore('projects');
             const old = await request(store.get(copy.id));
             if (old) {

@@ -31,3 +31,7 @@ Bei Aufnahme der Karten-/PWA-Abhängigkeiten ihre tatsächlichen Lizenzhinweise 
 - React (MIT), MapLibre GL JS (BSD-3-Clause), Astro (MIT), Astro React (MIT) und osmtogeojson (MIT): Hinweise unter `public/licenses/dependencies.txt`. MapLibre enthält zusätzliche Fremdcodehinweise in seinem Lizenztext.
 - App-Icon, einfache Gebietssymbole und Kartenstil sind eigene Arbeit. Labels nutzen die installierte Systemschrift. Keine heruntergeladenen Fonts, Sprites, fremden Logos oder Kartenbilder.
 - `CREDITS.md` wird beim Produktionsbuild nach `/licenses/CREDITS.md` kopiert und ebenfalls offline gespeichert.
+
+## AST-004
+
+Eigene Gebietspaket- und Downloadimplementierung, kein kopierter Referenzcode. osmtogeojson wird nun auch im Browser zur OSM-Konvertierung verwendet; zusätzliche Hinweise für den gebündelten Lodash-Build, geojson-rewind und osm-polygon-features stehen im Offline-Lizenzinventar. Overpass liefert auf bewussten Nutzeraufruf kleine OSM-Auszüge; keine Rastertile-Vorabdownloads.

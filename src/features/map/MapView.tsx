@@ -9,17 +9,11 @@ import { accuracyRing, outside, type Fix } from '../../core/location/position';
 
 maplibregl.setWorkerUrl(workerUrl);
 
-interface Package {
-    name: string;
-    bounds: [number, number, number, number];
-    dataTimestamp: string;
-    file: string;
-    byteSize: number;
-    featureCount: number;
-}
+import type { Bounds, MapPackage } from '../../core/packages/maps';
 
-export default function MapView({ areaId, fix, stale, follow, onExplore }: {
-    areaId: string;
+export default function MapView({ mapPackage, onViewport, fix, stale, follow, onExplore }: {
+    mapPackage: MapPackage | null;
+    onViewport: (bounds: Bounds) => void;
     fix: Fix | null;
     stale: boolean;
     follow: boolean;
@@ -28,28 +22,22 @@ export default function MapView({ areaId, fix, stale, follow, onExplore }: {
     const container = useRef<HTMLDivElement>(null);
     const map = useRef<LibreMap | null>(null);
     const marker = useRef<maplibregl.Marker | null>(null);
-    const [area, setArea] = useState<Package | null>(null);
+    const [area, setArea] = useState<MapPackage | null>(null);
     const [mapReady, setMapReady] = useState(false);
     const [mapError, setMapError] = useState('');
     useEffect(() => {
+        if (!mapPackage) {
+            return;
+        }
         let disposed = false;
         const abort = new AbortController();
         setMapReady(false);
         setMapError('');
         async function init() {
             try {
-                const response = await fetch(`/maps/${areaId}.json`, { signal: abort.signal });
-                if (!response.ok) {
-                    throw new Error(de.map.missingManifest);
-                }
-                const pkg: Package = await response.json();
-                // Load through the controlled page, not the map worker: offline
-                // worker requests can bypass the service-worker cache on mobile.
-                const dataResponse = await fetch(pkg.file, { signal: abort.signal });
-                if (!dataResponse.ok) {
-                    throw new Error(de.map.missingData);
-                }
-                const data: GeoJSON.FeatureCollection = await dataResponse.json();
+                // Already verified and loaded in the controlled page; never fetch GeoJSON in a worker.
+                const pkg = mapPackage!;
+                const data = pkg.data;
                 if (disposed || !container.current) {
                     return;
                 }
@@ -83,6 +71,12 @@ export default function MapView({ areaId, fix, stale, follow, onExplore }: {
                 instance.addControl(new maplibregl.NavigationControl(), 'top-right');
                 instance.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
                 instance.on('dragstart', onExplore);
+                const reportViewport = () => {
+                    const bounds = instance.getBounds();
+                    onViewport([bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]);
+                };
+                instance.on('moveend', reportViewport);
+                reportViewport();
                 instance.on('error', (event) => {
                     setMapError(de.map.error(event.error.message));
                 });
@@ -162,7 +156,7 @@ export default function MapView({ areaId, fix, stale, follow, onExplore }: {
             map.current?.remove();
             map.current = null;
         };
-    }, [areaId, onExplore]);
+    }, [mapPackage, onExplore, onViewport]);
 
     useEffect(() => {
         if (!mapReady || !map.current || !fix) {

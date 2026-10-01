@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-alpha.1 — 2026-10-01 (testing)
+
+- AST-004: freie kleine Gebietsauswahl, begrenzte Overpass-Downloads, Kartenpaket-Import/Export, Hash-/Quota-Prüfung und atomare Speicherung.
+- Zusätzliche Karten überleben Offline-Neustarts; referenzierte Gebiete sind gegen Löschen geschützt. DB-Version 2 erhält Projekte aus v1 unverändert.
+- 21 automatisierte Tests bestanden. Live-Anbieter und reale Telefone noch nicht abgenommen.
+
 ## 0.1.0 — 2026-10-01
 
 Erste versionierte Integration von AST-002 und AST-003 auf `main`.

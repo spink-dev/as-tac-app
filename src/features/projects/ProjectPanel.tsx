@@ -9,7 +9,7 @@ export default function ProjectPanel({ session, state, areaId }: { session: Proj
     const [backupId, setBackupId] = useState('');
     const [downloadError, setDownloadError] = useState(false);
     const t = de.projects;
-    const locked = !state.ready || !session.canLeave();
+    const locked = !state.ready || state.busy || !session.canLeave();
     const project = state.project;
     const errorCode = state.error instanceof ProjectError ? state.error.code : 'storage';
     async function download(id?: string) {

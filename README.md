@@ -107,3 +107,9 @@ IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und
 Release-Stände auf `main` erhalten einen annotierten Git-Tag `vX.Y.Z`. Neue Funktionen erhöhen vor 1.0 die Minor-Version, Fehlerkorrekturen die Patch-Version; inkompatible Änderungen werden ausdrücklich dokumentiert und gegebenenfalls migriert. `testing` enthält die nächste Integration für die Preview. Der vollständige lokale MVP ist mit 0.1.0 noch nicht abgeschlossen.
 
 App-Version, inhaltsbasierte Offline-Cache-Version und Projekt-Schema sind getrennt: Ein Release erhöht das Projektschema nicht automatisch. Schema 1 bleibt in v0.1.0 unverändert. Der Offline-Build berücksichtigt App-Version, Ressourcen und Service-Worker-Code bei seiner Hashbildung.
+
+## Preview 0.2.0-alpha.1 — AST-004
+
+Unter „Gebietspakete“ freie kleine WGS84-Grenzen eingeben oder den sichtbaren Ausschnitt übernehmen. Der Download fragt Overpass einmalig ab (keine automatische Wiederholung, mindestens 60 Sekunden Abstand pro Sitzung), prüft Grösse/Hash/Speicher und installiert das Gebiet atomar. Der öffentliche Pilot-Endpunkt ist kein garantierter Produktionsdienst. Kartenpakete lassen sich separat als `.astac-map.json` sichern und offline importieren; dies sind noch keine vollständigen Projektpakete.
+
+Zusätzliche Gebiete liegen in IndexedDB, getrennt von den gebündelten App-Ressourcen. Schema 1 der Projekte bleibt erhalten; DB-Version 2 ergänzt den Store `maps`. Paketimporte überschreiben keine vorhandenen Gebiete. Ein von einem gespeicherten Projekt verwendetes Gebiet lässt sich nicht löschen. Scheitert das Laden eines gewählten Gebiets, bleibt die bisherige Karte mit ausdrücklichem Hinweis sichtbar.

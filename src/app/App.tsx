@@ -8,13 +8,27 @@ import { useOfflineApp } from '../core/useOfflineApp';
 import areas from '../config/maps.json';
 import { ProjectSession } from '../core/projects/session';
 import ProjectPanel from '../features/projects/ProjectPanel';
+import PackagePanel from '../features/packages/PackagePanel';
+import { useMaps } from '../core/packages/useMaps';
+import type { Bounds } from '../core/packages/maps';
 
 export default function App() {
     const [areaId, setAreaId] = useState(areas[0].id);
     const [session] = useState(() => new ProjectSession());
     const projects = useSyncExternalStore(session.subscribe, session.getSnapshot);
     const selectedAreaId = projects.project?.mapPackageId ?? areaId;
-    const area = areas.find((item) => item.id === selectedAreaId);
+    const maps = useMaps(selectedAreaId);
+    const area = maps.areas.find((item) => item.id === selectedAreaId);
+    const [viewport, setViewport] = useState<Bounds | null>(null);
+    const [packageBusy, setPackageBusy] = useState(false);
+    const canReload = useCallback(() => session.canLeave() && !packageBusy, [session, packageBusy]);
+    const selectArea = (id: string) => {
+        if (projects.project) {
+            session.change([{ kind: 'project', mapPackageId: id }]);
+        } else {
+            setAreaId(id);
+        }
+    };
     useEffect(() => {
         void session.start();
         const guard = (event: BeforeUnloadEvent) => {
@@ -38,26 +52,24 @@ export default function App() {
     const [follow, setFollow] = useState(true);
     const pauseFollow = useCallback(() => setFollow(false), []);
     const { fix, now, gps, active, stale, startGps, stopGps } = useLocation();
-    const { online, offline, offlineText, registration, update, storage, verify, checkStorage, applyUpdate } = useOfflineApp(session.canLeave);
+    const { online, offline, offlineText, registration, update, storage, verify, checkStorage, applyUpdate } = useOfflineApp(canReload);
     return <main className="app-shell">
         <header><div><span className="eyebrow">AS-TAC</span><h1>{de.app.title}</h1></div>
             <span className="connection">{online ? de.app.online : de.app.offline}</span></header>
-        <MapView areaId={selectedAreaId} fix={fix} stale={stale} follow={follow} onExplore={pauseFollow} />
+        <MapView mapPackage={maps.current} onViewport={setViewport} fix={fix} stale={stale} follow={follow} onExplore={pauseFollow} />
         <aside className="panel">
-            <ProjectPanel session={session} state={projects} areaId={selectedAreaId} />
-            <section><label htmlFor="area">{de.app.area}</label><select id="area" value={selectedAreaId} disabled={projects.busy} onChange={(event) => {
-                if (projects.project) {
-                    session.change([{ kind: 'project', mapPackageId: event.target.value }]);
-                } else {
-                    setAreaId(event.target.value);
-                }
-            }}>{!area && <option value={selectedAreaId}>{selectedAreaId}</option>}{areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><h2>{offline.ready ? de.app.available : de.app.prepare}</h2>
+            <ProjectPanel session={session} state={{ ...projects, busy: projects.busy || packageBusy }} areaId={selectedAreaId} />
+            <section><label htmlFor="area">{de.app.area}</label><select id="area" value={selectedAreaId} disabled={projects.busy || packageBusy} onChange={(event) => selectArea(event.target.value)}>{!area && <option value={selectedAreaId}>{selectedAreaId}</option>}{maps.areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+                {maps.loading && <p role="status">{de.packages.loading}</p>}
+                {maps.error && <p role="alert">{de.packages.missing}</p>}
+                <h2>{offline.ready ? de.app.available : de.app.prepare}</h2>
                 <p role="status">{offlineText}</p>
                 <div className="actions"><button onClick={() => verify()}>{de.app.verify}</button><button onClick={checkStorage}>{de.app.storage}</button></div>
                 {storage && <p>{storage}</p>}
-                {update && <button disabled={!session.canLeave()} onClick={applyUpdate}>{de.app.update}</button>}
+                {update && <button disabled={!canReload()} onClick={applyUpdate}>{de.app.update}</button>}
                 {registration && !offline.ready && <button onClick={() => verify(true)}>{de.app.repair}</button>}
             </section>
+            <PackagePanel current={maps.current} viewport={viewport} refresh={maps.refresh} select={selectArea} disabled={!session.canLeave()} busyChanged={setPackageBusy} />
             <section><h2>{stale ? de.location.last : de.location.title}</h2>
                 <p role="status">{gps}</p>
                 {fix && <p className="coordinates">{fix.latitude.toFixed(6)}, {fix.longitude.toFixed(6)}<br />

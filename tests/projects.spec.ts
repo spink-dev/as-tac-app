@@ -344,3 +344,30 @@ test('editing during an in-flight commit never marks the newer draft saved prema
     await page.reload();
     await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Neuer Stand');
 });
+
+test('database v1 upgrades to package storage without changing the saved project', async ({ page }) => {
+    await page.goto('/');
+    await loadDatabaseCode(page);
+    const original = { project: fixture(), revision: 7, updatedAt: '2026-10-01T00:00:00.000Z', localChanges: true };
+    const result = await page.evaluate(async (record) => {
+        const name = 'upgrade-v1';
+        await new Promise<void>((resolve) => {
+            const opening = indexedDB.open(name, 1);
+            opening.onupgradeneeded = () => {
+                opening.result.createObjectStore('projects', { keyPath: 'project.id' }).put(record);
+                opening.result.createObjectStore('backups', { keyPath: 'id' });
+            };
+            opening.onsuccess = () => {
+                opening.result.close();
+                resolve();
+            };
+        });
+        const db = await (window as any).projectTest.ProjectDatabase.open(name);
+        const saved = await db.load(record.project.id);
+        const maps = await db.listMaps();
+        db.close();
+        return { saved, maps };
+    }, original);
+    expect(result.saved).toEqual(original);
+    expect(result.maps).toEqual([]);
+});
