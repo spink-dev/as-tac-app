@@ -48,7 +48,13 @@ export class ProjectSession {
             }
             const projects = await this.database.list();
             this.publish({ projects, ready: true, busy: false });
-            const first = projects.find((project) => project.readable);
+            let lastId: string | null = null;
+            try {
+                lastId = localStorage.getItem('as-tac-active-project');
+            } catch {
+                // Storage preferences are optional; project data lives in IndexedDB.
+            }
+            const first = projects.find((project) => project.id === lastId && project.readable) ?? projects.find((project) => project.readable);
             if (first) {
                 await this.open(first.id);
             }
@@ -63,7 +69,19 @@ export class ProjectSession {
     }
     canLeave = () => !this.state.busy && (this.state.saveState === 'saved' || this.state.saveState === 'empty');
 
+    private remember(id: string | null) {
+        try {
+            if (id) {
+                localStorage.setItem('as-tac-active-project', id);
+            } else {
+                localStorage.removeItem('as-tac-active-project');
+            }
+        } catch {
+            // A blocked preference store must not prevent project saves.
+        }
+    }
     private accept(record: SavedProject) {
+        this.remember(record.project.id);
         this.revision = record.revision;
         this.history = [];
         this.future = [];
@@ -92,6 +110,7 @@ export class ProjectSession {
             } else {
                 this.history = [];
                 this.future = [];
+                this.remember(null);
                 this.publish({ project: null, readOnly: false, saveState: 'empty' });
             }
         });
@@ -127,6 +146,7 @@ export class ProjectSession {
                 await database.remove(this.state.project.id, this.revision);
                 this.history = [];
                 this.future = [];
+                this.remember(null);
                 this.publish({ project: null, readOnly: false, saveState: 'empty' });
             }
         });

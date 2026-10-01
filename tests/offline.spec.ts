@@ -1,3 +1,4 @@
+import { openTab } from './workspace-helpers';
 import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,6 +25,7 @@ test('production shell, both maps and local labels survive offline new-page star
         }
     });
     await page.goto('/');
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
@@ -31,8 +33,10 @@ test('production shell, both maps and local labels survive offline new-page star
     await page.close();
     const offlinePage = await context.newPage();
     await offlinePage.goto('/');
+    await openTab(offlinePage, 'Karten');
     await expect(offlinePage.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await expect(offlinePage.locator('.map[aria-busy=\"false\"]')).toBeVisible();
+    await openTab(offlinePage, 'Karten');
     await offlinePage.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
     await expect(offlinePage.locator('.map-caption')).toContainText('Zürich');
     await expect(offlinePage.locator('.map[aria-busy=\"false\"]')).toBeVisible();
@@ -44,11 +48,14 @@ test('GPS stays local, shows accuracy, explore, outside bounds and stale fix', a
     await context.grantPermissions(['geolocation']);
     await context.setGeolocation({ latitude: 52.38, longitude: 11.82, accuracy: 15 });
     await page.goto('/');
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await context.setOffline(true);
+    await openTab(page, 'Orientierung');
     await page.getByRole('button', { name: 'Meine Position' }).click();
     await expect(page.locator('.coordinates')).toContainText('± 15 m');
     await expect(page.locator('.gps-dot')).toBeVisible();
+    await openTab(page, 'Orientierung');
     await page.getByRole('button', { name: 'Folgen pausieren' }).click();
     await expect(page.getByRole('button', { name: 'Position folgen' })).toBeVisible();
     await context.setGeolocation({ latitude: 47.35, longitude: 8.49, accuracy: 40 });
@@ -56,6 +63,7 @@ test('GPS stays local, shows accuracy, explore, outside bounds and stale fix', a
     await page.clock.install();
     await page.clock.fastForward(31_000);
     await expect(page.locator('.coordinates')).toContainText('VERALTET');
+    await openTab(page, 'Orientierung');
     await page.getByRole('button', { name: 'GPS stoppen' }).click();
     await expect(page.getByRole('button', { name: 'Meine Position' })).toBeVisible();
 });
@@ -71,6 +79,8 @@ test('permission denied and timeout are explicit', async ({ page }) => {
         } });
     });
     await page.goto('/');
+    await openTab(page, 'Karten');
+    await openTab(page, 'Orientierung');
     await page.getByRole('button', { name: 'Meine Position' }).click();
     await expect(page.getByText(/Standortfreigabe verweigert/)).toBeVisible();
     await page.evaluate(() => {
@@ -79,6 +89,7 @@ test('permission denied and timeout are explicit', async ({ page }) => {
             return 2;
         };
     });
+    await openTab(page, 'Orientierung');
     await page.getByRole('button', { name: 'Meine Position' }).click();
     await expect(page.getByText(/GPS-Zeitlimit/)).toBeVisible();
     await expect(page.locator('.gps-dot')).toHaveCount(0);
@@ -86,6 +97,7 @@ test('permission denied and timeout are explicit', async ({ page }) => {
 
 test('removed cached resource invalidates offline readiness', async ({ page, context }) => {
     await page.goto('/');
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await context.setOffline(true);
@@ -95,11 +107,14 @@ test('removed cached resource invalidates offline readiness', async ({ page, con
             await cache.delete('/maps/mahlwinkel.geojson');
         }
     });
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Dateien prüfen' }).click();
     await expect(page.getByText(/Ressource fehlt/)).toBeVisible();
     await expect(page.getByText('Offline verfügbar')).toHaveCount(0);
     await context.setOffline(false);
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Offline-Paket reparieren' }).click();
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
 });
 
@@ -110,15 +125,19 @@ test('browser process restarts offline using its persisted profile', async () =>
     try {
         const page = await context.newPage();
         await page.goto('http://localhost:4000/');
+        await openTab(page, 'Karten');
         await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
         await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
+        await openTab(page, 'Projekt');
         await page.getByLabel('Name des neuen Projekts').fill('Neustart-Nachweis');
+        await openTab(page, 'Projekt');
         await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
-        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
         await context.close();
         context = await chromium.launchPersistentContext(profile, { headless: true, offline: true });
         const coldPage = await context.newPage();
         await coldPage.goto('http://localhost:4000/');
+        await openTab(coldPage, 'Karten');
         await expect(coldPage.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
         await expect(coldPage.locator('.map[aria-busy=\"false\"]')).toBeVisible();
         await expect(coldPage.locator('.map')).toHaveAttribute('aria-busy', 'false');
@@ -131,6 +150,7 @@ test('browser process restarts offline using its persisted profile', async () =>
 
 test('offline terrain does not require GeoJSON fetches from the map worker', async ({ page, context }) => {
     await page.goto('/');
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await context.addInitScript(() => {
         const NativeWorker = window.Worker;
@@ -153,6 +173,7 @@ test('offline terrain does not require GeoJSON fetches from the map worker', asy
     });
     await context.setOffline(true);
     await page.reload();
+    await openTab(page, 'Karten');
     await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
     await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
@@ -165,7 +186,9 @@ test('app updates wait for consent and a broken update preserves the offline ver
     const original = await readFile(workerPath, 'utf8');
     const manifest = JSON.parse(original.split('\n')[0].slice('const MANIFEST = '.length, -1));
     await page.goto('/');
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
+    await openTab(page, 'Karten');
     await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
     try {
         const next = { ...manifest, version: 'test-valid-update' };
@@ -183,9 +206,11 @@ test('app updates wait for consent and a broken update preserves the offline ver
             navigator.serviceWorker.controller!.postMessage({ type: 'VERIFY' }, [channel.port2]);
             return message;
         })).toBe(manifest.version);
+        await openTab(page, 'Projekt');
         await page.getByLabel('Name des neuen Projekts').fill('Update-Nachweis');
+        await openTab(page, 'Projekt');
         await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
-        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
         await page.evaluate(() => {
             const put = IDBObjectStore.prototype.put;
             (window as any).restoreStorage = () => {
@@ -198,13 +223,18 @@ test('app updates wait for consent and a broken update preserves the offline ver
                 return put.call(this, value);
             };
         });
+        await openTab(page, 'Projekt');
         await page.getByLabel('Projektname', { exact: true }).fill('Update-Entwurf');
         await expect(page.getByText('Nicht gespeichert', { exact: true })).toBeVisible();
+        await openTab(page, 'Karten');
         await expect(page.getByRole('button', { name: 'Update installieren und neu starten' })).toBeDisabled();
         await page.evaluate(() => (window as any).restoreStorage());
+        await openTab(page, 'Projekt');
         await page.getByRole('button', { name: 'Erneut versuchen', exact: true }).click();
-        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
+        await openTab(page, 'Karten');
         await page.getByRole('button', { name: 'Update installieren und neu starten' }).click();
+        await openTab(page, 'Karten');
         await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
         await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Update-Entwurf');
         await expect(page.getByLabel('Vorbereitetes Gebiet')).toHaveValue('benglen');
@@ -231,7 +261,9 @@ test('app updates wait for consent and a broken update preserves the offline ver
         });
         await context.setOffline(true);
         await page.reload();
+        await openTab(page, 'Karten');
         await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
+        await openTab(page, 'Karten');
         await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
         await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
         await expect(page.locator('.map-error')).toHaveCount(0);

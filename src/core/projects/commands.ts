@@ -1,7 +1,7 @@
-import { validateProject, type Project, type PlanElement, type Phase, type Team } from './model';
+import { validateProject, type Project, type PlanElement, type Phase, type Team, type Workspace } from './model';
 
 export type Command =
-    | { kind: 'project'; name?: string; mapPackageId?: string }
+    | { kind: 'project'; name?: string; mapPackageId?: string; schemaVersion?: 1 | 2; workspace?: Workspace | null }
     | { kind: 'element'; id: string; index?: number; value: PlanElement | null }
     | { kind: 'team'; id: string; index?: number; value: Team | null }
     | { kind: 'phase'; id: string; index?: number; value: Phase | null };
@@ -15,7 +15,17 @@ export function execute(project: Project, commands: Command[]): { project: Proje
     const inverse: Command[] = [];
     for (const command of commands) {
         if (command.kind === 'project') {
-            inverse.unshift({ kind: 'project', name: next.name, mapPackageId: next.mapPackageId });
+            inverse.unshift({ kind: 'project', name: next.name, mapPackageId: next.mapPackageId, schemaVersion: next.schemaVersion, workspace: next.workspace ?? null });
+            if (command.schemaVersion !== undefined) {
+                next.schemaVersion = command.schemaVersion;
+            }
+            if (command.workspace !== undefined) {
+                if (command.workspace === null) {
+                    delete next.workspace;
+                } else {
+                    next.workspace = structuredClone(command.workspace);
+                }
+            }
             if (command.name !== undefined) {
                 next.name = command.name;
             }

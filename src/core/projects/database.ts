@@ -176,7 +176,7 @@ export class ProjectDatabase {
     async save(project: Project, expectedRevision: number): Promise<SavedProject> {
         validateProject(project);
         const copy = structuredClone(project);
-        const tx = this.database.transaction(['projects', 'maps'], 'readwrite');
+        const tx = this.database.transaction(['projects', 'maps', 'backups'], 'readwrite');
         const done = completed(tx);
         try {
             if (copy.mapPackageId.startsWith('local-') && !await request(tx.objectStore('maps').get(copy.mapPackageId))) {
@@ -192,6 +192,9 @@ export class ProjectDatabase {
             }
             if ((old?.revision ?? 0) !== expectedRevision) {
                 throw new ProjectError('conflict');
+            }
+            if (old && old.project.schemaVersion !== copy.schemaVersion) {
+                await request(tx.objectStore('backups').add({ id: crypto.randomUUID(), projectId: copy.id, original: old, createdAt: new Date().toISOString() }));
             }
             const record: SavedProject = { project: copy, revision: expectedRevision + 1, updatedAt: new Date().toISOString(), localChanges: true };
             await request(store.put(record));

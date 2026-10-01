@@ -1,3 +1,4 @@
+import { openTab } from './workspace-helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { createProject, type Phase } from '../src/core/projects/model';
 import { execute } from '../src/core/projects/commands';
@@ -42,22 +43,28 @@ async function stored(page: Page) {
     });
 }
 async function saved(page: Page) {
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
 }
 async function prepare(page: Page) {
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
+    await openTab(page, 'Projekt');
     await page.getByLabel('Name des neuen Projekts').fill('Briefing-Test');
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
     await saved(page);
-    await page.getByRole('button', { name: 'Plan bearbeiten', exact: true }).click();
+    await openTab(page, 'Planung');
     await page.getByRole('group', { name: 'Zeichenwerkzeuge' }).getByRole('button', { name: 'Punkt', exact: true }).click();
     await page.locator('.maplibregl-canvas').click({ position: { x: 140, y: 260 } });
+    await openTab(page, 'Planung');
     await page.getByLabel('Beschriftung', { exact: true }).fill('Eingang');
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Übernehmen', exact: true }).click();
     await saved(page);
 }
 async function stroke(page: Page) {
+    await openTab(page, 'Briefing');
     await page.getByRole('button', { name: 'Temporär zeichnen', exact: true }).click();
     const canvas = page.locator('.maplibregl-canvas');
     await canvas.scrollIntoViewIfNeeded();
@@ -66,6 +73,7 @@ async function stroke(page: Page) {
     await page.mouse.down();
     await page.mouse.move(box.x + 290, box.y + 370, { steps: 10 });
     await page.mouse.up();
+    await openTab(page, 'Briefing');
     await expect(page.getByText('1 temporäre Markierungen', { exact: true })).toBeVisible();
 }
 
@@ -73,12 +81,18 @@ test('teams, phases and camera persist; briefing filters locally and temporary s
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await prepare(page);
+    await openTab(page, 'Planung');
     await page.getByLabel('Neues Team', { exact: true }).fill('Alpha');
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Team anlegen', exact: true }).click();
+    await openTab(page, 'Planung');
     await page.getByLabel('Team zuordnen', { exact: true }).selectOption({ label: 'Alpha' });
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Übernehmen', exact: true }).click();
     for (const title of ['Start', 'Ende']) {
+        await openTab(page, 'Planung');
         await page.getByLabel('Neue Phase', { exact: true }).fill(title);
+        await openTab(page, 'Planung');
         await page.getByRole('button', { name: 'Phase anlegen', exact: true }).click();
     }
     await page.locator('summary').filter({ hasText: /^Ende$/ }).click();
@@ -90,12 +104,14 @@ test('teams, phases and camera persist; briefing filters locally and temporary s
     const before = await stored(page);
     expect(before.project.elements[0].teamId).toBe(before.project.teams[0].id);
     expect(before.project.phases[0].camera).not.toBeNull();
+    await openTab(page, 'Briefing');
     await page.getByRole('button', { name: 'Briefing starten', exact: true }).click();
     await expect(page.getByRole('heading', { name: '1 / 2 · Start' })).toBeVisible();
     await expect(page.locator('.plan-label')).toHaveCount(1);
     await expect(page.locator('.plan-label')).toContainText('[ALPHA]');
     await expect(page.getByLabel('Projekt öffnen')).toBeDisabled();
     await stroke(page);
+    await openTab(page, 'Briefing');
     await page.getByRole('button', { name: 'Nächste Phase', exact: true }).click();
     await expect(page.getByRole('heading', { name: '2 / 2 · Ende' })).toBeVisible();
     await expect(page.locator('.plan-label')).toHaveCount(0);
@@ -103,21 +119,28 @@ test('teams, phases and camera persist; briefing filters locally and temporary s
     await page.keyboard.press('ArrowLeft');
     await expect(page.getByRole('heading', { name: '1 / 2 · Start' })).toBeVisible();
     await stroke(page);
+    await openTab(page, 'Briefing');
     await page.getByRole('button', { name: 'Briefing beenden', exact: true }).click();
     expect(await stored(page)).toEqual(before);
     await expect(page.locator('.plan-label')).toHaveCount(1);
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await context.setOffline(true);
     await page.reload();
+    await openTab(page, 'Projekt');
+    await openTab(page, 'Briefing');
     await page.getByRole('button', { name: 'Briefing starten', exact: true }).click();
     await expect(page.getByRole('heading', { name: '1 / 2 · Start' })).toBeVisible();
     await stroke(page);
+    await openTab(page, 'Briefing');
     await page.getByRole('button', { name: 'In Plan übernehmen', exact: true }).click();
     await saved(page);
     expect((await stored(page)).project.elements).toHaveLength(2);
     await expect(page.locator('.plan-label')).toHaveCount(2);
     await page.screenshot({ path: 'test-results/briefing-mobile.png', fullPage: true });
+    await openTab(page, 'Briefing');
     await page.getByRole('button', { name: 'Briefing beenden', exact: true }).click();
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Rückgängig', exact: true }).click();
     await saved(page);
     expect((await stored(page)).project.elements).toHaveLength(1);

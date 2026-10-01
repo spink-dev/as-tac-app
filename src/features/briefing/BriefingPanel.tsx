@@ -156,7 +156,7 @@ export default function BriefingPanel({ project, map, change, onPhase, disabled,
             <p className="muted">{t.temporary}</p>
             <p role="status">{t.strokeCount(strokes.length)}</p>
             <div className="actions">
-                <button aria-pressed={drawing} onClick={() => setDrawing(!drawing)}>{drawing ? t.cancelDrawing : t.draw}</button>
+                <button data-draw-tool="briefing" aria-pressed={drawing} onClick={() => setDrawing(!drawing)}>{drawing ? t.cancelDrawing : t.draw}</button>
                 <button disabled={!strokes.length || drawing} onClick={() => setStrokes([])}>{t.clear}</button>
                 <button disabled={readOnly || !strokes.length || drawing} onClick={() => {
                     try {

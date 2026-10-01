@@ -1,3 +1,4 @@
+import { openTab } from './workspace-helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { validateBounds, validateData } from '../src/core/packages/maps';
@@ -7,11 +8,14 @@ function fixture() {
     return { format: 'as-tac-map', formatVersion: 1, id: 'local-11111111-1111-4111-8111-111111111111', name: 'Eigenes Testgebiet', bounds: [8.62, 47.349, 8.652, 47.373], dataTimestamp: '2026-10-01T00:00:00Z', source: 'Test fixture', attribution: '© OpenStreetMap contributors', license: 'ODbL 1.0', byteSize: Buffer.byteLength(json), sha256: createHash('sha256').update(json).digest('hex'), data };
 }
 async function importPackage(page: Page, pkg = fixture()) {
+    await openTab(page, 'Karten');
     await page.getByLabel('Kartenpaket importieren (.astac-map.json)').setInputFiles({ name: 'test.astac-map.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(pkg)) });
 }
 async function openPanel(page: Page) {
     await page.goto('/');
+    await openTab(page, 'Karten');
     await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
+    await openTab(page, 'Karten');
     await page.getByText('Eigenes Gebiet laden oder importieren', { exact: true }).click();
 }
 
@@ -28,18 +32,25 @@ test('import, offline reopen, export and referenced-package deletion guard', asy
     await importPackage(page);
     await expect(page.getByText('Gebiet geprüft und lokal gespeichert.', { exact: true })).toBeVisible();
     await expect(page.locator('.map-caption')).toContainText('Eigenes Testgebiet');
+    await openTab(page, 'Projekt');
     await page.getByLabel('Name des neuen Projekts').fill('Projekt mit eigenem Gebiet');
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Gebiet entfernen', exact: true }).click();
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Gebiet endgültig entfernen', exact: true }).click();
     await expect(page.getByText('Dieses Gebiet wird von einem Projekt verwendet und kann nicht entfernt werden.')).toBeVisible();
     const download = page.waitForEvent('download');
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Kartenpaket als Datei sichern', exact: true }).click();
     expect((await download).suggestedFilename()).toMatch(/\.astac-map\.json$/);
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await context.setOffline(true);
     await page.reload();
+    await openTab(page, 'Karten');
     await expect(page.locator('.map-caption')).toContainText('Eigenes Testgebiet');
     await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Projekt mit eigenem Gebiet');
@@ -61,7 +72,9 @@ test('corrupt hash, quota failure and aborted download keep current map and publ
         await new Promise((resolve) => setTimeout(resolve, 500));
         await route.abort();
     });
+    await openTab(page, 'Karten');
     await page.getByLabel('Gebietsname', { exact: true }).fill('Abbruch');
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Gebiet offline speichern', exact: true }).click();
     await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(page.getByText('Abgebrochen. Vorhandene Gebiete bleiben erhalten.')).toBeVisible();
@@ -75,11 +88,15 @@ test('custom bounds download converts OSM, installs offline, then unused package
         await route.fulfill({ json: { osm3s: { timestamp_osm_base: '2026-10-01T00:00:00Z' }, elements: [{ type: 'node', id: 1, lat: 47.36, lon: 8.63, tags: { name: 'Testpunkt', tourism: 'viewpoint' } }] } });
     });
     await openPanel(page);
+    await openTab(page, 'Karten');
     await page.getByLabel('Gebietsname', { exact: true }).fill('Freie Auswahl');
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Gebiet offline speichern', exact: true }).click();
     await expect(page.getByText('Gebiet geprüft und lokal gespeichert.', { exact: true })).toBeVisible();
     await expect(page.locator('.map-caption')).toContainText('Freie Auswahl');
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Gebiet entfernen', exact: true }).click();
+    await openTab(page, 'Karten');
     await page.getByRole('button', { name: 'Gebiet endgültig entfernen', exact: true }).click();
     await expect(page.getByText('Gebiet entfernt.', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Vorbereitetes Gebiet')).toHaveValue('benglen');

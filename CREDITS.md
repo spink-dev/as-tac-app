@@ -48,3 +48,10 @@ Eigene Gebietspaket- und Downloadimplementierung, kein kopierter Referenzcode. o
 ## AST-010–012
 
 Eigene Client-Synchronisierung, Konfliktoberfläche und PostgreSQL-Briefing-Leases. Keine zusätzliche Referenzcodeübernahme und keine neuen Laufzeitabhängigkeiten. Quellen-/Lizenzansicht und vollständiger Paketexport stehen auch im gemeinsamen Workspace zur Verfügung.
+
+## Kartenarbeitsplatz / Mahlwinkel-Eventvorlagen
+
+- Übernommene Daten: FieldMaps `2998bb6d7413a3e036412fa37443e8eead1238f3`, `src/points-of-interest.ts` und `src/scenarios/{mission24,dark-emergency,operation-tschernobyl,light-sim,airsoft-days,lost-airfield}.ts` → `src/data/mahlwinkel-fieldmaps.json`. Konverter: `scripts/import-fieldmaps.mjs`; AS-TAC-Projekte: `src/features/catalog/catalog.ts`.
+- Gemeinsame physische Punkte, eventspezifische Namen, Spielfeldgrenzen, Zonen, Hauptquartiere und Grenzlinien übernommen. Keine Logos, Bildkarten, Termine, CSS-Themes oder Vermarktungstexte. Koordinaten beim Projektaufbau von `[lat, lon]` nach `[lon, lat]` umgeordnet. Stabile Quell-IDs erhalten; frische Projekt-/Element-/Ebenen-IDs je Kopie.
+- Quellenhinweis des Originals: Dark Emergency nutzt die gedruckte Karte DE-39517-2026-1; Windturbinen-Kontrollpunkte schlossen dort mit 3,0 m RMS. Handgezeichnete Spiel- und Sicherheitszonengrenzen sind nur auf einige zehn Meter genau. Diese Genauigkeit wurde in AS-TAC nicht unabhängig verifiziert. Andere Eventdaten ebenfalls als Referenzstand, nicht als aktuelle offizielle Einteilung verstehen.
+- Schraffuren/Biohazard-Symbole werden als transparente Flächen mit Originalbezeichnung vereinfacht. Eine „Zivile Zone“ wird nicht als „Safe Zone“ umgedeutet. Verbindlich bleibt die Einweisung des Veranstalters.

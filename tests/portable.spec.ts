@@ -1,3 +1,4 @@
+import { openTab } from './workspace-helpers';
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { zipSync, unzipSync } from 'fflate';
@@ -61,13 +62,19 @@ test('bounded ZIP rejects traversal, duplicates, truncation and dishonest expand
 test('complete package roundtrip across isolated devices, offline readonly reopen, editable copy', async ({ page, browser }) => {
     const { bytes } = await fixture();
     await page.goto('/');
+    await openTab(page, 'Projekt');
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
+    await openTab(page, 'Projekt');
     await page.getByLabel('Projektpaket öffnen (.astac.zip)').setInputFiles({ name: 'einsatz.astac.zip', mimeType: 'application/zip', buffer: Buffer.from(bytes) });
     await expect(page.getByText('Projekt und Karte gemeinsam gespeichert · schreibgeschützte Kopie geöffnet.')).toBeVisible();
     await expect(page.getByLabel('Projektname', { exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Plan bearbeiten', exact: true })).toBeDisabled();
+    await openTab(page, 'Planung');
+    await expect(page.getByRole('group', { name: 'Zeichenwerkzeuge' })).toHaveCount(0);
+    await openTab(page, 'Projekt');
     await expect(page.locator('.map-caption')).toContainText('Benglen');
     const downloaded = page.waitForEvent('download');
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Vollständiges Projekt sichern (.astac.zip)' }).click();
     const bytes2 = readFileSync((await (await downloaded).path())!);
     const files = unzipSync(bytes2);
@@ -78,16 +85,23 @@ test('complete package roundtrip across isolated devices, offline readonly reope
     const second = await browser.newContext();
     const other = await second.newPage();
     await other.goto('/');
+    await openTab(other, 'Projekt');
+    await openTab(other, 'Karten');
     await expect(other.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await second.setOffline(true);
+    await openTab(other, 'Projekt');
     await other.getByLabel('Projektpaket öffnen (.astac.zip)').setInputFiles({ name: 'copy.astac.zip', mimeType: 'application/zip', buffer: bytes2 });
     await expect(other.getByLabel('Projektname', { exact: true })).toHaveValue('Verteilter Einsatz');
     await other.reload();
+    await openTab(other, 'Projekt');
     await expect(other.getByLabel('Projektname', { exact: true })).toBeDisabled();
     await expect(other.locator('.map-caption')).toContainText('Benglen');
+    await openTab(other, 'Briefing');
     await other.getByRole('button', { name: 'Briefing starten', exact: true }).click();
     await expect(other.getByRole('button', { name: 'In Plan übernehmen', exact: true })).toBeDisabled();
+    await openTab(other, 'Briefing');
     await other.getByRole('button', { name: 'Briefing beenden', exact: true }).click();
+    await openTab(other, 'Projekt');
     await other.getByRole('button', { name: 'Bearbeitbare Kopie erstellen', exact: true }).click();
     await expect(other.getByLabel('Projektname', { exact: true })).toBeEnabled();
     await expect(other.getByLabel('Projekt öffnen').locator('option')).toHaveCount(3);
@@ -98,6 +112,7 @@ test('hash corruption and transaction failure install neither project nor map', 
     const { files, bytes } = await fixture();
     files['project.json'] = encode({ ...JSON.parse(new TextDecoder().decode(files['project.json'])), name: 'Tampered' });
     await page.goto('/');
+    await openTab(page, 'Projekt');
     const input = page.getByLabel('Projektpaket öffnen (.astac.zip)');
     await input.setInputFiles({ name: 'bad.astac.zip', mimeType: 'application/zip', buffer: Buffer.from(pack(files)) });
     await expect(page.getByText(/Projektpaket konnte nicht verarbeitet werden/)).toBeVisible();

@@ -1,3 +1,4 @@
+import { openTab } from './workspace-helpers';
 import { test, expect } from '@playwright/test';
 
 test('foreground GPS restarts once, ignores old callbacks and preserves explicit stop/denial', async ({ page }) => {
@@ -25,6 +26,7 @@ test('foreground GPS restarts once, ignores old callbacks and preserves explicit
         };
     });
     await page.goto('/');
+    await openTab(page, 'Orientierung');
     await page.getByRole('button', { name: 'Meine Position', exact: true }).click();
     await page.evaluate(() => (window as any).gpsTest.fix(0));
     await expect(page.locator('.coordinates')).toContainText('± 12 m');
@@ -46,6 +48,7 @@ test('foreground GPS restarts once, ignores old callbacks and preserves explicit
     await expect(page.locator('.coordinates')).toContainText('± 80 m');
     await page.evaluate(() => (window as any).gpsTest.fix(1, 15, 60000));
     await expect(page.getByText('Ungültiger GPS-Fix.', { exact: true })).toBeVisible();
+    await openTab(page, 'Orientierung');
     await page.getByRole('button', { name: 'GPS stoppen', exact: true }).click();
     await page.evaluate(() => {
         (window as any).gpsTest.fix(1, 25);
@@ -54,6 +57,7 @@ test('foreground GPS restarts once, ignores old callbacks and preserves explicit
     });
     await expect(page.locator('.coordinates')).toContainText('± 80 m');
     expect(await page.evaluate(() => (window as any).gpsTest.callbacks.length)).toBe(2);
+    await openTab(page, 'Orientierung');
     await page.getByRole('button', { name: 'Meine Position', exact: true }).click();
     await page.evaluate(() => (window as any).gpsTest.callbacks[2].error({ code: 1 }));
     await expect(page.getByText(/Standortfreigabe verweigert/)).toBeVisible();

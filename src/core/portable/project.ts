@@ -22,7 +22,7 @@ export async function exportProject(project: Project, map: MapPackage, revision:
         files[`credits/${path}`] = new Uint8Array(await response.arrayBuffer());
     }
     const resources = await Promise.all(Object.entries(files).map(async ([path, bytes]) => ({ path, bytes: bytes.length, sha256: await digest(bytes) })));
-    files['manifest.json'] = encode({ format: 'as-tac', formatVersion: 1, appVersion: version, createdAt: new Date().toISOString(), projectId: project.id, planRevision: revision, resources });
+    files['manifest.json'] = encode({ format: 'as-tac', formatVersion: 1, appVersion: version, createdAt: new Date().toISOString(), projectId: project.id, planRevision: Math.max(1, revision), resources });
     return pack(files);
 }
 export async function importProject(bytes: Uint8Array, signal: AbortSignal) {

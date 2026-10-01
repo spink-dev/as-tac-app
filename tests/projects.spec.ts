@@ -1,3 +1,4 @@
+import { openTab } from './workspace-helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
@@ -99,6 +100,7 @@ async function loadDatabaseCode(page: Page) {
 
 test('IndexedDB commits metadata atomically, detects stale saves and rolls back aborted writes', async ({ page }) => {
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await loadDatabaseCode(page);
     const result = await page.evaluate(async () => {
         const { ProjectDatabase, createProject } = (window as any).projectTest;
@@ -146,6 +148,7 @@ test('IndexedDB commits metadata atomically, detects stale saves and rolls back 
 
 test('migration preserves original, rejects invalid/future data and rolls back both stores', async ({ page }) => {
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await loadDatabaseCode(page);
     const result = await page.evaluate(async () => {
         const { ProjectDatabase, createProject } = (window as any).projectTest;
@@ -223,39 +226,53 @@ test('migration preserves original, rejects invalid/future data and rolls back b
 });
 
 async function create(page: Page, name = 'Benglen Planung') {
+    await openTab(page, 'Projekt');
     await page.getByLabel('Name des neuen Projekts').fill(name);
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
 }
 
 test('local project lifecycle, map selection and undo/redo survive offline reopen', async ({ page, context }) => {
     await page.goto('/');
+    await openTab(page, 'Projekt');
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
+    await openTab(page, 'Karten');
     await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
     await create(page);
+    await openTab(page, 'Projekt');
     await page.getByLabel('Projektname', { exact: true }).fill('Übung Zürich');
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Rückgängig', exact: true }).click();
     await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Benglen Planung');
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Wiederholen', exact: true }).click();
     await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Übung Zürich');
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
     await context.setOffline(true);
     await page.close();
     const reopened = await context.newPage();
     await reopened.goto('/');
+    await openTab(reopened, 'Projekt');
     await expect(reopened.getByLabel('Projektname', { exact: true })).toHaveValue('Übung Zürich');
     await expect(reopened.getByLabel('Vorbereitetes Gebiet')).toHaveValue('benglen');
     await expect(reopened.locator('.map')).toHaveAttribute('aria-busy', 'false');
+    await openTab(reopened, 'Projekt');
     await reopened.getByRole('button', { name: 'Duplizieren', exact: true }).click();
     await expect(reopened.getByLabel('Projektname', { exact: true })).toHaveValue('Übung Zürich · Kopie');
+    await openTab(reopened, 'Projekt');
     await reopened.getByRole('button', { name: 'Löschen', exact: true }).click();
     await reopened.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(reopened.getByLabel('Projektname', { exact: true })).toHaveValue('Übung Zürich · Kopie');
+    await openTab(reopened, 'Projekt');
     await reopened.getByRole('button', { name: 'Löschen', exact: true }).click();
+    await openTab(reopened, 'Projekt');
     await reopened.getByRole('button', { name: 'Endgültig löschen', exact: true }).click();
     await expect(reopened.getByLabel('Projektname', { exact: true })).toHaveCount(0);
     await expect(reopened.getByLabel('Projekt öffnen').locator('option')).toHaveCount(2);
+    await openTab(reopened, 'Projekt');
     await reopened.getByLabel('Projekt öffnen').selectOption({ label: 'Übung Zürich' });
     await expect(reopened.getByLabel('Projektname', { exact: true })).toHaveValue('Übung Zürich');
     await expect(reopened.locator('.map[aria-busy=\"false\"]')).toBeVisible();
@@ -265,6 +282,7 @@ test('local project lifecycle, map selection and undo/redo survive offline reope
 
 test('storage failure keeps draft, blocks navigation, retries, and does not claim saved', async ({ page }) => {
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await create(page);
     await page.evaluate(() => {
         const put = IDBObjectStore.prototype.put;
@@ -278,6 +296,7 @@ test('storage failure keeps draft, blocks navigation, retries, and does not clai
             return put.call(this, value);
         };
     });
+    await openTab(page, 'Projekt');
     await page.getByLabel('Projektname', { exact: true }).fill('Ungesicherter Entwurf');
     await expect(page.getByText('Nicht gespeichert', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Projekt öffnen')).toBeDisabled();
@@ -287,25 +306,31 @@ test('storage failure keeps draft, blocks navigation, retries, and does not clai
     expect((await download).suggestedFilename()).toBe('as-tac-local-recovery.json');
     await page.evaluate(() => (window as any).restoreStorage());
     await page.getByRole('button', { name: 'Erneut versuchen', exact: true }).click();
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
     await page.reload();
+    await openTab(page, 'Projekt');
     await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Ungesicherter Entwurf');
 });
 
 test('two tabs cannot clobber each other; conflict draft can be recovered as independent project', async ({ page, context }) => {
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await create(page);
     const second = await context.newPage();
     await second.goto('/');
+    await openTab(second, 'Projekt');
     await expect(second.getByLabel('Projektname', { exact: true })).toHaveValue('Benglen Planung');
+    await openTab(page, 'Projekt');
     await page.getByLabel('Projektname', { exact: true }).fill('Erster Tab');
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
+    await openTab(second, 'Projekt');
     await second.getByLabel('Projektname', { exact: true }).fill('Zweiter Tab');
     await expect(second.getByRole('alert')).toContainText('anderen Tab');
     await expect(second.getByLabel('Projektname', { exact: true })).toHaveValue('Zweiter Tab');
     await second.getByRole('button', { name: 'Entwurf als neues Projekt retten', exact: true }).click();
-    await expect(second.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(second.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
     await expect(second.getByLabel('Projekt öffnen').locator('option')).toHaveCount(3);
+    await openTab(second, 'Projekt');
     await second.getByLabel('Projekt öffnen').selectOption({ label: 'Erster Tab' });
     await expect(second.getByLabel('Projektname', { exact: true })).toHaveValue('Erster Tab');
 });
@@ -313,6 +338,7 @@ test('two tabs cannot clobber each other; conflict draft can be recovered as ind
 
 test('editing during an in-flight commit never marks the newer draft saved prematurely', async ({ page }) => {
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await create(page);
     await page.evaluate(() => {
         const transaction = IDBDatabase.prototype.transaction;
@@ -336,17 +362,21 @@ test('editing during an in-flight commit never marks the newer draft saved prema
             return tx;
         };
     });
+    await openTab(page, 'Projekt');
     await page.getByLabel('Projektname', { exact: true }).fill('Erster Stand');
     await expect(page.getByText('Wird lokal gespeichert …', { exact: true })).toBeVisible();
+    await openTab(page, 'Projekt');
     await page.getByLabel('Projektname', { exact: true }).fill('Neuer Stand');
     await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
     await page.reload();
+    await openTab(page, 'Projekt');
     await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Neuer Stand');
 });
 
 test('database v1 upgrades to package storage without changing the saved project', async ({ page }) => {
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await loadDatabaseCode(page);
     const original = { project: fixture(), revision: 7, updatedAt: '2026-10-01T00:00:00.000Z', localChanges: true };
     const result = await page.evaluate(async (record) => {
@@ -370,4 +400,46 @@ test('database v1 upgrades to package storage without changing the saved project
     }, original);
     expect(result.saved).toEqual(original);
     expect(result.maps).toEqual([]);
+});
+
+test('explicit schema changes preserve the previous record atomically with the save', async ({ page }) => {
+    await page.goto('/');
+    await loadDatabaseCode(page);
+    const result = await page.evaluate(async () => {
+        const { ProjectDatabase, createProject } = (window as any).projectTest;
+        const db = await ProjectDatabase.open('format-backup');
+        const original = await db.save(createProject('Vor Ebenen', 'benglen'), 0);
+        const upgraded = { ...original.project, schemaVersion: 2, workspace: { layers: [], siteId: 'test', eventId: '', edition: '', source: '' } };
+        await db.save(upgraded, 1);
+        const put = IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put = function (...args) {
+            if (this.name === 'projects') {
+                throw new DOMException('Injected failure', 'QuotaExceededError');
+            }
+            return put.apply(this, args);
+        };
+        try {
+            await db.save(original.project, 2);
+        } catch {
+            // Both the replacement and its backup must roll back.
+        } finally {
+            IDBObjectStore.prototype.put = put;
+        }
+        const current = await db.load(original.project.id);
+        db.close();
+        const stored = await new Promise<IDBDatabase>((resolve) => {
+            const request = indexedDB.open('format-backup');
+            request.onsuccess = () => resolve(request.result);
+        });
+        const backups = await new Promise<any[]>((resolve) => {
+            const request = stored.transaction('backups').objectStore('backups').getAll();
+            request.onsuccess = () => resolve(request.result);
+        });
+        stored.close();
+        return { original, current, backups };
+    });
+    expect(result.current.project.schemaVersion).toBe(2);
+    expect(result.current.revision).toBe(2);
+    expect(result.backups).toHaveLength(1);
+    expect(result.backups[0].original).toEqual(result.original);
 });

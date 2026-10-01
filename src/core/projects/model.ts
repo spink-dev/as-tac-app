@@ -12,6 +12,8 @@ export interface PlanElement {
     geometry: Geometry;
     label: string;
     notes: string;
+    layerId?: string;
+    sourceId?: string;
     teamId?: string;
     phaseIds: string[];
     style: { colour: string; width: number; opacity: number };
@@ -32,9 +34,23 @@ export interface Phase {
     camera: { center: Coordinate; zoom: number; bearing: number; pitch: number } | null;
     visibleElementIds: string[];
 }
+export interface PlanLayer {
+    id: string;
+    name: string;
+    opacity: number;
+    locked: boolean;
+}
+export interface Workspace {
+    layers: PlanLayer[];
+    siteId: string;
+    eventId: string;
+    edition: string;
+    source: string;
+}
 export interface Project {
     id: string;
-    schemaVersion: 1;
+    schemaVersion: 1 | 2;
+    workspace?: Workspace;
     name: string;
     mapPackageId: string;
     teams: Team[];
@@ -97,10 +113,29 @@ function references(values: unknown, available: Set<string>) {
 /** Reject unknown fields as well as bad values: accidental sensor data is never persisted. */
 export function validateProject(value: unknown): asserts value is Project {
     object(value);
-    if (value.schemaVersion !== 1) {
+    if (value.schemaVersion !== 1 && value.schemaVersion !== 2) {
         throw new ProjectError('version');
     }
-    keys(value, ['id', 'schemaVersion', 'name', 'mapPackageId', 'teams', 'phases', 'elements']);
+    keys(value, ['id', 'schemaVersion', 'name', 'mapPackageId', 'teams', 'phases', 'elements', ...(value.schemaVersion === 2 ? ['workspace'] : [])]);
+    const layers: PlanLayer[] = [];
+    if (value.workspace !== undefined) {
+        object(value.workspace);
+        keys(value.workspace, ['layers', 'siteId', 'eventId', 'edition', 'source']);
+        list(value.workspace.layers, 32);
+        for (const layer of value.workspace.layers) {
+            object(layer);
+            keys(layer, ['id', 'name', 'opacity', 'locked']);
+            id(layer.id);
+            text(layer.name, 80, true);
+            number(layer.opacity, 0, 1);
+            requireValid(typeof layer.locked === 'boolean');
+            layers.push(layer as unknown as PlanLayer);
+        }
+        for (const field of ['siteId', 'eventId', 'edition']) {
+            text(value.workspace[field], 120);
+        }
+        text(value.workspace.source, 2000);
+    }
     id(value.id);
     text(value.name, 120, true);
     text(value.mapPackageId, 100, true);
@@ -108,7 +143,7 @@ export function validateProject(value: unknown): asserts value is Project {
     list(value.teams, 100);
     list(value.phases, 100);
     list(value.elements, 500);
-    uniqueIds([...value.teams, ...value.phases, ...value.elements]);
+    uniqueIds([...layers, ...value.teams, ...value.phases, ...value.elements]);
     const teams = new Set<string>(value.teams.map((team: Team) => team.id));
     const phases = new Set<string>(value.phases.map((phase: Phase) => phase.id));
     const elements = new Set<string>(value.elements.filter((element: PlanElement) => !element.deletedAt).map((element: PlanElement) => element.id));
@@ -136,7 +171,11 @@ export function validateProject(value: unknown): asserts value is Project {
     }
     let vertices = 0;
     for (const element of value.elements) {
-        keys(element, ['id', 'projectId', 'type', 'geometry', 'label', 'notes', 'teamId', 'phaseIds', 'style', 'version', 'deletedAt']);
+        keys(element, ['id', 'projectId', 'type', 'geometry', 'label', 'notes', 'teamId', 'phaseIds', 'style', 'version', 'deletedAt', ...(value.schemaVersion === 2 ? ['layerId', 'sourceId'] : [])]);
+        requireValid(element.layerId === undefined || layers.some((layer) => layer.id === element.layerId));
+        if (element.sourceId !== undefined) {
+            text(element.sourceId, 200, true);
+        }
         requireValid(element.projectId === value.id);
         text(element.label, 200);
         text(element.notes, 10_000);
@@ -195,9 +234,12 @@ export function createProject(name: string, mapPackageId: string): Project {
 export function duplicateProject(source: Project, name: string): Project {
     validateProject(source);
     const copy = structuredClone(source);
-    const ids = new Map([source.id, ...source.teams.map((team) => team.id), ...source.phases.map((phase) => phase.id), ...source.elements.map((element) => element.id)].map((old) => [old, crypto.randomUUID()]));
+    const ids = new Map([source.id, ...source.teams.map((team) => team.id), ...source.phases.map((phase) => phase.id), ...source.elements.map((element) => element.id), ...(source.workspace?.layers.map((layer) => layer.id) ?? [])].map((old) => [old, crypto.randomUUID()]));
     copy.id = ids.get(source.id)!;
     copy.name = name;
+    for (const layer of copy.workspace?.layers ?? []) {
+        layer.id = ids.get(layer.id)!;
+    }
     for (const team of copy.teams) {
         team.id = ids.get(team.id)!;
     }
@@ -208,10 +250,17 @@ export function duplicateProject(source: Project, name: string): Project {
     for (const element of copy.elements) {
         element.id = ids.get(element.id)!;
         element.projectId = copy.id;
+        if (element.layerId) {
+            element.layerId = ids.get(element.layerId)!;
+        }
         element.version = 1;
         element.teamId = element.teamId ? ids.get(element.teamId)! : undefined;
         element.phaseIds = element.phaseIds.map((old) => ids.get(old)!);
     }
     validateProject(copy);
     return copy;
+}
+
+export function workspaceOf(project: Project): Workspace {
+    return project.workspace ?? { layers: [], siteId: '', eventId: '', edition: '', source: '' };
 }

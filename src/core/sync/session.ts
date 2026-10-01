@@ -45,7 +45,7 @@ export function prepare(base: OnlineProject, batch: Command[]): Draft {
         const expectedVersion = base.versions[key] ?? 0;
         let value: unknown;
         if (c.kind === 'project') {
-            value = { name: final.name, mapPackageId: final.mapPackageId };
+            value = { name: final.name, mapPackageId: final.mapPackageId, schemaVersion: final.schemaVersion, workspace: final.workspace ?? null };
         } else {
             const collection = c.kind === 'element' ? final.elements : c.kind === 'team' ? final.teams : final.phases;
             value = collection.find((item) => item.id === id) ?? null;

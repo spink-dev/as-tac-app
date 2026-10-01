@@ -1,3 +1,4 @@
+import { openTab, closePanel } from './workspace-helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { distance, displayGeometry, measurements, translate, withVertices } from '../src/features/editor/geometry';
 
@@ -14,22 +15,32 @@ test('geodesic distances, circles, polygon area and vertex replacement retain WG
 });
 async function prepare(page: Page) {
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
+    await openTab(page, 'Karten');
     await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
     await expect(page.locator('.map-caption')).toContainText('Benglen');
+    await openTab(page, 'Projekt');
     await page.getByLabel('Name des neuen Projekts').fill('Editor-Test');
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Plan bearbeiten', exact: true }).click();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
+    await openTab(page, 'Planung');
 }
 async function tool(page: Page, name: string) {
+    await openTab(page, 'Planung');
+    const enable = page.getByRole('button', { name: 'Plan bearbeiten', exact: true });
+    if (await enable.isVisible()) {
+        await enable.click();
+    }
     await page.getByRole('group', { name: 'Zeichenwerkzeuge' }).getByRole('button', { name, exact: true }).click();
 }
 async function point(page: Page, x: number, y: number) {
+    await closePanel(page);
     await page.locator('.maplibregl-canvas').click({ position: { x, y } });
 }
 async function saved(page: Page) {
-    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+    await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
 }
 
 test('all six drawing types persist offline; attributes, coordinates, deletion and undo are reversible', async ({ page, context }) => {
@@ -39,9 +50,13 @@ test('all six drawing types persist offline; attributes, coordinates, deletion a
     await tool(page, 'Punkt');
     await point(page, 70, 160);
     await expect(page.locator('.element-list li')).toHaveCount(1);
+    await openTab(page, 'Planung');
     await page.getByLabel('Beschriftung', { exact: true }).fill('Sammelpunkt');
+    await openTab(page, 'Planung');
     await page.getByLabel('Notizen', { exact: true }).fill('Tor öffnen\nKein GPS-Tracking');
+    await openTab(page, 'Planung');
     await page.getByLabel('Koordinaten / Eckpunkte', { exact: true }).fill('8.627, 47.37');
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Übernehmen', exact: true }).click();
     await expect(page.locator('.element-list')).toContainText('Sammelpunkt');
     await tool(page, 'Text');
@@ -49,16 +64,20 @@ test('all six drawing types persist offline; attributes, coordinates, deletion a
     await tool(page, 'Linie');
     await point(page, 60, 255);
     await point(page, 140, 265);
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Zeichnung abschliessen', exact: true }).click();
     await tool(page, 'Fläche');
     await point(page, 215, 250);
     await point(page, 285, 255);
     await point(page, 250, 305);
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Zeichnung abschliessen', exact: true }).click();
     await tool(page, 'Kreis');
     await point(page, 85, 350);
     await point(page, 115, 350);
+    await openTab(page, 'Planung');
     await page.getByLabel('Radius in Metern').fill('50');
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Übernehmen', exact: true }).click();
     await tool(page, 'Freihand');
     const canvas = page.locator('.maplibregl-canvas');
@@ -69,16 +88,21 @@ test('all six drawing types persist offline; attributes, coordinates, deletion a
     await page.mouse.move(box.x + 280, box.y + 400, { steps: 10 });
     await page.mouse.up();
     await expect(page.locator('.element-list li')).toHaveCount(6);
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Element löschen', exact: true }).click();
     await expect(page.locator('.element-list li')).toHaveCount(5);
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Plan rückgängig', exact: true }).click();
     await expect(page.locator('.element-list li')).toHaveCount(6);
     await saved(page);
+    await openTab(page, 'Karten');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
     await context.setOffline(true);
     await page.reload();
+    await openTab(page, 'Orientierung');
     await expect(page.locator('.element-list li')).toHaveCount(6);
-    await expect(page.getByRole('button', { name: 'Plan bearbeiten', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Planung', exact: true })).toBeVisible();
+    await openTab(page, 'Orientierung');
     await page.locator('.element-list button').filter({ hasText: 'Sammelpunkt' }).click();
     await expect(page.locator('.notes')).toContainText('Tor öffnen');
     await expect(page.locator('.plan-label')).toHaveCount(6);
@@ -106,16 +130,23 @@ test('cancel, invalid edits and map dragging leave stored geometry intact; drag 
     await expect(page.locator('.element-list li')).toHaveCount(0);
     await tool(page, 'Punkt');
     await point(page, 300, 300);
+    await openTab(page, 'Planung');
     await page.getByLabel('Koordinaten / Eckpunkte').fill('8.63, 47.36');
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Übernehmen', exact: true }).click();
     await saved(page);
+    await openTab(page, 'Planung');
     await page.getByLabel('Koordinaten / Eckpunkte').fill('181, 47');
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Übernehmen', exact: true }).click();
     await expect(page.getByRole('alert').first()).toContainText('Ungültige');
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Plan rückgängig', exact: true }).click();
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Plan wiederholen', exact: true }).click();
     await expect(page.getByLabel('Koordinaten / Eckpunkte')).toHaveValue('8.63, 47.36');
     // A visible draggable handle changes the plan on release, and undo restores exact coordinates.
+    await closePanel(page);
     const handle = page.getByRole('button', { name: 'Element verschieben', exact: true });
     await handle.scrollIntoViewIfNeeded();
     const box = (await handle.boundingBox())!;
@@ -124,19 +155,23 @@ test('cancel, invalid edits and map dragging leave stored geometry intact; drag 
     await page.mouse.move(box.x + 70, box.y + 54, { steps: 8 });
     await page.mouse.up();
     await expect(page.getByLabel('Koordinaten / Eckpunkte')).not.toHaveValue('8.63, 47.36');
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Plan rückgängig', exact: true }).click();
     await expect(page.getByLabel('Koordinaten / Eckpunkte')).toHaveValue('8.63, 47.36');
     await tool(page, 'Linie');
     await point(page, 110, 480);
     await point(page, 230, 580);
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Zeichnung abschliessen', exact: true }).click();
     const original = await page.getByLabel('Koordinaten / Eckpunkte').inputValue();
+    await closePanel(page);
     const vertex = (await page.getByRole('button', { name: 'Eckpunkt 1', exact: true }).boundingBox())!;
     await page.mouse.move(vertex.x + 24, vertex.y + 24);
     await page.mouse.down();
     await page.mouse.move(vertex.x + 64, vertex.y + 44, { steps: 8 });
     await page.mouse.up();
     await expect(page.getByLabel('Koordinaten / Eckpunkte')).not.toHaveValue(original);
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Plan rückgängig', exact: true }).click();
     await expect(page.getByLabel('Koordinaten / Eckpunkte')).toHaveValue(original);
 });
@@ -152,14 +187,16 @@ test('touch taps draw a closed polygon and field mode does not create elements',
     for (const [x, y] of [[70, 200], [210, 210], [120, 320]]) {
         await page.touchscreen.tap(box.x + x, box.y + y);
     }
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Zeichnung abschliessen', exact: true }).tap();
     await expect(page.locator('.element-list li')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Zur Feldansicht', exact: true }).tap();
+    await openTab(page, 'Orientierung');
+    await closePanel(page);
     await canvas.scrollIntoViewIfNeeded();
     box = (await canvas.boundingBox())!;
     await page.touchscreen.tap(box.x + 280, box.y + 350);
     await expect(page.locator('.element-list li')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Plan bearbeiten', exact: true }).tap();
+    await openTab(page, 'Planung');
     await tool(page, 'Freihand');
     await canvas.scrollIntoViewIfNeeded();
     box = (await canvas.boundingBox())!;
@@ -181,6 +218,7 @@ test('active tools draw over existing objects without selecting the object under
     await point(page, 290, 180);
     await point(page, 290, 330);
     await point(page, 100, 330);
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Zeichnung abschliessen', exact: true }).click();
     await expect(page.locator('.element-list li')).toHaveCount(1);
     await tool(page, 'Punkt');
@@ -188,8 +226,10 @@ test('active tools draw over existing objects without selecting the object under
     await expect(page.locator('.element-list li')).toHaveCount(2);
     await tool(page, 'Linie');
     await point(page, 190, 250);
+    await openTab(page, 'Planung');
     await expect(page.getByRole('button', { name: 'Linie', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await point(page, 250, 290);
+    await openTab(page, 'Planung');
     await page.getByRole('button', { name: 'Zeichnung abschliessen', exact: true }).click();
     await expect(page.locator('.element-list li')).toHaveCount(3);
     await saved(page);

@@ -1,3 +1,4 @@
+import { openTab } from './workspace-helpers';
 import { test, expect } from '@playwright/test';
 import { createProject } from '../src/core/projects/model';
 
@@ -37,6 +38,7 @@ test('online panel stays local without configuration; configured login and membe
         });
     }
     await page.goto('/');
+    await openTab(page, 'Projekt');
     await page.getByText('Online-Projekte & Mitglieder', { exact: true }).click();
     if (!configured) {
         await expect(page.getByText(/Online-Zusammenarbeit ist hier noch nicht eingerichtet/)).toBeVisible();
@@ -48,6 +50,7 @@ test('online panel stays local without configuration; configured login and membe
     await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
     await expect(page.getByText(/Eigene Konto-ID/)).toBeVisible();
     await page.getByLabel('Name des Online-Projekts', { exact: true }).fill('Online Test');
+    await openTab(page, 'Projekt');
     await page.getByRole('button', { name: 'Leeres Online-Projekt erstellen', exact: true }).click();
     await expect(page.getByText('Online-Projekt auf dem Server erstellt.')).toBeVisible();
     await page.getByLabel('Online-Projekt', { exact: true }).selectOption(project.id);
