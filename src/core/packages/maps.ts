@@ -19,17 +19,17 @@ export interface MapPackage {
     sha256: string;
     data: GeoJSON.FeatureCollection;
 }
-export function validateBounds(bounds: unknown): asserts bounds is Bounds {
+export function validateBounds(bounds: unknown, prepared = false): asserts bounds is Bounds {
     if (!Array.isArray(bounds) || bounds.length !== 4 || !bounds.every(Number.isFinite)
         || bounds[0] < -180 || bounds[2] > 180 || bounds[1] < -85 || bounds[3] > 85
         || bounds[0] >= bounds[2] || bounds[1] >= bounds[3]
-        || bounds[2] - bounds[0] > 0.08 || bounds[3] - bounds[1] > 0.05) {
+        || bounds[2] - bounds[0] > (prepared ? 0.2 : 0.08) || bounds[3] - bounds[1] > (prepared ? 0.1 : 0.05)) {
         throw new Error('bounds');
     }
 }
 export function validateData(data: unknown): asserts data is GeoJSON.FeatureCollection {
     const collection = data as GeoJSON.FeatureCollection;
-    if (!collection || collection.type !== 'FeatureCollection' || !Array.isArray(collection.features) || collection.features.length > 50_000) {
+    if (!collection || collection.type !== 'FeatureCollection' || !Array.isArray(collection.features) || collection.features.length > 100_000) {
         throw new Error('format');
     }
     let vertices = 0;
@@ -38,7 +38,7 @@ export function validateData(data: unknown): asserts data is GeoJSON.FeatureColl
             throw new Error('format');
         }
         if (depth === 0) {
-            if (value.length !== 2 || !value.every(Number.isFinite) || Math.abs(value[0]) > 180 || Math.abs(value[1]) > 90 || ++vertices > 500_000) {
+            if (value.length !== 2 || !value.every(Number.isFinite) || Math.abs(value[0]) > 180 || Math.abs(value[1]) > 90 || ++vertices > 750_000) {
                 throw new Error('format');
             }
         } else {
@@ -64,14 +64,14 @@ export async function hash(data: string) {
 export async function verifyPackage(value: unknown): Promise<MapPackage> {
     const pkg = value as MapPackage;
     if (!pkg || pkg.format !== 'as-tac-map' || pkg.formatVersion !== 1 || typeof pkg.id !== 'string'
-        || !/^(local-[0-9a-f-]{36}|mahlwinkel|benglen)$/.test(pkg.id)
+        || (!/^local-[0-9a-f-]{36}$/.test(pkg.id) && !presets.some((preset) => preset.id === pkg.id))
         || typeof pkg.name !== 'string' || !pkg.name.trim() || pkg.name.length > 120
         || pkg.license !== 'ODbL 1.0' || pkg.attribution !== '© OpenStreetMap contributors'
         || typeof pkg.source !== 'string' || pkg.source.length > 500
         || typeof pkg.dataTimestamp !== 'string' || !Number.isFinite(Date.parse(pkg.dataTimestamp))) {
         throw new Error('format');
     }
-    validateBounds(pkg.bounds);
+    validateBounds(pkg.bounds, true);
     validateData(pkg.data);
     const data = JSON.stringify(pkg.data);
     const bytes = new TextEncoder().encode(data).length;

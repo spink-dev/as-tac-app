@@ -9,7 +9,7 @@ const preset = areas.find((area) => area.id === id);
 const bounds = process.env.MAP_BOUNDS ? JSON.parse(process.env.MAP_BOUNDS) : preset?.bounds;
 if (!/^[a-z0-9-]+$/.test(id) || !Array.isArray(bounds) || bounds.length !== 4
     || !bounds.every(Number.isFinite) || bounds[0] >= bounds[2] || bounds[1] >= bounds[3]
-    || bounds[2] - bounds[0] > 0.08 || bounds[3] - bounds[1] > 0.05
+    || bounds[2] - bounds[0] > (preset ? 0.2 : 0.08) || bounds[3] - bounds[1] > (preset ? 0.1 : 0.05)
     || bounds[0] < -180 || bounds[2] > 180 || bounds[1] < -85 || bounds[3] > 85) {
     throw new Error('Gültige kleine WGS84-Bounds erforderlich: [west,south,east,north].');
 }
@@ -26,8 +26,22 @@ if (!response.ok) {
     throw new Error(`Overpass HTTP ${response.status}`);
 }
 const raw = await response.json();
+if (raw.remark || !Array.isArray(raw.elements)) {
+    throw new Error('Unvollständige Overpass-Antwort');
+}
 const geojson = osmtogeojson(raw, { flatProperties: true });
+// Keep display tags and OSM IDs; discard contact/address metadata from the offline basemap.
+const tags = new Set(['name', 'highway', 'building', 'landuse', 'natural', 'waterway', 'amenity', 'tourism', 'place', 'leisure', 'railway']);
+for (const feature of geojson.features) {
+    feature.properties = Object.fromEntries(Object.entries(feature.properties ?? {}).filter(([key]) => tags.has(key)));
+}
+if (geojson.features.length > 100000) {
+    throw new Error('Kartenpaket überschreitet 100000 Objekte');
+}
 const data = JSON.stringify(geojson);
+if (Buffer.byteLength(data) > 25 * 1024 * 1024) {
+    throw new Error('Kartenpaket überschreitet 25 MiB');
+}
 const manifest = {
     id,
     name: process.env.MAP_NAME ?? preset?.name ?? id,

@@ -1,3 +1,4 @@
+import presets from '../../config/maps.json';
 import { IndexedDraftStore, type CachedProject } from '../../core/sync/drafts';
 import type { OnlineTarget } from './OnlineWorkspace';
 import { useEffect, useRef, useState } from 'react';
@@ -136,7 +137,7 @@ export default function OnlinePanel({ onOpen, locked }: { onOpen: (target: Onlin
                 });
             }}>
                 <label>{t.newName}<input required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></label>
-                <label>{t.map}<select value={map} onChange={(e) => setMap(e.target.value)}><option value="benglen">Zürich · Benglen</option><option value="mahlwinkel">Mahlwinkel</option></select></label>
+                <label>{t.map}<select value={map} onChange={(e) => setMap(e.target.value)}>{presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
                 <button disabled={busy || !name.trim()}>{t.create}</button>
             </form>
             {project && <>

@@ -35,7 +35,17 @@ export default function App() {
 }
 function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
     const [tab, setTab] = useState<WorkspaceTab>('field');
-    const [areaId, setAreaId] = useState(areas[0].id);
+    const [areaId, setAreaId] = useState(() => {
+        try {
+            const saved = localStorage.getItem('as-tac-area');
+            if (saved && (areas.some((area) => area.id === saved) || /^local-[0-9a-f-]{36}$/.test(saved))) {
+                return saved;
+            }
+        } catch {
+            // Browsing still works when preferences cannot be stored.
+        }
+        return areas[0].id;
+    });
     const [session] = useState(() => new ProjectSession());
     const projects = useSyncExternalStore(session.subscribe, session.getSnapshot);
     const selectedAreaId = projects.project?.mapPackageId ?? areaId;
@@ -82,6 +92,11 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
             session.change([{ kind: 'project', mapPackageId: id }]);
         } else {
             setAreaId(id);
+            try {
+                localStorage.setItem('as-tac-area', id);
+            } catch {
+                // The current selection remains usable for this session.
+            }
         }
     };
     useEffect(() => {

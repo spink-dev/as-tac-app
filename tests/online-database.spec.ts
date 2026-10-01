@@ -39,6 +39,7 @@ test.beforeAll(async () => {
     await db.exec(readFileSync('supabase/migrations/202610010002_briefing.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/202610010003_workspace.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/202610010004_symbols.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/202610010005_zurich.sql', 'utf8'));
 });
 test.afterAll(async () => {
     await db.close();
@@ -617,4 +618,12 @@ test('optional map symbols roundtrip and invalid style values roll back atomical
     const snapshot = (await db.query<any>('select document from public.ast_projects where id=$1', [id])).rows[0].document;
     expect(snapshot.elements[0].style).toEqual(element.style);
     await expect(apply(id, crypto.randomUUID(), [{ kind: 'element', id: element.id, value: { ...element, version: 2, style: { ...element.style, pattern: 'url' } }, expectedVersion: 1 }])).rejects.toThrow();
+});
+
+test('Zurich is an accepted prepared collaborative map', async () => {
+    await as(owner);
+    const id = crypto.randomUUID();
+    await db.query('select public.ast_create_project($1,$2,$3)', [id, 'Zürich Feldtest', 'zurich']);
+    const { rows } = await db.query<any>('select document from public.ast_projects where id=$1', [id]);
+    expect(rows[0].document.mapPackageId).toBe('zurich');
 });

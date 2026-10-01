@@ -53,3 +53,5 @@ Kein Client-RPC zum Ernennen weiterer Roots. Keine Root-Konten automatisch angel
 ## Darstellungsoptionen (0.6.0)
 
 Vor neuen Online-Clients zusätzlich `202610010004_symbols.sql` anwenden. Die Migration erweitert nur das validierte Styleschema; Rollen/RLS bleiben unverändert. Alte Dokumente sind weiterhin gültig, ältere App-Versionen können Dokumente mit neuen Stilfeldern jedoch nicht lesen. Client-Versionen gemeinsam aktualisieren. GPS-Aufnahme und Abgleich erzeugen keine neuen Backend-Endpunkte.
+
+Für Zürich als Online-Karte und Studio-Paket zusätzlich `202610010005_zurich.sql` anwenden. Rollen und Schreibrechte bleiben unverändert.

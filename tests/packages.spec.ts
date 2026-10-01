@@ -1,3 +1,4 @@
+import presets from '../src/config/maps.json' with { type: 'json' };
 import { openTab } from './workspace-helpers';
 import { test, expect, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
@@ -67,7 +68,7 @@ test('corrupt hash, quota failure and aborted download keep current map and publ
     });
     await importPackage(page);
     await expect(page.getByText('Nicht genügend freier Speicher für dieses Gebiet.', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Vorbereitetes Gebiet').locator('option')).toHaveCount(2);
+    await expect(page.getByLabel('Vorbereitetes Gebiet').locator('option')).toHaveCount(presets.length);
     await page.route('https://overpass-api.de/api/interpreter', async (route) => {
         await new Promise((resolve) => setTimeout(resolve, 500));
         await route.abort();
@@ -79,7 +80,7 @@ test('corrupt hash, quota failure and aborted download keep current map and publ
     await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(page.getByText('Abgebrochen. Vorhandene Gebiete bleiben erhalten.')).toBeVisible();
     await expect(page.getByLabel('Vorbereitetes Gebiet')).toHaveValue(before);
-    await expect(page.getByLabel('Vorbereitetes Gebiet').locator('option')).toHaveCount(2);
+    await expect(page.getByLabel('Vorbereitetes Gebiet').locator('option')).toHaveCount(presets.length);
 });
 
 test('custom bounds download converts OSM, installs offline, then unused package can be removed', async ({ page }) => {
@@ -100,5 +101,5 @@ test('custom bounds download converts OSM, installs offline, then unused package
     await page.getByRole('button', { name: 'Gebiet endgültig entfernen', exact: true }).click();
     await expect(page.getByText('Gebiet entfernt.', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Vorbereitetes Gebiet')).toHaveValue('benglen');
-    await expect(page.getByLabel('Vorbereitetes Gebiet').locator('option')).toHaveCount(2);
+    await expect(page.getByLabel('Vorbereitetes Gebiet').locator('option')).toHaveCount(presets.length);
 });
