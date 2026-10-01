@@ -2,13 +2,13 @@
 
 Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Die Kartenfunktionalität aus **AST-001** ist integriert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
 
-**Stand 2026-10-01:** v0.5.0 auf `main` integriert AST-001–012 und ergänzt den Kartenarbeitsplatz, Ebenen, sechs Mahlwinkel-Eventvorlagen und das Root-Kartenstudio sowie AS-TAC-Branding mit Tag-/Dunkel-/Rotlichtmodus. Echte Supabase-Bereitstellung und Geräteabnahme auf iPhone 16 Pro / Samsung Galaxy A24 bleiben offen.
+**Stand 2026-10-01:** v0.6.0 auf `main` integriert AST-001–012 und ergänzt den Kartenarbeitsplatz, Ebenen, sechs Mahlwinkel-Eventvorlagen und das Root-Kartenstudio sowie AS-TAC-Branding mit Tag-/Dunkel-/Rotlichtmodus. Echte Supabase-Bereitstellung und Geräteabnahme auf iPhone 16 Pro / Samsung Galaxy A24 bleiben offen.
 
 **Enthalten seit 0.5.1-alpha.1:** Mahlwinkel-Ausgabe r2 erweitert den Offline-Ausschnitt und korrigiert Dark Emergency mit fünf Safe-Zone-Polygonen über den Gelände-Flächen. Bestehende Projektkopien bleiben unverändert; unter Karten die Eventkarte erneut speichern. [Datenabgleich und offene Erfassungslücken](docs/reviews/2026-10-01-fieldmaps.md) · [Performance-Review](docs/reviews/2026-10-01-performance.md).
 
 **Seit 0.6.0-alpha.1:** [Kartensymbole, Schraffuren, Pfadaufnahme, Standortabgleich und Tastenkürzel](specs/003-field-navigation/spec.md). Freiwillige lokale Aufnahme; keine autonome GPS-/IMU-Navigation. Online-Betrieb benötigt zusätzlich Migration `202610010004_symbols.sql`.
 
-**Testing 0.6.0-alpha.2:** Einheitliche Kartenzeichen und Wege-/Gebäudedarstellung auf allen Karten. Unter **Karten → Vorbereitetes Gebiet → Zürich Stadt · bis Benglen** liegt ein zusammenhängendes OSM-Paket für Zürich-West, Zentrum und Benglen (ca. 24 MB). Enthält beide ZHAW-Standorte Lagerstrasse und Toni-Areal. Einmal online vollständig vorbereiten und „Offline bereit“ abwarten. [Umfang und Prüfung](docs/reviews/2026-10-01-map-presentation.md).
+**In 0.6.0 enthalten:** Einheitliche Kartenzeichen und Wege-/Gebäudedarstellung auf allen Karten. Unter **Karten → Vorbereitetes Gebiet → Zürich Stadt · bis Benglen** liegt ein zusammenhängendes OSM-Paket für Zürich-West, Zentrum und Benglen (ca. 24 MB). Enthält beide ZHAW-Standorte Lagerstrasse und Toni-Areal. Einmal online vollständig vorbereiten und „Offline bereit“ abwarten. [Umfang und Prüfung](docs/reviews/2026-10-01-map-presentation.md).
 
 ## Starten
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 — 2026-10-01 (main)
+
+- Freigegebene Integration aller Änderungen aus 0.5.1-alpha.1 bis 0.6.0-alpha.2: Mahlwinkel-Datenkorrekturen, einheitliche Kartensymbole und Schraffuren, lokale GPS-Pfadaufnahme, Standortabgleich, Desktop-Zeichentasten und Zürich–Benglen als Offline-Testgebiet.
+- Grundlage: 63 bestandene Chromium-Regressionstests, 1 mangels Live-Backend übersprungener Test und 5 bestandene WebKit-Tests. Versionswechsel ändert keine Anwendungslogik.
+- Online-Betrieb benötigt Migrationen 202610010004_symbols.sql und 202610010005_zurich.sql. Live-Migration und physische Geräteabnahme bleiben separat offen.
+
 ## 0.6.0-alpha.2 — 2026-10-01
 
 - Zusammenhängendes Offline-Testgebiet Zürich-West/Zentrum bis Benglen, einschliesslich ZHAW Lagerstrasse und Toni-Areal.
