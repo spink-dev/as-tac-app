@@ -2,7 +2,7 @@
 
 Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Die Kartenfunktionalität aus **AST-001** ist integriert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
 
-**Stand 2026-10-01:** 0.3.0 auf main umfasst Offline-Karten, Editor, Teams/Phasen, Briefing und portable Projektpakete. 0.4.0-alpha.1 auf testing ergänzt die AST-009-Online-Grundlage. Echte Supabase-Integration und gemeinsame Live-Bearbeitung sowie Geräteabnahme auf iPhone 16 Pro und Samsung Galaxy A24 bleiben offen.
+**Stand 2026-10-01:** v0.4.0 auf `main` integriert AST-001–012. v0.5.0-alpha.1 auf `testing` ergänzt den Kartenarbeitsplatz, Ebenen, sechs Mahlwinkel-Eventvorlagen und das Root-Kartenstudio. Echte Supabase-Bereitstellung und Geräteabnahme auf iPhone 16 Pro / Samsung Galaxy A24 bleiben offen.
 
 ## Starten
 
@@ -62,7 +62,7 @@ Das neue Gebiet mit ID, Name und Bounds in `src/config/maps.json` aufnehmen. Die
 - [Credits und Herkunft](CREDITS.md), auch offline in der App verfügbar.
 - Die separate Prüfstand-Oberfläche bleibt auf `feature/ast-001-mobile-proof`; `main` enthält die Karten-App ohne Testanweisungen und Messwert-Panel. Remote `origin`: `git@github.com:spink-dev/as-tac-app.git`.
 
-Danke an **[FieldMaps](https://github.com/rwolffgang/FieldMaps) von [@rwolffgang](https://github.com/rwolffgang)** für die technische Referenz und Erlaubnis zur Wiederverwendung. Mahlwinkel-Gebietsgrenzen übernommen, kein Referenzcode oder Event-Asset kopiert. Karten: **© OpenStreetMap contributors**, ODbL 1.0.
+Danke an **[FieldMaps](https://github.com/rwolffgang/FieldMaps) von [@rwolffgang](https://github.com/rwolffgang)** für die technische Referenz und Erlaubnis zur Wiederverwendung. Mahlwinkel-Gebietsgrenzen sowie POIs und Event-Geometrien mit exakter Herkunft übernommen; keine Logos oder Kartenbilder kopiert. Karten: **© OpenStreetMap contributors**, ODbL 1.0.
 
 ## App-Grundstruktur (AST-002)
 
@@ -91,7 +91,7 @@ Die URL-Zuordnung ist die Vorgabe des Nutzers. `testing` wird als Git-Deploy-Que
 
 ## Lokale Projekte (AST-003)
 
-Gebiet auswählen, Projektnamen eingeben und „Projekt erstellen“. Das Projekt lässt sich ohne Konto öffnen, umbenennen, duplizieren oder nach Bestätigung löschen. Name und Gebiet speichern automatisch; „Auf diesem Gerät gespeichert“ erscheint erst nach erfolgreicher Transaktion. Undo/Redo umfasst die letzten 50 Aktionen der geöffneten Sitzung (zusammenhängendes Tippen zählt als eine Aktion). Nach erneutem Öffnen beginnt die Undo-Historie neu; beim App-Start öffnet sich das alphabetisch erste lesbare Projekt.
+Gebiet auswählen, Projektnamen eingeben und „Projekt erstellen“. Das Projekt lässt sich ohne Konto öffnen, umbenennen, duplizieren oder nach Bestätigung löschen. Name und Gebiet speichern automatisch; „Auf diesem Gerät gespeichert“ erscheint erst nach erfolgreicher Transaktion. Undo/Redo umfasst die letzten 50 Aktionen der geöffneten Sitzung (zusammenhängendes Tippen zählt als eine Aktion). Nach erneutem Öffnen beginnt die Undo-Historie neu; beim App-Start öffnet sich das zuletzt verwendete lesbare Projekt (ohne gespeicherte Auswahl das alphabetisch erste).
 
 `src/core/projects/` enthält das WGS84-Modell, reversible Commands, die IndexedDB-Transaktionen und den Sitzungszustand. `src/features/projects/` enthält die Oberfläche. Der erste lokale Datenstand nutzt Schema 1; keine erfundene Migration für AST-001/002, die keine Projekte gespeichert haben. Explizite spätere Migrationen sichern den Originaldatensatz in derselben Transaktion und ersetzen ihn nur nach Validierung. Unbekannte Formate bleiben unangetastet und können als Original-JSON gesichert werden.
 
@@ -145,3 +145,19 @@ Optionaler Supabase-Integrationsstand: Anmeldung, leere Online-Projekte und Owne
 Nach Konfiguration und Anmeldung unter „Online-Projekte & Mitglieder“ das Projekt wählen und „Gemeinsam auf der Karte öffnen“. Änderungen werden serverseitig versioniert; Mitglieder sehen bestätigte Snapshots. Bei Offline-Betrieb einen eigenen Entwurf bearbeiten und nach Anmeldung bewusst mit dem Server abgleichen. Gesicherte Online-Kopien lassen sich ohne Anmeldung öffnen; dort wird nichts publiziert. Ein `.astac.zip` kann auch dort exportiert werden.
 
 „Briefing leiten“ übernimmt die exklusive Leitung, „Präsentation folgen“ ist freiwillig. Andere Admins können unabhängig weiter planen. Bei Netzverlust läuft die Leitung aus. [Implementierungsnachweis](specs/001-foundation/evidence/ast-010-012-collaboration.md) und [offene Feldabnahme](specs/001-foundation/evidence/ast-014-field-acceptance.md).
+
+## Kartenarbeitsplatz (0.5.0-alpha.1)
+
+- **Orientierung:** Karte, eigenes GPS und lesbare Objekte. Ebenen unter dem Panel ein-/ausblenden oder für die eigene Ansicht transparenter machen.
+- **Planung:** aktive Zeichenebene wählen, über bestehenden Objekten zeichnen, Überlagerungen gezielt auswählen; Deckkraft, Reihenfolge und Sperren speichern. Unübernommene Objektangaben vor einem Tabwechsel übernehmen oder verwerfen.
+- **Briefing:** Phasen zeigen, temporär zeichnen, optional online präsentieren/folgen.
+- **Karten:** Mahlwinkel-Event wählen und offline speichern. Unter „Eigenes Gebiet laden oder importieren“ Kartenausschnitt übernehmen, OSM herunterladen oder `.astac-map.json` einlesen. Offline-Dateien hier prüfen.
+- **Projekt:** gespeicherte Pläne, bearbeitbare Kopien, `.astac.zip`, Zusammenarbeit, Quellen und Kartenstudio.
+
+Mahlwinkel enthält Mission 24H, Dark Emergency, Operation Tschernobyl, Light Sim, Airsoft Days und Lost Airfield als getrennte FieldMaps-Referenzstände. Positionen behalten stabile Quell-IDs, Labels/Zonen bleiben je Event unabhängig. Downloads sind schreibgeschützt; „Bearbeitbare Kopie erstellen“ erzeugt einen eigenen Entwurf. Keine Aussage über die aktuelle offizielle Event-Einteilung.
+
+Schema 1 bleibt lesbar. Erst das Anlegen von Ebenen oder Event-Metadaten erweitert ein Projekt auf Schema 2; diese Änderung ist rückgängig machbar und sichert beim Speichern den vorherigen Datensatz atomar. Alte App-Versionen können Schema 2 nicht bearbeiten. ZIP-Format 1 bleibt erhalten und transportiert das angegebene Projektschema. Exportierte Pakete enthalten Karte, Ebenen, Quellen und lokale Lizenztexte.
+
+Das Kartenstudio nutzt den vorhandenen Planeditor zur Datenproduktion. Gelände-ID, Event-ID, Ausgabe und Quellen unter Projekt erfassen; zum Veröffentlichen ist eine separate serverseitige Root-Berechtigung erforderlich. Katalog enthält höchstens die 100 neuesten Ausgaben in seiner aktuellen Liste. Bereits veröffentlichte Ausgaben bleiben unverändert; neue Ausgabe bewusst herunterladen. Keine automatische Verteilung oder Migration im Hintergrund.
+
+[Redesign-Spezifikation](specs/002-map-workspace/spec.md) · [Designregeln](DESIGN.md) · [Prüfstand und Grenzen](specs/002-map-workspace/evidence.md).

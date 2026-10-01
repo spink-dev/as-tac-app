@@ -1,6 +1,6 @@
 # AS-TAC Online-Grundlage
 
-AST-009–012: Auth, gemeinsamer Editor, Konflikte und Briefing. Beide Migrationen in Reihenfolge anwenden: `migrations/202610010001_online.sql`, danach `migrations/202610010002_briefing.sql`. Sie setzt Supabase Auth mit `auth.users`, `auth.uid()` und Rollen `anon`/`authenticated` voraus.
+AST-009–012: Auth, gemeinsamer Editor, Konflikte und Briefing. Alle Migrationen in Reihenfolge anwenden: `migrations/202610010001_online.sql`, danach `migrations/202610010002_briefing.sql` und `migrations/202610010003_workspace.sql`. Sie setzt Supabase Auth mit `auth.users`, `auth.uid()` und Rollen `anon`/`authenticated` voraus.
 
 ## Einrichtung eines separaten Testing-Projekts
 
@@ -33,3 +33,19 @@ Gemeinsamen Editor über „Gemeinsam auf der Karte öffnen“ starten. Transpor
 Astro bindet die beiden öffentlichen Variablen **beim Build** ein. Bei Docker die gleichnamigen `--build-arg PUBLIC_SUPABASE_URL=…` und `--build-arg PUBLIC_SUPABASE_PUBLISHABLE_KEY=…` setzen; reine Container-Laufzeitvariablen ändern die bereits gebaute App nicht. Nur öffentliche Schlüssel verwenden. Der Docker-Daemon war lokal nicht verfügbar; Containerbuild nicht nachgewiesen.
 
 Konkrete Prüfgrenzen und Nutzerabläufe: `specs/001-foundation/evidence/ast-010-012-collaboration.md`. Vor produktiver Freigabe A03–A06/A08 mit echtem Supabase Auth, getrennten Datenbankverbindungen und Geräten durchführen. Hier wurden weder ein Cloud-Projekt angelegt noch Migrationen auf einen externen Server angewendet.
+
+
+## Root-Kartenstudio / Katalog (0.5.0-alpha.1)
+
+Die dritte Migration erweitert das validierte Projektschema um Ebenen und Event-Metadaten und ergänzt einen öffentlich lesbaren Katalog. Pakete liegen unveränderlich in `ast_private.catalog`, ohne direkte Client-Tabellenrechte. `ast_publish` prüft die aktuelle Root-Zuordnung separat von Projektmitgliedschaften. Owner/Admin sind dadurch **nicht** Root. Root darf vorbereitete, für öffentliche Verteilung bestimmte Kartendaten veröffentlichen; die Quellenverantwortung bleibt beim Herausgeber. Kartenpakete werden vor Upload und bei Installation vom Client vollständig auf Geometrie, Grenzen, Grösse und SHA-256 geprüft. Der Server begrenzt zusätzlich Dokument, Identität, Lizenz und Paketgrösse; er bestätigt keine fachliche Kartenqualität.
+
+Root-Zuordnung ausschliesslich mit administrativem Datenbankzugriff nach Festlegen des Kontos, z. B. im Supabase-SQL-Editor:
+
+```sql
+-- Die tatsächlich vorgesehene Auth-Konto-ID einsetzen, keine E-Mail oder Projekt-ID.
+insert into ast_private.roots(user_id) values ('ROOT-AUTH-USER-UUID');
+-- Entzug:
+-- delete from ast_private.roots where user_id = 'ROOT-AUTH-USER-UUID';
+```
+
+Kein Client-RPC zum Ernennen weiterer Roots. Keine Root-Konten automatisch angelegt. `ast_catalog` / `ast_catalog_package` liefern ausschliesslich bereits veröffentlichte Daten. Gleiche Gelände-/Event-/Ausgabe-Kombinationen lassen sich auch durch Root nicht überschreiben. Der aktuelle Client erfasst Metadaten und editiert Geometrie lokal; Publikation geschieht ausdrücklich über „Diese Ausgabe veröffentlichen“. Backend, Auth-Konto, Migrationen und Hosting sind in dieser Arbeitsumgebung nicht bereitgestellt worden.

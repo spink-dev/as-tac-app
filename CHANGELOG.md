@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0-alpha.1 — 2026-10-01
+
+- Neuer Kartenarbeitsplatz für Orientierung, Planung, Briefing, Karten und Projekt: volle Kartenfläche, schliessbare Panels, mobile Tabs, Tastaturnavigation und Safe Areas.
+- Gespeicherte Ebenen mit Zeichenebene, Reihenfolge, Deckkraft und Sperren; lokale Ansichtsoptionen für Betrachter und Auswahl überlagerter Objekte. Zeichnen über bestehenden Objekten bleibt möglich.
+- Sechs Mahlwinkel-Eventvorlagen aus dem freigegebenen FieldMaps-Referenzstand, mit gemeinsamen Quell-IDs, unabhängigen Labels/Zonen und Offline-Installation als schreibgeschützte Kopie. Herkunft und Genauigkeitsgrenzen dokumentiert.
+- Kartenstudio für Gelände-/Event-/Ausgabenmetadaten, lokale Datenproduktion und ausdrückliche Root-Veröffentlichung. Server prüft Root separat von Projektrollen; veröffentlichte Ausgaben sind unveränderlich.
+- Rückwärtskompatibles Lesen von Projektschema 1, Schema 2 für Ebenen/Events, atomare Original-Sicherung bei Formatwechsel und vollständiger ZIP-Roundtrip. Letztes lokales Projekt wird beim Neustart wieder geöffnet.
+- Unübernommene Objektattribute vor Navigation/Objektwechsel geschützt. Gemeinsamer Workspace nutzt dieselben Arbeitsbereiche. Online-Export von Serverstand 0 erzeugt ein importierbares Paket.
+- Korrigierte serverseitige Briefing-Kameragrenzen. Reale Supabase-Bereitstellung, Domain-Deployment und Geräteabnahme bleiben getrennte Prüfungen.
+
+
 ## 0.4.0 — 2026-10-01 (main)
 
 - Vom Nutzer freigegebene Integration des gesamten bisherigen Stands bis AST-012.
