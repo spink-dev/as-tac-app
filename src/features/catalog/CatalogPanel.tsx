@@ -71,8 +71,9 @@ export default function CatalogPanel({
                 </select>
             </label>
             <p className="muted">
-                FieldMaps / @rwolffgang · Referenzstand 2998bb6. Grenzen teilweise von gedruckten Karten abgeleitet. Aktuelle Einweisung vor
-                Ort beachten.
+                FieldMaps / @rwolffgang · Ausgabe r2. Dark Emergency: erweiterte Geländegrenze und fünf Safe-Zone-Flächen.
+                HQ-Marker zeigen Standorte, keine vollständigen HQ-Grenzen. Grenzen sind ungefähre Nachzeichnungen; vor Ort prüfen.
+                Vorhandene Projektkopien bleiben unverändert. Für diese Ausgabe die Eventkarte erneut speichern.
             </p>
             <button
                 className="primary"

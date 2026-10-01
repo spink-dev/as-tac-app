@@ -1,6 +1,9 @@
 import data from '../../data/mahlwinkel-fieldmaps.json' with { type: 'json' };
+import deCorrection from '../../data/dark-emergency-correction.json' with { type: 'json' };
 import { createProject, validateProject, type Coordinate, type Geometry, type PlanElement } from '../../core/projects/model';
-export const events = data.events;
+export const events = data.events.map((event) => event.id === 'de'
+    ? { ...event, playArea: deCorrection.playArea, zones: deCorrection.zones }
+    : event);
 export function eventProject(eventId: string) {
     const event = events.find((item) => item.id === eventId);
     if (!event) {
@@ -8,7 +11,7 @@ export function eventProject(eventId: string) {
     }
     const project = createProject(`Mahlwinkel · ${event.name}`, 'mahlwinkel');
     project.schemaVersion = 2;
-    const layers = ['Spielfeld', 'Zonen', 'Grenzlinien', 'Gebäude & Orte', 'Hauptquartiere'].map((name) => ({
+    const layers = ['Spielfeld', 'Zonen', 'Grenzlinien', 'Gebäude & Orte', 'Hauptquartiere', 'Safe Zones'].map((name) => ({
         id: crypto.randomUUID(),
         name,
         opacity: 1,
@@ -17,8 +20,8 @@ export function eventProject(eventId: string) {
     project.workspace = {
         siteId: 'mahlwinkel',
         eventId,
-        edition: `fieldmaps-${data.commit.slice(0, 7)}`,
-        source: `FieldMaps / @rwolffgang · ${data.commit}. Teilweise von gedruckten Eventkarten abgeleitet; Grenzen können um mehrere zehn Meter abweichen. Vor Ort geltende Einteilung prüfen.`,
+        edition: `fieldmaps-${data.commit.slice(0, 7)}-r2`,
+        source: `FieldMaps / @rwolffgang · ${data.commit}. Teilweise von gedruckten Eventkarten abgeleitet; Grenzen können um mehrere zehn Meter abweichen. Dark Emergency: Aussengrenze und fünf Safe Zones nach DE-39517-2026-1 nachgezeichnet (AS-TAC r2). HQ-Punkte sind keine vermessenen HQ-Flächen. Vor Ort geltende Einteilung prüfen.`,
         layers,
     };
     const colour = (value: string) => (/^#[0-9a-f]{6}$/i.test(value) ? value : '#365f4b');
@@ -50,13 +53,22 @@ export function eventProject(eventId: string) {
         add(`mahlwinkel:${event.id}:boundary`, 'Spielfeldgrenze', polygon(event.playArea), 0);
     }
     for (const zone of event.zones) {
+        const safe = event.id === 'de' && zone.id.endsWith('-safe');
+        if (safe) {
+            // Safe areas belong to the site even where the event's play boundary excludes them.
+            // Preserve the source footprint; do not invent a larger HQ perimeter from its point.
+            add(`mahlwinkel:${event.id}:site:${zone.id}`, '', polygon(zone.points), 0, '#365f4b',
+                `${zone.name}: bekannte Gelände-Teilfläche unter der Safe-Zone-Ebene; keine zusätzliche HQ-Grenze.`);
+        }
         add(
             `mahlwinkel:${event.id}:zone:${zone.id}`,
-            zone.name,
+            zone.name.replace(/<br\s*\/?\s*>/gi, ' '),
             polygon(zone.points),
-            1,
+            safe ? 5 : 1,
             zone.color,
-            'Grenze aus FieldMaps; vereinfachte transparente Darstellung.',
+            safe
+                ? 'Nachzeichnung DE-39517-2026-1 · AS-TAC r2; ungefähre Grenze, teils durch Symbole verdeckt. Vor Ort prüfen.'
+                : 'Grenze aus FieldMaps; vereinfachte transparente Darstellung.',
         );
     }
     for (const line of event.lines) {

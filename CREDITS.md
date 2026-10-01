@@ -55,3 +55,17 @@ Eigene Client-Synchronisierung, Konfliktoberfläche und PostgreSQL-Briefing-Leas
 - Gemeinsame physische Punkte, eventspezifische Namen, Spielfeldgrenzen, Zonen, Hauptquartiere und Grenzlinien übernommen. Keine Logos, Bildkarten, Termine, CSS-Themes oder Vermarktungstexte. Koordinaten beim Projektaufbau von `[lat, lon]` nach `[lon, lat]` umgeordnet. Stabile Quell-IDs erhalten; frische Projekt-/Element-/Ebenen-IDs je Kopie.
 - Quellenhinweis des Originals: Dark Emergency nutzt die gedruckte Karte DE-39517-2026-1; Windturbinen-Kontrollpunkte schlossen dort mit 3,0 m RMS. Handgezeichnete Spiel- und Sicherheitszonengrenzen sind nur auf einige zehn Meter genau. Diese Genauigkeit wurde in AS-TAC nicht unabhängig verifiziert. Andere Eventdaten ebenfalls als Referenzstand, nicht als aktuelle offizielle Einteilung verstehen.
 - Schraffuren/Biohazard-Symbole werden als transparente Flächen mit Originalbezeichnung vereinfacht. Eine „Zivile Zone“ wird nicht als „Safe Zone“ umgedeutet. Verbindlich bleibt die Einweisung des Veranstalters.
+
+### Mahlwinkel audit and Dark Emergency correction (AS-TAC r2)
+
+The original FieldMaps snapshot remains unchanged. `scripts/data/dark-emergency-trace.json`
+records an AS-TAC manual retrace of the retained organiser reference image
+`reference/tactical-maps/de_2026_taktikkarte.jpg` (DE-39517-2026-1, SHA-256
+`b0cf139b6f3fd76a8b10d83d6b46170229f9f4da9c6bb978931eea84ba34edaa`).
+`scripts/import-fieldmaps.mjs` additionally executes the pinned FieldMaps
+`src/transform.ts` similarity fit against its turbine registry to produce
+`src/data/dark-emergency-correction.json`. This adds the missing Miliz safe area,
+revises all five safe-area contours and the event perimeter. Image/logos are not
+bundled. The measured 4.41 m control residual is not boundary accuracy; contours
+are approximate, sometimes obscured by symbols, and require on-site verification.
+See `docs/reviews/2026-10-01-fieldmaps.md` for coverage and unresolved HQ boundaries.

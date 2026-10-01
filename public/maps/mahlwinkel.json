@@ -3,16 +3,16 @@
   "name": "Mahlwinkel · Airsoft-Feld",
   "bounds": [
     11.809,
-    52.376,
+    52.375,
     11.84,
-    52.3855
+    52.387
   ],
-  "dataTimestamp": "2026-09-30T23:07:04Z",
+  "dataTimestamp": "2026-10-01T11:57:06Z",
   "source": "https://overpass-api.de/api/interpreter",
   "attribution": "© OpenStreetMap contributors",
   "license": "ODbL 1.0",
   "file": "/maps/mahlwinkel.geojson",
-  "byteSize": 270784,
-  "sha256": "1d66adfc21e4c35965a5146f199388f591d25602cbbf86a6f2249feadb1bcb98",
-  "featureCount": 370
+  "byteSize": 305055,
+  "sha256": "c9a74fc7e9ca392be9b830f42239d53eb921e2e63c536c0db7e0ea3e62c3adc3",
+  "featureCount": 430
 }
