@@ -5,9 +5,9 @@ import { execute, type Command } from '../../core/projects/commands';
 import { distance, makeElement } from '../editor/geometry';
 import { de } from '../../i18n/de';
 
-export default function BriefingPanel({ project, map, change, onPhase, disabled, pauseFollow, readOnly = false }: {
+export default function BriefingPanel({ project, map, change, onPhase, disabled, pauseFollow, readOnly = false, remotePhase }: {
     project: Project | null; map: LibreMap | null; change: (commands: Command[]) => void;
-    onPhase: (phase: Phase | null) => void; disabled: boolean; pauseFollow: () => void; readOnly?: boolean;
+    onPhase: (phase: Phase | null) => void; disabled: boolean; pauseFollow: () => void; readOnly?: boolean; remotePhase?: { id: string | null };
 }) {
     const t = de.briefing;
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -25,6 +25,11 @@ export default function BriefingPanel({ project, map, change, onPhase, disabled,
         setDrawing(false);
     }, [project?.id]);
     useEffect(() => {
+        if (remotePhase) {
+            setActiveId(remotePhase.id);
+        }
+    }, [remotePhase?.id, !!remotePhase]);
+    useEffect(() => {
         onPhase(phase);
     }, [phase, onPhase]);
     useEffect(() => {
@@ -41,7 +46,7 @@ export default function BriefingPanel({ project, map, change, onPhase, disabled,
             return;
         }
         const keyboard = (event: KeyboardEvent) => {
-            if ((event.target as HTMLElement)?.closest('input,textarea,select') || drawing) {
+            if ((event.target as HTMLElement)?.closest('input,textarea,select') || drawing || remotePhase) {
                 return;
             }
             const next = latest.current.index + (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0);
@@ -55,7 +60,7 @@ export default function BriefingPanel({ project, map, change, onPhase, disabled,
         };
         window.addEventListener('keydown', keyboard);
         return () => window.removeEventListener('keydown', keyboard);
-    }, [phase?.id, drawing]);
+    }, [phase?.id, drawing, !!remotePhase]);
     useEffect(() => {
         if (!map) {
             return;
@@ -139,14 +144,14 @@ export default function BriefingPanel({ project, map, change, onPhase, disabled,
         return null;
     }
     return <section aria-label={t.title}><h2>{t.title}</h2>
-        {!phase ? <button disabled={disabled || !map || !phases.length} onClick={() => setActiveId(phases[0].id)}>{t.start}</button> : <>
+        {!phase ? <button disabled={disabled || !map || !phases.length || !!remotePhase} onClick={() => setActiveId(phases[0].id)}>{t.start}</button> : <>
             <h3>{index + 1} / {phases.length} · {phase.title}</h3>
             <p className="notes">{phase.notes}</p>
             <p>{t.visibleCount(phase.visibleElementIds.length)}</p>
             <div className="actions">
-                <button disabled={index <= 0 || drawing} onClick={() => setActiveId(phases[index - 1].id)}>{t.previous}</button>
-                <button disabled={index >= phases.length - 1 || drawing} onClick={() => setActiveId(phases[index + 1].id)}>{t.next}</button>
-                <button onClick={() => setActiveId(null)}>{t.stop}</button>
+                <button disabled={index <= 0 || drawing || !!remotePhase} onClick={() => setActiveId(phases[index - 1].id)}>{t.previous}</button>
+                <button disabled={index >= phases.length - 1 || drawing || !!remotePhase} onClick={() => setActiveId(phases[index + 1].id)}>{t.next}</button>
+                <button disabled={!!remotePhase} onClick={() => setActiveId(null)}>{t.stop}</button>
             </div>
             <p className="muted">{t.temporary}</p>
             <p role="status">{t.strokeCount(strokes.length)}</p>

@@ -1,10 +1,18 @@
+import { IndexedDraftStore, type CachedProject } from '../../core/sync/drafts';
+import type { OnlineTarget } from './OnlineWorkspace';
 import { useEffect, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { onlineClient, OnlineApi, type OnlineProject, type Role } from '../../core/sync/client';
 import { de } from '../../i18n/de';
 
-export default function OnlinePanel() {
+export default function OnlinePanel({ onOpen, locked }: { onOpen: (target: OnlineTarget) => void; locked: boolean }) {
     const t = de.online;
+    const [cached, setCached] = useState<CachedProject[]>([]);
+    useEffect(() => {
+        void IndexedDraftStore.cached().then(setCached).catch(() => {
+            // Existing local project storage UI reports unavailable browser storage.
+        });
+    }, []);
     const [api, setApi] = useState<OnlineApi | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [email, setEmail] = useState('');
@@ -85,6 +93,10 @@ export default function OnlinePanel() {
     }
     return <section className="online-panel" aria-label={t.title}><details>
         <summary>{t.title}</summary>
+        {api && cached.length > 0 && <details><summary>Gesicherte Online-Projekte ohne Anmeldung öffnen</summary>
+            <p>Lokale Kopien bleiben auf diesem Gerät. Rechte werden erst nach Anmeldung erneut geprüft; hier wird nichts publiziert.</p>
+            {cached.map((entry) => <button key={entry.key} disabled={locked} onClick={() => onOpen({ api, projectId: entry.snapshot.id, userId: entry.userId, offline: entry })}>{entry.snapshot.document.name} · Offline-Kopie · Stand {entry.snapshot.server_seq}</button>)}
+        </details>}
         {!api ? <p>{t.unavailable}</p> : !user ? <form onSubmit={(event) => {
             event.preventDefault();
             void run(async () => {
@@ -107,7 +119,7 @@ export default function OnlinePanel() {
                     throw error;
                 }
             })}>{t.logout}</button>
-            <p className="muted">{t.foundationHint}</p>
+            <p className="muted">Online-Projekte werden separat von lokalen Projekten geöffnet. Mitglieder sehen den bestätigten Serverstand schreibgeschützt.</p>
             <button disabled={busy} onClick={() => void run(() => refresh())}>{t.refresh}</button>
             <label htmlFor="online-project">{t.project}</label>
             <select id="online-project" disabled={busy} value={selected} onChange={(event) => void run(() => refresh(event.target.value))}>
@@ -128,6 +140,7 @@ export default function OnlinePanel() {
                 <button disabled={busy || !name.trim()}>{t.create}</button>
             </form>
             {project && <>
+                <button disabled={busy || locked} onClick={() => onOpen({ api, projectId: project.id, userId: user.id })}>Gemeinsam auf der Karte öffnen</button>
                 <p>{t.revision(project.server_seq)} · {project.document.elements.length} {t.elements}</p>
                 <h3>{t.members}</h3>
                 <ul>{members.map((m) => <li key={m.user_id}><code>{m.user_id}</code> · {t.roles[m.role]}

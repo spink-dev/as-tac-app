@@ -69,3 +69,10 @@ fieldset { border: 1px solid #cbd2c6; border-radius: 6px; padding: 12px; margin:
 .map-label-options input { width: 16px; min-height: 16px; margin: 0; }
 
 .online-panel code { overflow-wrap: anywhere; font-size: 11px; }
+
+.online-workspace pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 18rem;
+    overflow: auto;
+}

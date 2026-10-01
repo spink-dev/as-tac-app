@@ -35,6 +35,7 @@ test.beforeAll(async () => {
         await db.query('insert into auth.users values($1)', [id]);
     }
     await db.exec(readFileSync('supabase/migrations/202610010001_online.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/202610010002_briefing.sql', 'utf8'));
 });
 test.afterAll(async () => {
     await db.close();
@@ -135,4 +136,411 @@ test('full geometry and reference batch validates; referenced deletion and senso
     expect(snapshot.server_seq).toBe(1);
     expect(snapshot.document.elements).toHaveLength(6);
     expect(snapshot.document.teams).toHaveLength(1);
+});
+
+// Exercise the actual client state machine against the actual SQL functions.
+// PGlite serializes one connection; this proves protocol behavior, not socket-level races.
+import { OnlineSession, type Draft, type SyncApi, scope } from '../src/core/sync/session';
+import type { OnlineProject, OnlineOperation, Role } from '../src/core/sync/client';
+let queue = Promise.resolve();
+function apiFor(user: string): SyncApi {
+    function call<T>(fn: () => Promise<T>): Promise<T> {
+        const next = queue.then(async () => {
+            await as(user);
+            return fn();
+        });
+        queue = next.then(() => {}, () => {});
+        return next;
+    }
+    return {
+        members: (id) => call(async () => (await db.query<{user_id:string;role:Role}>('select user_id,role from public.ast_memberships where project_id=$1', [id])).rows),
+        snapshot: (id) => call(async () => {
+            const record = (await db.query<OnlineProject>('select id,document,server_seq,versions from public.ast_projects where id=$1', [id])).rows[0];
+            if (!record) {
+                throw Object.assign(new Error('forbidden'), { code: '42501' });
+            }
+            return record;
+        }),
+        apply: (id, op, version, changes) => call(async () => (await apply(id, op, changes, version)).rows[0] as OnlineOperation),
+        operation: (id, op) => call(async () => (await db.query<OnlineOperation>('select * from public.ast_operations where project_id=$1 and op_id=$2', [id, op])).rows[0] ?? null),
+    };
+}
+function memoryStore() {
+    let value: Draft | null = null;
+    return {
+        load: async () => structuredClone(value),
+        save: async (draft: Draft | null) => {
+            value = structuredClone(draft);
+        },
+    };
+}
+async function settled(session: OnlineSession) {
+    await expect.poll(() => session.getSnapshot().busy).toBe(false);
+}
+function online(value: boolean) {
+    Object.defineProperty(globalThis.navigator, 'onLine', { configurable: true, value });
+}
+
+test('two editors and a viewer converge; versioned undo never overwrites another editor', async () => {
+    online(true);
+    const id = await create();
+    const a = new OnlineSession(apiFor(owner), id, owner, memoryStore());
+    const b = new OnlineSession(apiFor(admin), id, admin, memoryStore());
+    const v = new OnlineSession(apiFor(viewer), id, viewer, memoryStore());
+    await Promise.all([a.start(), b.start(), v.start()]);
+    const pointA = makeElement(id, 'point', [[8.63,47.36]], 'A');
+    const pointB = makeElement(id, 'point', [[8.631,47.36]], 'B');
+    a.change([{kind:'element', id:pointA.id, value:pointA}]);
+    b.change([{kind:'element', id:pointB.id, value:pointB}]);
+    await Promise.all([settled(a), settled(b)]);
+    await Promise.all([a.refresh(), b.refresh(), v.refresh()]);
+    expect(v.getSnapshot().snapshot?.server_seq).toBe(2);
+    expect(v.getSnapshot().project?.elements.map(e => e.label).sort()).toEqual(['A','B']);
+    expect(() => v.change([{kind:'project',name:'Attack'}])).toThrow();
+    a.undo();
+    await settled(a);
+    expect(a.getSnapshot().project?.elements.map(e => e.label)).toEqual(['B']);
+    expect(a.getSnapshot().canRedo).toBe(true);
+    a.redo();
+    await settled(a);
+    expect(a.getSnapshot().project?.elements.find(e => e.id === pointA.id)?.version).toBe(3);
+    await b.refresh();
+    b.change([{kind:'element',id:pointA.id,value:{...pointA,label:'B edits A',version:4}}]);
+    await settled(b);
+    await a.refresh();
+    expect(a.getSnapshot().canUndo).toBe(false);
+    await v.refresh();
+    expect(v.getSnapshot().project?.elements.find(e => e.id === pointA.id)?.label).toBe('B edits A');
+});
+
+test('same-object conflict survives restart, shows both versions and publishes only explicitly', async () => {
+    online(true);
+    const id = await create();
+    const store = memoryStore();
+    const a = new OnlineSession(apiFor(owner), id, owner, memoryStore());
+    const b = new OnlineSession(apiFor(admin), id, admin, store);
+    await Promise.all([a.start(), b.start()]);
+    const point = makeElement(id,'point',[[8.63,47.36]],'Original');
+    a.change([{kind:'element',id:point.id,value:point}]);
+    await settled(a);
+    await b.refresh();
+    a.change([{kind:'element',id:point.id,value:{...point,label:'Server',version:2}}]);
+    await settled(a);
+    b.change([{kind:'element',id:point.id,value:{...point,label:'Mine',version:2}}]);
+    await settled(b);
+    expect(b.getSnapshot().status).toBe('conflict');
+    expect((await store.load())?.project.elements[0].label).toBe('Mine');
+    b.dispose();
+    const restored = new OnlineSession(apiFor(admin),id,admin,store);
+    await restored.start();
+    expect(restored.getSnapshot().status).toBe('conflict');
+    expect(restored.getSnapshot().snapshot?.document.elements[0].label).toBe('Server');
+    const draft = restored.getSnapshot().draft!;
+    await restored.resolve(draft.changes.map(scope), restored.getSnapshot().snapshot!.server_seq);
+    expect(restored.getSnapshot().status).toBe('live');
+    expect(restored.getSnapshot().project?.elements[0]).toMatchObject({label:'Mine',version:3});
+    expect(await store.load()).toBeNull();
+});
+
+test('lost acknowledgement and sequence gaps recover without duplicate writes; offline draft waits', async () => {
+    online(true);
+    const id = await create();
+    const real = apiFor(owner);
+    let calls = 0;
+    const unreliable: SyncApi = {...real, apply: async (...args) => {
+        calls += 1;
+        await real.apply(...args);
+        throw new Error('Response lost');
+    }};
+    const store = memoryStore();
+    const a = new OnlineSession(unreliable,id,owner,store);
+    await a.start();
+    a.change([{kind:'project',name:'Committed despite lost reply'}]);
+    await settled(a);
+    expect(a.getSnapshot().draft?.sent).toBe(true);
+    await a.refresh();
+    expect(a.getSnapshot().status).toBe('live');
+    expect(a.getSnapshot().snapshot?.server_seq).toBe(1);
+    expect(calls).toBe(1);
+    online(false);
+    a.change([{kind:'project',name:'Offline draft'}]);
+    await settled(a);
+    online(true);
+    await a.refresh();
+    expect(calls).toBe(1);
+    expect(a.getSnapshot().draft?.sent).toBe(false);
+    expect(a.getSnapshot().snapshot?.document.name).toBe('Committed despite lost reply');
+    await a.retry();
+    await a.refresh();
+    expect(a.getSnapshot().project?.name).toBe('Offline draft');
+    expect(a.getSnapshot().snapshot?.server_seq).toBe(2);
+    expect(calls).toBe(2);
+});
+
+test('storage failure sends nothing; revoked membership hides plan and preserves draft', async () => {
+    online(true);
+    const id = await create();
+    const bad = new OnlineSession(apiFor(admin),id,admin, {load:async () => null, save:async () => { throw new Error('quota'); }});
+    await bad.start();
+    bad.change([{kind:'project',name:'Not sent'}]);
+    await settled(bad);
+    expect(bad.getSnapshot().status).toBe('storage-error');
+    expect((await apiFor(owner).snapshot(id)).server_seq).toBe(0);
+    const store = memoryStore();
+    const a = new OnlineSession(apiFor(admin),id,admin,store);
+    await a.start();
+    online(false);
+    a.change([{kind:'project',name:'Saved draft'}]);
+    await settled(a);
+    online(true);
+    await as(owner);
+    await db.query('select public.ast_set_member($1,$2,$3)',[id,admin,null]);
+    await a.refresh();
+    expect(a.getSnapshot().status).toBe('denied');
+    expect(a.getSnapshot().project).toBeNull();
+    expect(a.getSnapshot().role).toBeNull();
+    expect((await store.load())?.project.name).toBe('Saved draft');
+    expect(() => a.change([{kind:'project',name:'Attack'}])).toThrow();
+});
+
+test('configured browser editor uses SQL, viewer receives changes and IndexedDB draft survives reload', async ({ browser }) => {
+    test.skip(process.env.AST_ONLINE_UI_TEST !== '1', 'Requires configured production test build');
+    const id = await create();
+    let network = true;
+    async function open(user: string) {
+        const context = await browser.newContext({ viewport: {width:393,height:852}, serviceWorkers: 'block' });
+        const page = await context.newPage();
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        const api = apiFor(user);
+        await context.route('https://as-tac-test.invalid/**', async (route) => {
+            if (!network && user === owner) {
+                await route.abort();
+                return;
+            }
+            const request = route.request();
+            const url = new URL(request.url());
+            let data: unknown;
+            try {
+                if (url.pathname === '/auth/v1/token') {
+                    data = { access_token:'test-only-token',refresh_token:'test-only-refresh',token_type:'bearer',expires_in:3600,user:{id:user,email:'test@example.test',aud:'authenticated'} };
+                } else if (url.pathname === '/rest/v1/ast_projects') {
+                    const record = await api.snapshot(id);
+                    data = url.searchParams.has('id') ? record : [record];
+                } else if (url.pathname === '/rest/v1/ast_memberships') {
+                    data = await api.members(id);
+                } else if (url.pathname === '/rest/v1/ast_operations') {
+                    const op = await api.operation(id, url.searchParams.get('op_id')!.slice(3));
+                    data = op ? [op] : [];
+                } else if (url.pathname === '/rest/v1/rpc/ast_briefing' || url.pathname === '/rest/v1/rpc/ast_present') {
+                    const body = request.postDataJSON();
+                    const result = queue.then(async () => {
+                        await as(user);
+                        return url.pathname.endsWith('/ast_briefing')
+                            ? db.query<any>('select public.ast_briefing($1) as value',[body.p_project])
+                            : db.query<any>('select public.ast_present($1,$2,$3,$4,$5) as value',[body.p_project,body.p_session,body.p_action,body.p_phase,JSON.stringify(body.p_camera)]);
+                    });
+                    queue = result.then(() => {}, () => {});
+                    data = (await result).rows[0].value;
+                } else if (url.pathname === '/rest/v1/rpc/ast_apply') {
+                    const body = request.postDataJSON();
+                    data = await api.apply(body.p_project,body.p_op,body.p_project_version,body.p_changes);
+                } else {
+                    data = null;
+                }
+                await route.fulfill({json:data ?? null});
+            } catch (error) {
+                await route.fulfill({status:409,json:{code:(error as any).code,message:(error as Error).message}});
+            }
+        });
+        async function loginOpen() {
+            await page.goto('/');
+            await page.getByText('Online-Projekte & Mitglieder',{exact:true}).click();
+            await page.getByLabel('E-Mail',{exact:true}).fill('test@example.test');
+            await page.getByLabel('Passwort',{exact:true}).fill('test-only-password');
+            await page.getByRole('button',{name:'Anmelden',exact:true}).click();
+            await page.getByRole('button',{name:'Online-Stand aktualisieren',exact:true}).click();
+            await page.getByLabel('Online-Projekt',{exact:true}).selectOption(id);
+            await page.getByRole('button',{name:'Gemeinsam auf der Karte öffnen',exact:true}).click();
+            await expect(page.locator('.map')).toHaveAttribute('aria-busy','false');
+            await expect(page.getByRole('heading',{name:'Gemeinsamer Plan',exact:true,level:2})).toBeVisible();
+        }
+        await loginOpen();
+        return {context,page,errors,loginOpen};
+    }
+    const a = await open(owner);
+    const v = await open(viewer);
+    await expect(v.page.getByRole('button',{name:'Plan bearbeiten',exact:true})).toBeDisabled();
+    await a.page.getByRole('button',{name:'Plan bearbeiten',exact:true}).click();
+    await a.page.getByRole('group',{name:'Zeichenwerkzeuge'}).getByRole('button',{name:'Punkt',exact:true}).click();
+    await a.page.locator('.maplibregl-canvas').click({position:{x:100,y:220}});
+    await expect(a.page.getByRole('region',{name:'Online-Status'})).toContainText('Serverstand bestätigt');
+    await expect(v.page.locator('.element-list li')).toHaveCount(1);
+    network = false;
+    await a.page.getByRole('button',{name:'Serverstand prüfen',exact:true}).click();
+    await expect(a.page.getByRole('region',{name:'Online-Status'})).toContainText('Offline');
+    await a.page.getByLabel('Beschriftung',{exact:true}).fill('Entwurf im Funkloch');
+    await a.page.getByRole('button',{name:'Übernehmen',exact:true}).click();
+    await expect(a.page.getByRole('region',{name:'Online-Status'})).toContainText('Eigener Entwurf');
+    const count = (await apiFor(owner).snapshot(id)).server_seq;
+    network = true;
+    await a.page.getByRole('button',{name:'Serverstand prüfen',exact:true}).click();
+    expect((await apiFor(owner).snapshot(id)).server_seq).toBe(count);
+    await a.loginOpen();
+    await expect(a.page.locator('.element-list')).toContainText('Entwurf im Funkloch');
+    await a.page.getByRole('button',{name:'Unveränderte Sendung erneut prüfen',exact:true}).click();
+    await expect(v.page.locator('.element-list')).toContainText('Entwurf im Funkloch');
+    for (const title of ['Sammeln', 'Vorrücken']) {
+        await a.page.getByLabel('Neue Phase',{exact:true}).fill(title);
+        await a.page.getByRole('button',{name:'Phase anlegen',exact:true}).click();
+        await expect(a.page.getByRole('region',{name:'Online-Status'})).toContainText('Serverstand bestätigt');
+    }
+    await a.page.getByRole('button',{name:'Briefing starten',exact:true}).click();
+    // Exclusive presentation is voluntary and does not increment the shared plan sequence.
+    const confirmed = (await apiFor(owner).snapshot(id)).server_seq;
+    await a.page.getByRole('button',{name:'Briefing leiten',exact:true}).click();
+    await expect(a.page.getByText(/Du leitest das Briefing/)).toBeVisible();
+    await expect(v.page.getByLabel('Präsentation folgen',{exact:true})).toBeEnabled();
+    await expect(v.page.getByLabel('Präsentation folgen',{exact:true})).not.toBeChecked();
+    await v.page.getByLabel('Präsentation folgen',{exact:true}).check();
+    await expect(v.page.getByLabel('Präsentation folgen',{exact:true})).toBeChecked();
+    await expect(v.page.getByRole('region',{name:'Lokales Briefing'})).toContainText('Sammeln');
+    await v.page.getByLabel('Präsentation folgen',{exact:true}).uncheck();
+    await a.page.getByRole('button',{name:'Nächste Phase',exact:true}).click();
+    await expect(a.page.getByRole('region',{name:'Lokales Briefing'})).toContainText('Vorrücken');
+    await expect(v.page.getByRole('region',{name:'Lokales Briefing'})).toContainText('Sammeln');
+    await v.page.getByLabel('Präsentation folgen',{exact:true}).check();
+    await expect(v.page.getByRole('region',{name:'Lokales Briefing'})).toContainText('Vorrücken');
+    await a.page.getByRole('button',{name:'Leitung abgeben',exact:true}).click();
+    expect((await apiFor(owner).snapshot(id)).server_seq).toBe(confirmed);
+    await a.page.screenshot({ path: 'test-results/online-briefing-mobile.png', fullPage: true });
+    // Cached snapshots open without authentication or any successful API request.
+    network = false;
+    await a.page.goto('/');
+    await a.page.getByText('Online-Projekte & Mitglieder',{exact:true}).click();
+    await a.page.getByText('Gesicherte Online-Projekte ohne Anmeldung öffnen',{exact:true}).click();
+    await a.page.getByRole('button',{name:/Offline-Kopie · Stand/}).click();
+    await expect(a.page.locator('.element-list')).toContainText('Entwurf im Funkloch');
+    await expect(a.page.getByRole('region',{name:'Online-Status'})).toContainText('Offline-Kopie');
+    await a.page.getByRole('button',{name:'Plan bearbeiten',exact:true}).click();
+    await a.page.locator('.element-list button').first().click();
+    await a.page.getByLabel('Beschriftung',{exact:true}).fill('Offline ohne Anmeldung');
+    await a.page.getByRole('button',{name:'Übernehmen',exact:true}).click();
+    await expect(a.page.locator('.element-list')).toContainText('Offline ohne Anmeldung');
+    await expect(a.page.getByRole('button',{name:'Unveränderte Sendung erneut prüfen',exact:true})).toBeDisabled();
+    expect((await apiFor(owner).snapshot(id)).server_seq).toBe(confirmed);
+    await a.page.screenshot({ path: 'test-results/online-draft-mobile.png', fullPage: true });
+    expect(a.errors).toEqual([]);
+    expect(v.errors).toEqual([]);
+    await a.context.close();
+    await v.context.close();
+});
+
+test('briefing lease is exclusive, rejects viewers and expires without modifying plan', async () => {
+    const id = await create();
+    const first = crypto.randomUUID();
+    const second = crypto.randomUUID();
+    const camera = {center:[8.63,47.36],zoom:15,bearing:0,pitch:0};
+    const present = (session: string, action: string, position: unknown = camera) => db.query<any>('select public.ast_present($1,$2,$3,null,$4) as value',[id,session,action,JSON.stringify(position)]);
+    await as(viewer);
+    await expect(present(first,'claim')).rejects.toThrow('forbidden');
+    await expect(db.query('select * from public.ast_briefings')).rejects.toThrow('permission denied');
+    await as(owner);
+    expect((await present(first,'claim')).rows[0].value).toMatchObject({presenterId:owner,sessionId:first,camera});
+    await as(admin);
+    await expect(present(second,'claim')).rejects.toThrow('already_presenting');
+    await expect(present(second,'update')).rejects.toThrow('presentation_expired');
+    await as(owner);
+    await expect(present(first,'update',{...camera,center:[8,91]})).rejects.toThrow('invalid_camera');
+    await expect(present(first,'update',{...camera,gps:{}})).rejects.toThrow('invalid_camera');
+    await present(first,'update',{...camera,zoom:16});
+    await as(viewer);
+    expect((await db.query<any>('select public.ast_briefing($1) as value',[id])).rows[0].value.camera.zoom).toBe(16);
+    await as(outsider);
+    await expect(db.query('select public.ast_briefing($1)',[id])).rejects.toThrow('forbidden');
+    await db.exec('reset role');
+    await db.query("update public.ast_briefings set expires_at=clock_timestamp()-interval '1 second' where project_id=$1",[id]);
+    await as(viewer);
+    expect((await db.query<any>('select public.ast_briefing($1) as value',[id])).rows[0].value).toBeNull();
+    await as(admin);
+    await present(second,'claim');
+    await as(owner);
+    await expect(present(first,'update')).rejects.toThrow('presentation_expired');
+    await db.query('select public.ast_set_member($1,$2,$3)',[id,admin,'viewer']);
+    expect((await db.query<any>('select public.ast_briefing($1) as value',[id])).rows[0].value).toBeNull();
+    await present(first,'claim');
+    await present(first,'release');
+    expect((await db.query<any>('select public.ast_briefing($1) as value',[id])).rows[0].value).toBeNull();
+    const snapshot = (await db.query<any>('select document,server_seq from public.ast_projects where id=$1',[id])).rows[0];
+    expect(snapshot.server_seq).toBe(0);
+    expect(snapshot.document.phases).toEqual([]);
+});
+
+
+test('form edit keeps its original base during refresh and offline draft accumulates atomic actions', async () => {
+    online(true);
+    const id = await create();
+    const a = new OnlineSession(apiFor(owner),id,owner,memoryStore());
+    const b = new OnlineSession(apiFor(admin),id,admin,memoryStore());
+    await Promise.all([a.start(),b.start()]);
+    const point = makeElement(id,'point',[[8.63,47.36]],'Initial');
+    a.change([{kind:'element',id:point.id,value:point}]);
+    await settled(a);
+    await b.refresh();
+    b.hold();
+    a.change([{kind:'element',id:point.id,value:{...point,version:2,label:'Remote'}}]);
+    await settled(a);
+    await b.refresh();
+    expect(b.getSnapshot().project?.elements[0].label).toBe('Initial');
+    expect(b.getSnapshot().snapshot?.document.elements[0].label).toBe('Remote');
+    b.change([{kind:'element',id:point.id,value:{...point,version:2,label:'Typed before refresh'}}]);
+    await settled(b);
+    expect(b.getSnapshot().status).toBe('conflict');
+    online(false);
+    a.change([{kind:'element',id:point.id,value:{...point,version:3,label:'Draft 1',teamId:undefined}}]);
+    await settled(a);
+    const extra = makeElement(id,'point',[[8.631,47.36]],'Draft 2');
+    a.change([{kind:'element',id:extra.id,value:extra}]);
+    await settled(a);
+    expect(a.getSnapshot().draft?.changes).toHaveLength(2);
+    online(true);
+    await a.retry();
+    expect(a.getSnapshot().status).toBe('live');
+    expect(a.getSnapshot().project?.elements.map(e => e.label).sort()).toEqual(['Draft 1','Draft 2']);
+});
+
+
+test('successive online undo/redo preserves causal versions and stops at intervening remote work', async () => {
+    online(true);
+    const id = await create();
+    const a = new OnlineSession(apiFor(owner),id,owner,memoryStore());
+    await a.start();
+    const p = makeElement(id,'point',[[8.63,47.36]],'One');
+    a.change([{kind:'element',id:p.id,value:p}]);
+    await settled(a);
+    a.change([{kind:'element',id:p.id,value:{...p,version:2,label:'Two'}}]);
+    await settled(a);
+    a.undo();
+    await settled(a);
+    expect(a.getSnapshot().canUndo).toBe(true);
+    a.undo();
+    await settled(a);
+    expect(a.getSnapshot().project?.elements).toHaveLength(0);
+    a.redo();
+    await settled(a);
+    expect(a.getSnapshot().canRedo).toBe(true);
+    a.redo();
+    await settled(a);
+    expect(a.getSnapshot().project?.elements[0].label).toBe('Two');
+    const b = new OnlineSession(apiFor(admin),id,admin,memoryStore());
+    await b.start();
+    b.change([{kind:'element',id:p.id,value:{...b.getSnapshot().project!.elements[0],label:'Remote'}}]);
+    await settled(b);
+    await a.refresh();
+    a.change([{kind:'element',id:p.id,value:{...a.getSnapshot().project!.elements[0],label:'After remote'}}]);
+    await settled(a);
+    a.undo();
+    await settled(a);
+    expect(a.getSnapshot().project?.elements[0].label).toBe('Remote');
+    expect(a.getSnapshot().canUndo).toBe(false);
 });

@@ -1,3 +1,4 @@
+import OnlineWorkspace, { type OnlineTarget } from '../features/online/OnlineWorkspace';
 import OnlinePanel from '../features/online/OnlinePanel';
 import PortablePanel from '../features/portable/PortablePanel';
 import { de } from '../i18n/de';
@@ -21,6 +22,11 @@ import BriefingPanel from '../features/briefing/BriefingPanel';
 import type { Phase } from '../core/projects/model';
 
 export default function App() {
+    const [target, setTarget] = useState<OnlineTarget | null>(null);
+    const close = useCallback(() => setTarget(null), []);
+    return target ? <OnlineWorkspace target={target} close={close} /> : <LocalApp onOpen={setTarget} />;
+}
+function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
     const [areaId, setAreaId] = useState(areas[0].id);
     const [session] = useState(() => new ProjectSession());
     const projects = useSyncExternalStore(session.subscribe, session.getSnapshot);
@@ -112,7 +118,7 @@ export default function App() {
                     }}>{follow ? de.location.pause : de.location.follow}</button>}</div>
                 <p className="muted">{de.location.privacy}</p>
             </section>
-            <OnlinePanel />
+            <OnlinePanel onOpen={onOpen} locked={!canReload()} />
             <details><summary>{de.app.sources}</summary>
                 <p>AS-TAC · v{version}</p>
                 <p>{area?.name ?? selectedAreaId}</p>

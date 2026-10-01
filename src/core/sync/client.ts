@@ -1,3 +1,5 @@
+import type { Presentation } from './briefing';
+import type { Phase } from '../projects/model';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { validateProject, type Project } from '../projects/model';
 export type Role = 'owner' | 'admin' | 'viewer';
@@ -28,7 +30,7 @@ export function onlineClient() {
     if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(parsed.hostname))) {
         throw new Error('Online endpoint requires HTTPS');
     }
-    client = createClient(url, key, { auth: { persistSession: false, detectSessionInUrl: false, autoRefreshToken: true } });
+    client = createClient(url, key, { db: { retry: false }, global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.any([AbortSignal.timeout(10_000), ...(init?.signal ? [init.signal] : [])]) }) }, auth: { persistSession: false, detectSessionInUrl: false, autoRefreshToken: true } });
     return client;
 }
 export class OnlineApi {
@@ -48,6 +50,34 @@ export class OnlineApi {
             throw new Error('Invalid online snapshot');
         }
         return value;
+    }
+    async briefing(project: string): Promise<Presentation | null> {
+        const { data, error } = await this.client.rpc('ast_briefing', { p_project: project });
+        if (error) {
+            throw error;
+        }
+        return data;
+    }
+    async present(project: string, session: string, action: 'claim' | 'update' | 'release', phase: string | null, camera: Phase['camera']): Promise<Presentation | null> {
+        const { data, error } = await this.client.rpc('ast_present', { p_project: project, p_session: session, p_action: action, p_phase: phase, p_camera: camera });
+        if (error) {
+            throw error;
+        }
+        return data;
+    }
+    async snapshot(project: string): Promise<OnlineProject> {
+        const { data, error } = await this.client.from('ast_projects').select('id,document,server_seq,versions').eq('id', project).single();
+        if (error || !data) {
+            throw error ?? Object.assign(new Error('forbidden'), { code: '42501' });
+        }
+        return this.validate(data);
+    }
+    async operation(project: string, op: string): Promise<OnlineOperation | null> {
+        const { data, error } = await this.client.from('ast_operations').select('*').eq('project_id', project).eq('op_id', op).maybeSingle();
+        if (error) {
+            throw error;
+        }
+        return data;
     }
     async create(name: string, map: string): Promise<void> {
         const { error } = await this.client.rpc('ast_create_project', { p_id: crypto.randomUUID(), p_name: name, p_map: map });

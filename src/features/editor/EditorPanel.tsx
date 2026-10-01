@@ -56,8 +56,8 @@ function Inspector({ element, editor, project }: { element: PlanElement; editor:
         </form>}
     </div>;
 }
-export default function EditorPanel({ editor, project, session, state, disabled }: {
-    editor: Editor; project: Project | null; session: ProjectSession; state: ProjectState; disabled: boolean;
+export default function EditorPanel({ editor, project, session, state, disabled, statusText }: {
+    editor: Editor; project: Project | null; session: Pick<ProjectSession, 'undo' | 'redo'>; state: Pick<ProjectState, 'saveState' | 'canUndo' | 'canRedo'>; disabled: boolean; statusText?: string;
 }) {
     const t = de.editor;
     const [query, setQuery] = useState('');
@@ -67,7 +67,7 @@ export default function EditorPanel({ editor, project, session, state, disabled 
     const elements = project.elements.filter((element) => !element.deletedAt && `${element.label} ${element.notes}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
     return <section aria-label={t.title}>
         <h2>{t.title}</h2>
-        <p role="status">{t.saveStates[state.saveState]}</p>
+        <p role="status">{statusText ?? t.saveStates[state.saveState]}</p>
         <button disabled={disabled || editor.hasDraft} aria-pressed={editor.editing} onClick={() => {
             editor.cancel();
             editor.setEditing(!editor.editing);
@@ -90,6 +90,6 @@ export default function EditorPanel({ editor, project, session, state, disabled 
         <label>{t.search}<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         <ul className="element-list">{elements.map((element) => <li key={element.id}><button disabled={editor.hasDraft} aria-pressed={editor.selected?.id === element.id} onClick={() => editor.select(element)}>{element.label || t.tools[element.type]} <small>· {t.tools[element.type]}</small></button></li>)}</ul>
         {!elements.length && <p>{t.empty}</p>}
-        {editor.selected && !editor.hasDraft && <Inspector key={`${editor.selected.id}:${editor.selected.version}:${editor.editing}`} element={editor.selected} editor={editor} project={project} />}
+        {editor.selected && !editor.hasDraft && <fieldset disabled={disabled}><Inspector key={`${editor.selected.id}:${editor.selected.version}:${editor.editing}`} element={editor.selected} editor={editor} project={project} /></fieldset>}
     </section>;
 }
