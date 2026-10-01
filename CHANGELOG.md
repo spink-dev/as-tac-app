@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 2026-10-01
+
+- AST-007/008 und Kartenkorrekturen aus der Preview integriert. Reale Geräteabnahme weiterhin offen.
+
+
 ## 0.3.0-alpha.3 — 2026-10-01 (testing)
 
 - Strassennamen folgen offline dem Strassenverlauf, ohne Punktmarker oder Textkästchen. Zu kurze/enge Abschnitte und überlappende Namen werden ausgeblendet.
