@@ -8,7 +8,7 @@ AST-003 implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nac
 | AST-002 | P0 / M1 | App-Grundstruktur, Versionskontrolle und Prüfkommandos — implementiert | 001 | Astro/React-App, Manifest, kontrollierter Service Worker, lokale Ressourcen; Build/Checks dokumentiert |
 | AST-003 | P0 / M1 | Domäne, Commands, lokale Speicherung — implementiert | 002 | WGS84-Schema, Transaktionen, Autosave-Status, Undo/Redo und Migrationstests |
 | AST-004 | P0 / M1 | Gebietspakete verwalten — implementiert, Anbieter-/Geräteprüfung offen | 003 | Import/Download, Grösse/Quota, Hashprüfung, atomarer Wechsel, Attribution; Abbruch erhält gültigen Stand |
-| AST-005 | P0 / M1 | Karteneditor und präzise Ergänzungen | 003, 004 | Punkte, Linien, Flächen/Kreise, Text, Freihand, Attribute, Koordinaten und Messung; Desktop/Touch geprüft |
+| AST-005 | P0 / M1 | Karteneditor und präzise Ergänzungen — implementiert, Geräteabnahme offen | 003, 004 | Punkte, Linien, Flächen/Kreise, Text, Freihand, Attribute, Koordinaten und Messung; Desktop/Touch geprüft |
 | AST-006 | P0 / M1 | Teams, Phasen und lokales Briefing | 005 | Zuordnung, Vor/Zurück, Kamera, temporäre Zeichnungen und klare Feldansicht |
 | AST-007 | P0 / M1 | Portables Paket und Teilen | 004, 006 | Vollständiger Roundtrip auf zweitem Gerät; begrenzte Dekompression, Hash-/Schemafehler, iOS-Dateiimport |
 | AST-008 | P0 / M1 | GPS und mobile Feldnutzung härten | 001, 004 | Genauigkeit/Alter, denied/timeout/stale, Follow/Explore, ausserhalb Gebiet; offline auf Telefon getestet |
@@ -54,3 +54,7 @@ Nächster Auftrag: **AST-004**, Gebietspakete verwalten und freie Gebietsauswahl
 ## AST-004 — Preview-Checkpoint
 
 Freie Bounds/Ausschnittsauswahl, begrenzter Download, importierbare OSM-GeoJSON-Pakete, Hash-/Quota-Prüfung, atomare Installation und Löschschutz für Projektreferenzen. Datenbank-Upgrade erhält bestehende Projekte. Automatisierte Providerantworten ersetzen keinen Live-Overpass-/iPhone-Nachweis. Weiter mit AST-005; siehe `evidence/ast-004-packages.md`.
+
+## AST-005 — Preview-Checkpoint
+
+Sechs Geometrietypen, Planungs-/Feldmodus, Attribute/Koordinaten, Messungen, Auswahl/Suche, lokale Sichtbarkeit, Objekt-/Vertexverschieben und Undo/Redo. Desktop und Chromium-Touchautomation geprüft, keine reale Geräteabnahme. Siehe `evidence/ast-005-editor.md`. Weiter mit AST-006.

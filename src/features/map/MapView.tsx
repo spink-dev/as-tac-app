@@ -11,9 +11,10 @@ maplibregl.setWorkerUrl(workerUrl);
 
 import type { Bounds, MapPackage } from '../../core/packages/maps';
 
-export default function MapView({ mapPackage, onViewport, fix, stale, follow, onExplore }: {
+export default function MapView({ mapPackage, onViewport, onReady, fix, stale, follow, onExplore }: {
     mapPackage: MapPackage | null;
     onViewport: (bounds: Bounds) => void;
+    onReady: (map: LibreMap | null) => void;
     fix: Fix | null;
     stale: boolean;
     follow: boolean;
@@ -135,6 +136,7 @@ export default function MapView({ mapPackage, onViewport, fix, stale, follow, on
                         instance.addLayer({ id: 'accuracy-line', type: 'line', source: 'accuracy',
                             paint: { 'line-color': '#176b89', 'line-width': 2 } });
                         setMapReady(true);
+                        onReady(instance);
                     } catch (error) {
                         if (!disposed) {
                             setMapError(String(error));
@@ -153,10 +155,11 @@ export default function MapView({ mapPackage, onViewport, fix, stale, follow, on
             abort.abort();
             marker.current?.remove();
             marker.current = null;
+            onReady(null);
             map.current?.remove();
             map.current = null;
         };
-    }, [mapPackage, onExplore, onViewport]);
+    }, [mapPackage, onExplore, onViewport, onReady]);
 
     useEffect(() => {
         if (!mapReady || !map.current || !fix) {

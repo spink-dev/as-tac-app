@@ -113,3 +113,9 @@ App-Version, inhaltsbasierte Offline-Cache-Version und Projekt-Schema sind getre
 Unter „Gebietspakete“ freie kleine WGS84-Grenzen eingeben oder den sichtbaren Ausschnitt übernehmen. Der Download fragt Overpass einmalig ab (keine automatische Wiederholung, mindestens 60 Sekunden Abstand pro Sitzung), prüft Grösse/Hash/Speicher und installiert das Gebiet atomar. Der öffentliche Pilot-Endpunkt ist kein garantierter Produktionsdienst. Kartenpakete lassen sich separat als `.astac-map.json` sichern und offline importieren; dies sind noch keine vollständigen Projektpakete.
 
 Zusätzliche Gebiete liegen in IndexedDB, getrennt von den gebündelten App-Ressourcen. Schema 1 der Projekte bleibt erhalten; DB-Version 2 ergänzt den Store `maps`. Paketimporte überschreiben keine vorhandenen Gebiete. Ein von einem gespeicherten Projekt verwendetes Gebiet lässt sich nicht löschen. Scheitert das Laden eines gewählten Gebiets, bleibt die bisherige Karte mit ausdrücklichem Hinweis sichtbar.
+
+## Preview 0.2.0-alpha.2 — AST-005
+
+Projekt öffnen und „Plan bearbeiten“ wählen. Punkt/Text per Tap, Linien/Flächen per Eckpunkten und „Zeichnung abschliessen“, Kreis mit Mittelpunkt und Rand, Freihand per Ziehen. Nach jeder Zeichnung wieder Auswahlmodus. Escape oder „Zeichnung abbrechen“ verwirft den laufenden Entwurf; Kartenbewegung in Auswahl/Feldansicht erzeugt keine Objekte.
+
+Elemente über Karte oder Liste auswählen. Beschriftung/Notizen/Farbe/Breite und WGS84-Koordinaten pro Zeile unter „Übernehmen“ anwenden. Kreuz verschiebt das ganze Objekt, Punktgriffe verschieben Eckpunkte (bis 200 sichtbare Griffe; längere Linien über die Koordinatenliste). Distanz und Fläche sind sphärische Näherungen, keine Vermessungszusage. Planänderungen speichern über AST-003 und lassen sich rückgängig machen. Sichtbarkeit und Auswahl bleiben lokal. Teams/Phasen folgen in AST-006.

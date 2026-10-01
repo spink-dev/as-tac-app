@@ -1,0 +1,9 @@
+# AST-005 — Karteneditor, Preview 0.2.0-alpha.2
+
+2026-10-01. Plan-Layer getrennt von Basiskarte und GPS. Bewusster Bearbeitungsmodus; sechs Zeichenarten, Suchliste und Kartenauswahl, Label/Notizen/Stil, Koordinaten-/Radiusbearbeitung, sphärische Messungen, Objekt-/Vertexverschieben, Löschen/Undo/Redo. Laufende Zeichnung wird erst beim Abschluss zum Projektcommand. Escape/Abbruch verwirft nur den Zeichenentwurf; Projektwechsel und App-Update sind dabei gesperrt. Eigene Darstellung und Gestenimplementierung; kein Referenzcode übernommen.
+
+Browsernachweise: alle sechs Typen erzeugt, Attribute/Koordinaten geändert, gelöscht und rückgängig gemacht, vollständig offline erneut geöffnet. Auswahl/Feldansicht erzeugen beim Verschieben keine Objekte. Ungültige Koordinaten erhalten den vorherigen Stand. Mausbewegung des Objektgriffs und eines Linieneckpunkts erzeugt reversible Änderungen. Chromium-Touchkontext: Polygon per Tap, Feldmodus ohne Neuanlage, native Touch-Freihandsequenz. Geometrie-Unitchecks: WGS84-Abstand, Kreisradius/-schluss, Polygonfläche, Translation/Eckpunktersetzung. Bestehende Karten-/GPS-/Projekt-/Pakettests erhalten.
+
+Gefundene Fehler behoben: nichtinteraktive OSM-Labels fangen keine Pointerereignisse mehr; Textarea-Namen sind stabil; Freihand verhindert native Touch-Scrollübernahme. Mobile Screenshotkontrolle unter `test-results/editor-mobile.png`; keine laufenden Browserfehler im vollständigen Zeichenablauf.
+
+Grenzen: Chromium ist kein iPhone-/Galaxy-Feldnachweis. Maximal 500 Planelemente, 5 000 Eckpunkte pro Element und 100 000 pro Projekt, 200 interaktive Vertexgriffe. Keine Topologie-/Selbstschnittreparatur und keine automatische Routenberechnung. Feldansicht ist momentan die kompakte Karten-/Panelansicht; Endgeräteergonomie bleibt Teil von AST-008/014. Inspector-Eingaben werden bewusst mit „Übernehmen“ abgeschlossen; Undo-Historie bleibt sitzungsbezogen.

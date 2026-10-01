@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-alpha.2 — 2026-10-01 (testing)
+
+- AST-005: bewusster Planungsmodus, Punkte/Linien/Flächen/Kreise/Text/Freihand, Auswahl/Elementsuche und lokale Layer-Sichtbarkeit.
+- Attribute, präzise WGS84-Eckpunkte, Radius, geodätische Distanz/Fläche, Objekt-/Vertexverschieben und undo-fähige Löschung.
+- Desktop- und Chromium-Touchgesten geprüft, inklusive nativer Touch-Freihandbewegung; reale Geräteabnahme bleibt offen.
+
 ## 0.2.0-alpha.1 — 2026-10-01 (testing)
 
 - AST-004: freie kleine Gebietsauswahl, begrenzte Overpass-Downloads, Kartenpaket-Import/Export, Hash-/Quota-Prüfung und atomare Speicherung.
