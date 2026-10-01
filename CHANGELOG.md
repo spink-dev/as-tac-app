@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0 — 2026-10-01 (main)
+
+- Vom Nutzer freigegebene Integration des gesamten bisherigen Stands bis AST-012.
+- Supabase-Konfiguration und reale Geräte-/Mehrverbindungsabnahme bleiben als offene Nachweise dokumentiert.
+
 ## 0.4.0-alpha.2 — 2026-10-01 (testing)
 
 - AST-010: Gemeinsamer Karteneditor für Owner/Admin, schreibgeschützte Mitgliederansicht, bestätigte Snapshot-Aktualisierung und serverversioniertes Undo/Redo.

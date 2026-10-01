@@ -102,7 +102,7 @@ IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und
 
 ## Versionierung und Releases
 
-`package.json` ist die Quelle der App-Version; `package-lock.json`, die Anzeige unter „Über & Quellen“ und `offline-manifest.json.appVersion` stimmen damit überein. Release **v0.3.0** integriert den Offline-Stack bis AST-008; **0.4.0-alpha.2** ergänzt AST-009–012 auf `testing`. Änderungen stehen im [Changelog](CHANGELOG.md).
+`package.json` ist die Quelle der App-Version; `package-lock.json`, die Anzeige unter „Über & Quellen“ und `offline-manifest.json.appVersion` stimmen damit überein. Release **v0.4.0** integriert den bisherigen Stand bis AST-012 auf `main`. Echte Backend- und Geräteabnahme bleiben offen. Änderungen stehen im [Changelog](CHANGELOG.md).
 
 Release-Stände auf `main` erhalten einen annotierten Git-Tag `vX.Y.Z`. Neue Funktionen erhöhen vor 1.0 die Minor-Version, Fehlerkorrekturen die Patch-Version; inkompatible Änderungen werden ausdrücklich dokumentiert und gegebenenfalls migriert. `testing` enthält die nächste Integration für die Preview. Der vollständige lokale MVP ist mit 0.1.0 noch nicht abgeschlossen.
 
