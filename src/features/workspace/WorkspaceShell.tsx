@@ -1,11 +1,18 @@
+import Appearance from '../appearance/Appearance';
+import BrandMark from '../appearance/BrandMark';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 export type WorkspaceTab = 'field' | 'plan' | 'briefing' | 'maps' | 'project';
 const tabs: { id: WorkspaceTab; label: string; icon: string; title: string }[] = [
-    { id: 'field', label: 'Orientierung', icon: '◎', title: 'Im Gelände' },
-    { id: 'plan', label: 'Planung', icon: '✎', title: 'Plan bearbeiten' },
-    { id: 'briefing', label: 'Briefing', icon: '▷', title: 'Briefing' },
-    { id: 'maps', label: 'Karten', icon: '▧', title: 'Karten & Gebiete' },
-    { id: 'project', label: 'Projekt', icon: '▤', title: 'Projekt & Zusammenarbeit' },
+    { id: 'field', label: 'Orientierung', icon: 'M12 3 4 21l8-5 8 5Z M12 3v13', title: 'Im Gelände' },
+    { id: 'plan', label: 'Planung', icon: 'm4 16 12-12 4 4-12 12H4Z M13 7l4 4', title: 'Plan bearbeiten' },
+    { id: 'briefing', label: 'Briefing', icon: 'm8 5 11 7-11 7Z', title: 'Briefing' },
+    { id: 'maps', label: 'Karten', icon: 'm3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2Z M9 3v16 M15 5v16', title: 'Karten & Gebiete' },
+    {
+        id: 'project',
+        label: 'Projekt',
+        icon: 'M3 7h7l2-3h9v17H3Z M7 12h10 M7 16h7',
+        title: 'Projekt & Zusammenarbeit',
+    },
 ];
 export default function WorkspaceShell({
     title,
@@ -61,9 +68,9 @@ export default function WorkspaceShell({
         <main className={`workspace ${open ? 'sheet-open' : 'sheet-closed'} mode-${tab}`}>
             <header className="workspace-header">
                 <a className="workspace-brand" href="#" onClick={(event) => event.preventDefault()} aria-label="AS-TAC Kartenarbeitsplatz">
-                    <span className="brand-mark">A</span>
+                    <BrandMark />
                     <span>
-                        AS-TAC<small>KARTENARBEITSPLATZ</small>
+                        AS-TAC<small>FIELD SYSTEMS</small>
                     </span>
                 </a>
                 <div className="workspace-title">
@@ -72,6 +79,7 @@ export default function WorkspaceShell({
                 </div>
                 <span className="workspace-status">{status}</span>
                 {actions}
+                <Appearance />
             </header>
             {map}
             <div className="map-context">
@@ -162,7 +170,20 @@ export default function WorkspaceShell({
                             }
                         }}
                     >
-                        <span aria-hidden="true">{item.icon}</span>
+                        <span aria-hidden="true">
+                            <svg
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.65"
+                                strokeLinejoin="round"
+                                strokeLinecap="round"
+                            >
+                                <path d={item.icon} />
+                            </svg>
+                        </span>
                         {item.label}
                     </button>
                 ))}

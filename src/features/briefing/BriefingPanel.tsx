@@ -1,3 +1,4 @@
+import { useTheme } from '../appearance/theme';
 import { useEffect, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as LibreMap } from 'maplibre-gl';
 import type { Coordinate, Phase, Project } from '../../core/projects/model';
@@ -9,6 +10,7 @@ export default function BriefingPanel({ project, map, change, onPhase, disabled,
     project: Project | null; map: LibreMap | null; change: (commands: Command[]) => void;
     onPhase: (phase: Phase | null) => void; disabled: boolean; pauseFollow: () => void; readOnly?: boolean; remotePhase?: { id: string | null };
 }) {
+    const theme = useTheme();
     const t = de.briefing;
     const [activeId, setActiveId] = useState<string | null>(null);
     const [drawing, setDrawing] = useState(false);
@@ -74,6 +76,11 @@ export default function BriefingPanel({ project, map, change, onPhase, disabled,
             }
         };
     }, [map]);
+    useEffect(() => {
+        if (map?.getLayer('briefing-notes-line')) {
+            map.setPaintProperty('briefing-notes-line', 'line-color', theme === 'red' ? '#eeeeee' : '#d55216');
+        }
+    }, [map, theme]);
     useEffect(() => {
         const source = map?.getSource('briefing-notes') as GeoJSONSource | undefined;
         source?.setData({ type: 'FeatureCollection', features: phase ? strokes.map((coordinates) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } })) : [] });

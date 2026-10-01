@@ -1,1 +1,25 @@
-{"id":"/","name":"as-tac Offline-Karte","short_name":"as-tac","lang":"de","start_url":"/","scope":"/","display":"standalone","background_color":"#f6f5ed","theme_color":"#253d32","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"}]}
+{
+  "id": "/",
+  "name": "AS-TAC · Field Systems",
+  "short_name": "AS-TAC",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#171a1e",
+  "theme_color": "#171a1e",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

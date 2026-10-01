@@ -4,7 +4,21 @@ Produktkontext: [PRODUCT.md](PRODUCT.md). Funktionale Karte für Gelände, Planu
 
 ## Visuelle Regeln
 
-Systemschrift, keine extern geladenen Fonts. Hintergrund weiss bzw. `#f0f4f2`, Text `#1e302a`, zweitrangiger Text `#53665e`, einzige UI-Akzentfarbe `#215b45`. Team-/Objektfarben gehören zu Kartendaten, nicht zur Navigation. Abstände in 4-/8-px-Schritten. Bedienelemente mindestens 48 px hoch. Sichtbarer Tastaturfokus, Safe-Area-Berücksichtigung, keine verpflichtende Animation.
+Eigenes geometrisches AS-TAC-Zeichen aus zwei gerichteten A-Segmenten; Wortmarke als exportierbare Vektoren unter `public/brand/`, App-Icon in SVG/192/512 px. Einheitliche 24-px-Konturicons, Systemschrift und keine externen Fonts. Graphit, sachliche Flächen und Signalorange; kompakte 4-px-Radien statt dekorativer Karten. Abstände in 4-/8-px-Schritten, Bedienelemente mindestens 48 px hoch. Tastaturfokus und Safe Areas bleiben sichtbar.
+
+### Darstellung
+
+| Modus | Fläche | Text | Akzent |
+| --- | --- | --- | --- |
+| Tag | `#f4f5f6` | `#23272c` | `#ac3c0e` |
+| Dunkel | `#171a1e` | `#e0e4e8` | `#ef8c62` |
+| Rotlicht | `#100505` | `#df7366` | `#e47a6a` |
+
+Der Schalter steht immer rechts oben, unabhängig von offenem Panel, Zeichenmodus oder lokalem/Online-Projekt. Die ausdrückliche Wahl wird als `as-tac.appearance` lokal gespeichert. Ohne Wahl gilt beim Start die Systemeinstellung hell/dunkel. Inline-Initialisierung vor React verhindert einen hellen App-Start bei gespeichertem Nachtmodus; bei gesperrtem Local Storage funktioniert die Wahl für die aktuelle Sitzung.
+
+Eigene Basiskartenpaletten werden ohne Neuerzeugung der Karte gewechselt: Ausschnitt, laufende Zeichnung und Objektattribute bleiben erhalten. Rotlicht transformiert auch nachträglich geladene Plan-/Teamfarben, GPS, Briefing-Markierungen, Labels und MapLibre-Bedienelemente in Rot. Die gespeicherten Farben bleiben unverändert. Farben allein dürfen daher im Rotmodus keine Teams unterscheiden: Teamkürzel/Objektbeschriftungen bleiben verfügbar. Keine Farbüberblendung beim Wechsel.
+
+Rotlicht steuert die App-Farben, **nicht die physische Displayhelligkeit**. Gerätehelligkeit zusätzlich senken. Systemdialoge, Tastatur, Browseroberfläche und der statische PWA-Startbildschirm liegen ausserhalb der App-Farbsteuerung; der Manifest-Startbildschirm ist deshalb dauerhaft dunkel. Keine Unsichtbarkeits- oder Nachtsichtgarantie. OLED/LCD, reale Helligkeit und Lesbarkeit müssen auf iPhone 16 Pro / Galaxy A24 im Feld geprüft werden.
 
 ## Zustände und Ebenen
 

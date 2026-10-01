@@ -1,6 +1,8 @@
+import { useTheme } from '../appearance/theme';
+import { palettes } from './palette';
 import { installLabels } from './labels';
 import { de } from '../../i18n/de';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as LibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -12,7 +14,15 @@ maplibregl.setWorkerUrl(workerUrl);
 
 import type { Bounds, MapPackage } from '../../core/packages/maps';
 
-export default function MapView({ mapPackage, onViewport, onReady, fix, stale, follow, onExplore }: {
+export default function MapView({
+    mapPackage,
+    onViewport,
+    onReady,
+    fix,
+    stale,
+    follow,
+    onExplore,
+}: {
     mapPackage: MapPackage | null;
     onViewport: (bounds: Bounds) => void;
     onReady: (map: LibreMap | null) => void;
@@ -21,7 +31,13 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
     follow: boolean;
     onExplore: () => void;
 }) {
-    const [labelOptions, setLabelOptions] = useState({ roads: true, places: false });
+    const theme = useTheme();
+    const themeRef = useRef(theme);
+    themeRef.current = theme;
+    const [labelOptions, setLabelOptions] = useState({
+        roads: true,
+        places: false,
+    });
     const labelSettings = useRef(labelOptions);
     labelSettings.current = labelOptions;
     const labels = useRef<ReturnType<typeof installLabels> | null>(null);
@@ -51,27 +67,68 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
                     return;
                 }
                 setArea(pkg);
+                const palette = palettes[themeRef.current];
                 const instance = new maplibregl.Map({
                     container: container.current,
-                    bounds: [[pkg.bounds[0], pkg.bounds[1]], [pkg.bounds[2], pkg.bounds[3]]],
+                    bounds: [
+                        [pkg.bounds[0], pkg.bounds[1]],
+                        [pkg.bounds[2], pkg.bounds[3]],
+                    ],
                     fitBoundsOptions: { padding: 30 },
                     style: {
                         version: 8,
+                        transition: { duration: 0, delay: 0 },
                         sources: {
-                            terrain: { type: 'geojson', data,
-                                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>' },
+                            terrain: {
+                                type: 'geojson',
+                                data,
+                                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+                            },
                         },
                         layers: [
-                            { id: 'background', type: 'background', paint: { 'background-color': '#ecebdf' } },
-                            { id: 'areas', type: 'fill', source: 'terrain', filter: ['==', '$type', 'Polygon'],
-                                paint: { 'fill-color': ['case', ['has', 'building'], '#b7b5a8',
-                                    ['==', ['get', 'natural'], 'water'], '#a2c6d1', '#ced9bb'], 'fill-opacity': 0.85 } },
-                            { id: 'water', type: 'line', source: 'terrain', filter: ['has', 'waterway'],
-                                paint: { 'line-color': '#77a6b4', 'line-width': 2 } },
-                            { id: 'roads-outline', type: 'line', source: 'terrain', filter: ['has', 'highway'],
-                                paint: { 'line-color': '#9e9b86', 'line-width': 5 } },
-                            { id: 'roads', type: 'line', source: 'terrain', filter: ['has', 'highway'],
-                                paint: { 'line-color': '#fffdf2', 'line-width': 3 } },
+                            {
+                                id: 'background',
+                                type: 'background',
+                                paint: { 'background-color': palette.background },
+                            },
+                            {
+                                id: 'areas',
+                                type: 'fill',
+                                source: 'terrain',
+                                filter: ['==', '$type', 'Polygon'],
+                                paint: {
+                                    'fill-color': [
+                                        'case',
+                                        ['has', 'building'],
+                                        palette.building,
+                                        ['==', ['get', 'natural'], 'water'],
+                                        palette.water,
+                                        palette.land,
+                                    ],
+                                    'fill-opacity': 0.85,
+                                },
+                            },
+                            {
+                                id: 'water',
+                                type: 'line',
+                                source: 'terrain',
+                                filter: ['has', 'waterway'],
+                                paint: { 'line-color': palette.waterLine, 'line-width': 2 },
+                            },
+                            {
+                                id: 'roads-outline',
+                                type: 'line',
+                                source: 'terrain',
+                                filter: ['has', 'highway'],
+                                paint: { 'line-color': palette.roadEdge, 'line-width': 5 },
+                            },
+                            {
+                                id: 'roads',
+                                type: 'line',
+                                source: 'terrain',
+                                filter: ['has', 'highway'],
+                                paint: { 'line-color': palette.road, 'line-width': 3 },
+                            },
                         ],
                     },
                     attributionControl: { compact: false },
@@ -95,11 +152,22 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
                             return;
                         }
                         labels.current = installLabels(instance, data, labelSettings.current);
-                        instance.addSource('accuracy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-                        instance.addLayer({ id: 'accuracy-fill', type: 'fill', source: 'accuracy',
-                            paint: { 'fill-color': '#176b89', 'fill-opacity': 0.16 } });
-                        instance.addLayer({ id: 'accuracy-line', type: 'line', source: 'accuracy',
-                            paint: { 'line-color': '#176b89', 'line-width': 2 } });
+                        instance.addSource('accuracy', {
+                            type: 'geojson',
+                            data: { type: 'FeatureCollection', features: [] },
+                        });
+                        instance.addLayer({
+                            id: 'accuracy-fill',
+                            type: 'fill',
+                            source: 'accuracy',
+                            paint: { 'fill-color': palette.gps, 'fill-opacity': 0.16 },
+                        });
+                        instance.addLayer({
+                            id: 'accuracy-line',
+                            type: 'line',
+                            source: 'accuracy',
+                            paint: { 'line-color': palette.gps, 'line-width': 2 },
+                        });
                         setMapReady(true);
                         onReady(instance);
                     } catch (error) {
@@ -128,6 +196,28 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
         };
     }, [mapPackage, onExplore, onViewport, onReady]);
 
+    useLayoutEffect(() => {
+        const instance = map.current;
+        if (!mapReady || !instance) {
+            return;
+        }
+        const palette = palettes[theme];
+        instance.setPaintProperty('background', 'background-color', palette.background);
+        instance.setPaintProperty('areas', 'fill-color', [
+            'case',
+            ['has', 'building'],
+            palette.building,
+            ['==', ['get', 'natural'], 'water'],
+            palette.water,
+            palette.land,
+        ]);
+        instance.setPaintProperty('water', 'line-color', palette.waterLine);
+        instance.setPaintProperty('roads-outline', 'line-color', palette.roadEdge);
+        instance.setPaintProperty('roads', 'line-color', palette.road);
+        instance.setPaintProperty('accuracy-fill', 'fill-color', stale ? '#707070' : palette.gps);
+        instance.setPaintProperty('accuracy-line', 'line-color', stale ? '#707070' : palette.gps);
+    }, [theme, mapReady, stale]);
+
     useEffect(() => {
         if (!mapReady || !map.current || !fix) {
             return;
@@ -136,15 +226,12 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
         if (!marker.current) {
             const dot = document.createElement('div');
             dot.className = 'gps-dot';
-            marker.current = new maplibregl.Marker({ element: dot })
-                .setLngLat([fix.longitude, fix.latitude]).addTo(instance);
+            marker.current = new maplibregl.Marker({ element: dot }).setLngLat([fix.longitude, fix.latitude]).addTo(instance);
         }
         marker.current.setLngLat([fix.longitude, fix.latitude]);
         marker.current.getElement().classList.toggle('stale', stale);
         marker.current.getElement().setAttribute('aria-label', stale ? de.location.last : de.location.own);
         (instance.getSource('accuracy') as GeoJSONSource).setData(accuracyRing(fix));
-        instance.setPaintProperty('accuracy-fill', 'fill-color', stale ? '#707070' : '#176b89');
-        instance.setPaintProperty('accuracy-line', 'line-color', stale ? '#707070' : '#176b89');
         if (follow && !stale && area && !outside(fix, area.bounds)) {
             instance.easeTo({ center: [fix.longitude, fix.latitude], duration: 300 });
         }
@@ -152,13 +239,44 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
 
     return (
         <section className="map-wrap" aria-label={de.map.label}>
+            <svg className="night-filter" aria-hidden="true" width="0" height="0">
+                <defs>
+                    <filter id="as-tac-red-map" colorInterpolationFilters="sRGB">
+                        <feColorMatrix
+                            type="matrix"
+                            values="0.2126 0.7152 0.0722 0 0  0.04252 0.14304 0.01444 0 0  0.034016 0.114432 0.011552 0 0  0 0 0 1 0"
+                        />
+                    </filter>
+                </defs>
+            </svg>
             <div ref={container} className="map" aria-busy={!mapReady} />
-            <div className="map-caption">{area?.name ?? de.map.loading}<span>{de.map.local}</span></div>
-            <div className="map-label-options" aria-label={de.map.labels}>
-                <label><input type="checkbox" checked={labelOptions.roads} onChange={(event) => setLabelOptions({ ...labelOptions, roads: event.target.checked })} />{de.map.roads}</label>
-                <label><input type="checkbox" checked={labelOptions.places} onChange={(event) => setLabelOptions({ ...labelOptions, places: event.target.checked })} />{de.map.places}</label>
+            <div className="map-caption">
+                {area?.name ?? de.map.loading}
+                <span>{de.map.local}</span>
             </div>
-            {mapError && <p className="map-error" role="alert">{mapError}</p>}
+            <div className="map-label-options" aria-label={de.map.labels}>
+                <label>
+                    <input
+                        type="checkbox"
+                        checked={labelOptions.roads}
+                        onChange={(event) => setLabelOptions({ ...labelOptions, roads: event.target.checked })}
+                    />
+                    {de.map.roads}
+                </label>
+                <label>
+                    <input
+                        type="checkbox"
+                        checked={labelOptions.places}
+                        onChange={(event) => setLabelOptions({ ...labelOptions, places: event.target.checked })}
+                    />
+                    {de.map.places}
+                </label>
+            </div>
+            {mapError && (
+                <p className="map-error" role="alert">
+                    {mapError}
+                </p>
+            )}
         </section>
     );
 }

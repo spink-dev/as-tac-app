@@ -24,3 +24,7 @@ Benannte, geordnete Planelement-Layer mit Deckkraft und Sperre; Objektfarben und
 ## Abnahme
 
 Mobile Karte bleibt hinter dem geöffneten Sheet sichtbar; ein Tap schliesst Verwaltung. Desktop zeigt kompakte Navigation und ein begrenztes Seitenpanel. Keine verlorenen Entwürfe beim Tab-/Moduswechsel. Layer-/Event-Metadaten überleben Speichern, Duplizieren und ZIP-Roundtrip. Alte Projekte bleiben lesbar. Root-Veröffentlichung muss serverseitig für normale Owner/Admin/Viewer abgewiesen werden. Katalogdownload ist vor lokaler Übernahme vollständig validiert. Quellen bleiben offline zugänglich.
+
+## Branding / Darstellung (0.5.0-alpha.2)
+
+Eigenes AS-TAC-Zeichen und Vektor-Wortmarke, neue Panel-Palette, einheitliche Navigationsicons. Tag/Dunkel/Rotlicht rechts oben; gerätebezogen gespeichert und beim Offline-Kaltstart vor React gesetzt. Moduswechsel bewahrt Kartenausschnitt, Zeichnung und nicht übernommene Attribute. Rotlicht stellt auch Team-/Objektfarben monochrom dar, verändert jedoch keine Projektdaten. Gerätehelligkeit, Systemdialoge und echte Nacht-Lesbarkeit bleiben Geräteprüfungen. Designvertrag: [DESIGN.md](../../DESIGN.md).

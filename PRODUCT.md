@@ -31,3 +31,7 @@ Keine dekorative Kommandozentrale (UX-Spec). Keine endlose Formularspalte, die a
 ## Accessibility & Inclusion
 
 Mindestens 48 CSS-Pixel Touch-Ziele und Safe Areas gemäss vorhandener Spec. Sichtbarer Tastaturfokus, semantische Tabs, textliche Zustände zusätzlich zu Farbe, reduzierte Bewegung und kontrastreiche Lesbarkeit draussen. Keine neue formale WCAG-Zertifizierung behauptet.
+
+## Branding und Lichtverhältnisse
+
+Stand 2026-10-01: Nutzer verlangt eigene AS-TAC-Identität, neue Panel-Farben sowie Dunkel- und Rotlichtmodus für Nacht-/Abend-Airsoft. Tagsüber helle, gut lesbare Kartenkontrollen; nachts dunkle Flächen und bewusst wählbare rote Darstellung. Branding darf Bedienung, lokale Daten und Kartenfarben im Projekt nicht verändern.

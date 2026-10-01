@@ -1,3 +1,4 @@
+import { useTheme } from '../appearance/theme';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as LibreMap } from 'maplibre-gl';
@@ -15,6 +16,7 @@ export function useEditor(
     pauseFollow: () => void,
     visibleIds: string[] | null = null,
 ) {
+    const theme = useTheme();
     const [editing, setEditing] = useState(false);
     const [visible, setVisible] = useState(true);
     const [tool, setTool] = useState<Tool>('select');
@@ -223,6 +225,20 @@ export function useEditor(
             }
         };
     }, [map, cancel, pauseFollow]);
+    useEffect(() => {
+        if (!map?.getLayer('plan-line')) {
+            return;
+        }
+        const night = theme === 'red';
+        // Display-only override: even a dark blue/black plan remains visible at night.
+        // Do not change source features, stored colors, editing state or geometry.
+        map.setPaintProperty('plan-fill', 'fill-color', night ? '#b0b0b0' : ['get', 'colour']);
+        map.setPaintProperty('plan-line', 'line-color', ['case', ['get', 'selected'], night ? '#eeeeee' : '#d55216', night ? '#b0b0b0' : ['get', 'colour']]);
+        map.setPaintProperty('plan-point', 'circle-color', night ? '#b0b0b0' : ['get', 'colour']);
+        map.setPaintProperty('plan-point', 'circle-stroke-color', ['case', ['get', 'selected'], night ? '#eeeeee' : '#d55216', night ? '#777777' : '#ffffff']);
+        map.setPaintProperty('drawing-line', 'line-color', night ? '#eeeeee' : '#d55216');
+        map.setPaintProperty('drawing-point', 'circle-color', night ? '#eeeeee' : '#d55216');
+    }, [map, theme]);
     useEffect(() => {
         if (!map?.getSource('plan')) {
             return;
