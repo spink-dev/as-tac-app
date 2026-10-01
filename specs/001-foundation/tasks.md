@@ -10,7 +10,7 @@ AST-004–006 als Preview implementiert; AST-001-Geräteabnahme weiterhin offen 
 | AST-004 | P0 / M1 | Gebietspakete verwalten — implementiert, Anbieter-/Geräteprüfung offen | 003 | Import/Download, Grösse/Quota, Hashprüfung, atomarer Wechsel, Attribution; Abbruch erhält gültigen Stand |
 | AST-005 | P0 / M1 | Karteneditor und präzise Ergänzungen — implementiert, Geräteabnahme offen | 003, 004 | Punkte, Linien, Flächen/Kreise, Text, Freihand, Attribute, Koordinaten und Messung; Desktop/Touch geprüft |
 | AST-006 | P0 / M1 | Teams, Phasen und lokales Briefing — implementiert | 005 | Zuordnung, Vor/Zurück, Kamera, temporäre Zeichnungen und klare Feldansicht |
-| AST-007 | P0 / M1 | Portables Paket und Teilen | 004, 006 | Vollständiger Roundtrip auf zweitem Gerät; begrenzte Dekompression, Hash-/Schemafehler, iOS-Dateiimport |
+| AST-007 | P0 / M1 | Portables Paket und Teilen — implementiert, iOS-Abnahme offen | 004, 006 | Vollständiger Roundtrip auf zweitem Gerät; begrenzte Dekompression, Hash-/Schemafehler, iOS-Dateiimport |
 | AST-008 | P0 / M1 | GPS und mobile Feldnutzung härten | 001, 004 | Genauigkeit/Alter, denied/timeout/stale, Follow/Explore, ausserhalb Gebiet; offline auf Telefon getestet |
 | AST-009 | P0 / M2 | Backend wählen, Auth/Membership und dauerhafte Sync-Basis | 003 | Backend-ADR, Rollenmatrix, API-/Storage-/Subscription-Schutz, transaktionale Objektversionen/Sequenzen |
 | AST-010 | P0 / M2 | Gleichzeitige Bearbeitung und Live-Mitgliederansicht | 005, 009 | Zwei Admins bearbeiten unabhängig, Viewer sieht bestätigte Änderungen; direkte Viewer-Mutation scheitert |
@@ -62,3 +62,7 @@ Sechs Geometrietypen, Planungs-/Feldmodus, Attribute/Koordinaten, Messungen, Aus
 ## AST-006 — Preview-Checkpoint
 
 Teams/Phasen bearbeiten, zuordnen, atomar bereinigen und rückgängig machen. Offline-Briefing mit Kamera, Elementsichtbarkeit, Reihenfolge und temporären Markierungen; nur bewusste Übernahme schreibt den Plan. Nächster Umsetzungsschritt ist AST-007 (portables vollständiges Projektpaket). AST-008/014 benötigen weiterhin echte Telefone und Feldabnahme. Siehe `evidence/ast-006-briefing.md`.
+
+## AST-007 — Preview-Checkpoint
+
+Vollständiger Datei-Roundtrip in isolierten Chromium-Profilen einschliesslich Offline-Neustart. Begrenzter ZIP-Leser, Hash-/Schema-Prüfung, atomarer Import und schreibgeschützte Kopie. Geräteabnahme offen; siehe `evidence/ast-007-portable.md`.

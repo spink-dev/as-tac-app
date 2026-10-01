@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-alpha.1 — 2026-10-01 (testing)
+
+- AST-007: vollständige Projektpakete mit Karte und Credits, begrenzter ZIP-Import und atomare Installation.
+- Verteilte Kopien schreibgeschützt, ausdrückliche bearbeitbare Kopie.
+
+
 ## 0.2.0 — 2026-10-01
 
 - AST-004–006: Gebietspakete, geografischer Editor, Teams, Phasen und lokales Briefing.

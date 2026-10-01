@@ -1,3 +1,4 @@
+import PortablePanel from '../features/portable/PortablePanel';
 import { de } from '../i18n/de';
 import { version } from '../../package.json';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -42,7 +43,7 @@ export default function App() {
         }
     }, [editor.cancel, editor.setEditing, editor.setVisible, pauseFollow]);
     const drawingPending = useRef(false);
-    drawingPending.current = editor.hasDraft || !!briefingPhase;
+    drawingPending.current = packageBusy || editor.hasDraft || !!briefingPhase;
     const canReload = useCallback(() => session.canLeave() && !packageBusy && !editor.hasDraft && !briefingPhase, [session, packageBusy, editor.hasDraft, briefingPhase]);
     const selectArea = (id: string) => {
         if (projects.project) {
@@ -78,11 +79,11 @@ export default function App() {
             <span className="connection">{online ? de.app.online : de.app.offline}</span></header>
         <MapView mapPackage={maps.current} onViewport={setViewport} onReady={setMapInstance} fix={fix} stale={stale} follow={follow} onExplore={pauseFollow} />
         <aside className="panel">
-            {!briefingPhase && <EditorPanel editor={editor} project={projects.project} session={session} state={projects} disabled={projects.busy || packageBusy || maps.loading || maps.error} />}
-            <BriefingPanel project={projects.project} map={mapInstance} change={session.change} onPhase={handleBriefingPhase} disabled={!session.canLeave() || editor.hasDraft || packageBusy || maps.loading || maps.error} pauseFollow={pauseFollow} />
-            {!briefingPhase && <ManagementPanel project={projects.project} map={mapInstance} change={session.change} disabled={projects.busy || editor.hasDraft || packageBusy} />}
+            {!briefingPhase && <EditorPanel editor={editor} project={projects.project} session={session} state={projects} disabled={projects.readOnly || projects.busy || packageBusy || maps.loading || maps.error} />}
+            <BriefingPanel readOnly={projects.readOnly} project={projects.project} map={mapInstance} change={session.change} onPhase={handleBriefingPhase} disabled={!session.canLeave() || editor.hasDraft || packageBusy || maps.loading || maps.error} pauseFollow={pauseFollow} />
+            {!briefingPhase && <ManagementPanel project={projects.project} map={mapInstance} change={session.change} disabled={projects.readOnly || projects.busy || editor.hasDraft || packageBusy} />}
             <ProjectPanel session={session} state={projects} locked={packageBusy || editor.hasDraft || !!briefingPhase} areaId={selectedAreaId} />
-            <section><label htmlFor="area">{de.app.area}</label><select id="area" value={selectedAreaId} disabled={projects.busy || packageBusy || editor.hasDraft || !!briefingPhase} onChange={(event) => selectArea(event.target.value)}>{!area && <option value={selectedAreaId}>{selectedAreaId}</option>}{maps.areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+            <section><label htmlFor="area">{de.app.area}</label><select id="area" value={selectedAreaId} disabled={projects.readOnly || projects.busy || packageBusy || editor.hasDraft || !!briefingPhase} onChange={(event) => selectArea(event.target.value)}>{!area && <option value={selectedAreaId}>{selectedAreaId}</option>}{maps.areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
                 {maps.loading && <p role="status">{de.packages.loading}</p>}
                 {maps.error && <p role="alert">{de.packages.missing}</p>}
                 <h2>{offline.ready ? de.app.available : de.app.prepare}</h2>
@@ -92,7 +93,8 @@ export default function App() {
                 {update && <button disabled={!canReload()} onClick={applyUpdate}>{de.app.update}</button>}
                 {registration && !offline.ready && <button onClick={() => verify(true)}>{de.app.repair}</button>}
             </section>
-            <PackagePanel current={maps.current} viewport={viewport} refresh={maps.refresh} select={selectArea} disabled={!session.canLeave() || editor.hasDraft || !!briefingPhase} busyChanged={setPackageBusy} />
+            <PortablePanel session={session} state={projects} map={maps.current} refresh={maps.refresh} busyChanged={setPackageBusy} disabled={!session.canLeave() || packageBusy || editor.hasDraft || !!briefingPhase} />
+            <PackagePanel current={maps.current} viewport={viewport} refresh={maps.refresh} select={selectArea} disabled={projects.readOnly || packageBusy || !session.canLeave() || editor.hasDraft || !!briefingPhase} busyChanged={setPackageBusy} />
             <section><h2>{stale ? de.location.last : de.location.title}</h2>
                 <p role="status">{gps}</p>
                 {fix && <p className="coordinates">{fix.latitude.toFixed(6)}, {fix.longitude.toFixed(6)}<br />

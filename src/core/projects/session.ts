@@ -1,3 +1,4 @@
+import type { MapPackage } from '../packages/maps';
 import { execute, type Change, type Command } from './commands';
 import { ProjectDatabase, type ProjectSummary, type SavedProject } from './database';
 import { createProject, duplicateProject, ProjectError, type Project } from './model';
@@ -9,13 +10,14 @@ export interface ProjectState {
     busy: boolean;
     ready: boolean;
     error: unknown;
+    readOnly: boolean;
     canUndo: boolean;
     canRedo: boolean;
 }
 /** One editing session per tab. Revision checks prevent silent overwrites by other tabs. */
 export class ProjectSession {
     private database: ProjectDatabase | null = null;
-    private state: ProjectState = { project: null, projects: [], saveState: 'empty', busy: true, ready: false, error: null, canUndo: false, canRedo: false };
+    private state: ProjectState = { project: null, projects: [], saveState: 'empty', busy: true, ready: false, error: null, readOnly: false, canUndo: false, canRedo: false };
     private listeners = new Set<() => void>();
     private revision = 0;
     private generation = 0;
@@ -67,7 +69,7 @@ export class ProjectSession {
         this.future = [];
         this.group = null;
         this.generation += 1;
-        this.publish({ project: record.project, saveState: 'saved', error: null });
+        this.publish({ project: record.project, readOnly: record.readOnly === true, saveState: 'saved', error: null });
     }
     private async action(run: (database: ProjectDatabase) => Promise<void>) {
         if (!this.database || !this.canLeave()) {
@@ -90,9 +92,22 @@ export class ProjectSession {
             } else {
                 this.history = [];
                 this.future = [];
-                this.publish({ project: null, saveState: 'empty' });
+                this.publish({ project: null, readOnly: false, saveState: 'empty' });
             }
         });
+    };
+    getRevision = () => this.revision;
+    importBundle = async (project: Project, map: MapPackage, signal: AbortSignal) => {
+        if (!this.database || !this.canLeave()) {
+            throw new ProjectError('storage');
+        }
+        this.publish({ busy: true, error: null });
+        try {
+            this.accept(await this.database.importBundle(project, map, signal));
+            this.publish({ projects: await this.database.list() });
+        } finally {
+            this.publish({ busy: false });
+        }
     };
     create = async (name: string, mapPackageId: string) => {
         await this.action(async (database) => {
@@ -112,12 +127,12 @@ export class ProjectSession {
                 await database.remove(this.state.project.id, this.revision);
                 this.history = [];
                 this.future = [];
-                this.publish({ project: null, saveState: 'empty' });
+                this.publish({ project: null, readOnly: false, saveState: 'empty' });
             }
         });
     };
     change = (commands: Command[], groupKey?: string) => {
-        if (!this.state.project || this.state.busy) {
+        if (this.state.readOnly || !this.state.project || this.state.busy) {
             return;
         }
         try {
@@ -142,7 +157,7 @@ export class ProjectSession {
         }
     };
     undo = () => {
-        if (!this.state.project || this.state.busy || !this.history.length) {
+        if (this.state.readOnly || !this.state.project || this.state.busy || !this.history.length) {
             return;
         }
         const change = this.history.at(-1)!;
@@ -153,7 +168,7 @@ export class ProjectSession {
         this.dirty(result.project);
     };
     redo = () => {
-        if (!this.state.project || this.state.busy || !this.future.length) {
+        if (this.state.readOnly || !this.state.project || this.state.busy || !this.future.length) {
             return;
         }
         const change = this.future.at(-1)!;

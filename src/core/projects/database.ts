@@ -7,6 +7,7 @@ export interface SavedProject {
     revision: number;
     updatedAt: string;
     localChanges: true;
+    readOnly?: boolean;
 }
 export interface ProjectSummary {
     id: string;
@@ -31,7 +32,7 @@ function validateRecord(value: unknown): asserts value is SavedProject {
     }
     const record = value as SavedProject;
     validateProject(record.project);
-    if (!Number.isSafeInteger(record.revision) || record.revision < 1 || record.localChanges !== true || typeof record.updatedAt !== 'string' || !Number.isFinite(Date.parse(record.updatedAt))) {
+    if ((record.readOnly !== undefined && typeof record.readOnly !== 'boolean') || !Number.isSafeInteger(record.revision) || record.revision < 1 || record.localChanges !== true || typeof record.updatedAt !== 'string' || !Number.isFinite(Date.parse(record.updatedAt))) {
         throw new ProjectError('invalid');
     }
 }
@@ -117,6 +118,27 @@ export class ProjectDatabase {
         }
     }
 
+    async importBundle(project: Project, map: MapPackage, signal: AbortSignal): Promise<SavedProject> {
+        validateProject(project);
+        if (project.mapPackageId !== map.id || !map.id.startsWith('local-')) {
+            throw new ProjectError('invalid');
+        }
+        signal.throwIfAborted();
+        const tx = this.database.transaction(['projects', 'maps'], 'readwrite');
+        const done = completed(tx);
+        const abort = () => tx.abort();
+        signal.addEventListener('abort', abort, { once: true });
+        const record: SavedProject = { project: structuredClone(project), revision: 1, updatedAt: new Date().toISOString(), localChanges: true, readOnly: true };
+        try {
+            tx.objectStore('maps').add(map);
+            tx.objectStore('projects').add(record);
+            await done;
+            return record;
+        } finally {
+            signal.removeEventListener('abort', abort);
+        }
+    }
+
     async list(): Promise<ProjectSummary[]> {
         const tx = this.database.transaction('projects', 'readonly');
         const values = await request(tx.objectStore('projects').getAll());
@@ -154,6 +176,9 @@ export class ProjectDatabase {
             const old = await request(store.get(copy.id));
             if (old) {
                 validateRecord(old);
+                if (old.readOnly) {
+                    throw new ProjectError('invalid');
+                }
             }
             if ((old?.revision ?? 0) !== expectedRevision) {
                 throw new ProjectError('conflict');

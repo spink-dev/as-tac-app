@@ -61,3 +61,11 @@ Anwesenheit, Cursor und Präsentationskamera sind flüchtige Sitzungsevents mit 
 - Verbindung: local/offline → connecting → syncing → live; Unterbrechung → reconnecting/offline; Authproblem → auth-required.
 - Operation: local-pending → sent → acknowledged; alternativ rejected/conflict. „Sent“ ist nicht „gespeichert auf Server“.
 - GPS: idle → requesting → acquiring → valid; denied/unavailable/stale als sichtbare Alternativen. Vorgeschlagene Stale-Schwelle 30 Sekunden, im Feldtest überprüfen.
+
+## Implementierter Offline-Paketvertrag AST-007
+
+`.astac.zip`, formatVersion 1, verwendet genau sechs Dateien: `manifest.json`, `project.json`, `maps/area.json`, `credits/ODbL-1.0.txt`, `credits/CREDITS.md`, `credits/renderer.json`. Die Karte enthält alle GeoJSON-Daten. Der Renderer-Vertrag `as-tac-vector` v1 benötigt keine externen Glyphen, Sprites oder Assets; die Empfänger-App muss vorher installiert/offline vorbereitet sein. ZIP ist kein eigenständig ausführbares App-Paket.
+
+Für Mobilgeräte enger als der ursprüngliche Vorschlag: 100 MiB Archiv, 32 MiB pro Datei, 64 MiB insgesamt entpackt. Nur Store/Deflate, keine Verschlüsselung, ZIP64, Data-Descriptors oder ZIP-Kommentare. Zentralverzeichnis und lokale Header müssen übereinstimmen; feste Pfadliste verhindert Traversal/Extras/Duplikate. Streaming-Dekompression prüft tatsächliche Ausgabebytes vor Zusammenführung. Ressourcen werden mit SHA-256 geprüft, Projekt/Karte nach Schema.
+
+Import remappt Projekt-/Objekt-/Team-/Phasen-IDs und Karten-ID. Karte und Projekt entstehen in einer gemeinsamen IndexedDB-Transaktion. Schreibschutz ist lokale Datensatz-Metadaten (`readOnly`), keine Online-Berechtigung; Öffnen und Briefing möglich, Bearbeitung nur als bewusst erstellte neue Kopie. Exporte enthalten keine dieser Rechte-Metadaten.

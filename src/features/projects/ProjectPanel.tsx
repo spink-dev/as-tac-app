@@ -46,8 +46,9 @@ export default function ProjectPanel({ session, state, areaId, locked: navigatio
             <button disabled={locked || !name.trim()} type="submit">{t.create}</button>
         </form>
         {project && <>
+            {state.readOnly && <p role="status">{de.portable.readOnly}</p>}
             <label htmlFor="project-name">{t.name}</label>
-            <input id="project-name" value={project.name} maxLength={120} disabled={state.busy || navigationLocked} onChange={(event) => {
+            <input id="project-name" value={project.name} maxLength={120} disabled={state.readOnly || state.busy || navigationLocked} onChange={(event) => {
                 session.change([{ kind: 'project', name: event.target.value }], 'name');
             }} />
             <p role="status" aria-live="polite">{t.states[state.saveState]}</p>
@@ -57,7 +58,7 @@ export default function ProjectPanel({ session, state, areaId, locked: navigatio
                 <button disabled={locked} onClick={() => {
                     setConfirmDelete(false);
                     void session.duplicate(t.copyName(project.name));
-                }}>{t.duplicate}</button>
+                }}>{state.readOnly ? de.portable.editCopy : t.duplicate}</button>
                 <button disabled={locked} onClick={() => setConfirmDelete(true)}>{t.delete}</button>
             </div>
             {confirmDelete && <div className="project-warning">

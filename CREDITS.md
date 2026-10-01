@@ -35,3 +35,7 @@ Bei Aufnahme der Karten-/PWA-Abhängigkeiten ihre tatsächlichen Lizenzhinweise 
 ## AST-004
 
 Eigene Gebietspaket- und Downloadimplementierung, kein kopierter Referenzcode. osmtogeojson wird nun auch im Browser zur OSM-Konvertierung verwendet; zusätzliche Hinweise für den gebündelten Lodash-Build, geojson-rewind und osm-polygon-features stehen im Offline-Lizenzinventar. Overpass liefert auf bewussten Nutzeraufruf kleine OSM-Auszüge; keine Rastertile-Vorabdownloads.
+
+## AST-007
+
+- Eigenes Projektpaketformat und begrenzter ZIP-Leser; fflate 0.8.3 (MIT) für ZIP-Export. Lizenz unter `public/licenses/dependencies.txt`. Keine weitere Referenzcodeübernahme.

@@ -42,6 +42,17 @@ export const de = {
         move: 'Element verschieben', vertex: 'Eckpunkt',
         measure: (length: number, area: number) => `≈ ${Math.round(length)} m${area > 0 ? ` · ${Math.round(area)} m²` : ''}`,
     },
+    portable: {
+        title: 'Projekt teilen & importieren', export: 'Vollständiges Projekt sichern (.astac.zip)',
+        import: 'Projektpaket öffnen (.astac.zip)', working: 'Projektpaket wird geprüft …',
+        hint: 'Enthält Karte, Plan, Teams und Phasen. Die App muss auf dem Zielgerät bereits offline vorbereitet sein. Kein Konto und keine GPS-Daten enthalten.',
+        readOnly: 'Verteilte Kopie · schreibgeschützt. Zum Bearbeiten eine eigene Kopie erstellen.',
+        editCopy: 'Bearbeitbare Kopie erstellen', imported: 'Projekt und Karte gemeinsam gespeichert · schreibgeschützte Kopie geöffnet.',
+        exported: 'Projektdatei erstellt. Bewahre sie als Sicherung auf oder teile sie über die Dateien-App.',
+        failed: 'Projektpaket konnte nicht verarbeitet werden. Datei, Formatversion und freien Speicher prüfen. Bestehende Projekte bleiben erhalten.',
+        cancelled: 'Import abgebrochen. Bestehende Projekte bleiben erhalten.',
+        limit: 'Version 1: höchstens 100 MiB ZIP, 32 MiB je Datei und 64 MiB entpackt. Nur vollständige AS-TAC-Pakete; keine .tacmap-Dateien.',
+    },
     packages: {
         title: 'Gebietspakete', add: 'Eigenes Gebiet laden oder importieren', name: 'Gebietsname',
         bounds: ['West (Längengrad)', 'Süd (Breitengrad)', 'Ost (Längengrad)', 'Nord (Breitengrad)'],

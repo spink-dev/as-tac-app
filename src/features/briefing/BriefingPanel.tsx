@@ -5,9 +5,9 @@ import { execute, type Command } from '../../core/projects/commands';
 import { distance, makeElement } from '../editor/geometry';
 import { de } from '../../i18n/de';
 
-export default function BriefingPanel({ project, map, change, onPhase, disabled, pauseFollow }: {
+export default function BriefingPanel({ project, map, change, onPhase, disabled, pauseFollow, readOnly = false }: {
     project: Project | null; map: LibreMap | null; change: (commands: Command[]) => void;
-    onPhase: (phase: Phase | null) => void; disabled: boolean; pauseFollow: () => void;
+    onPhase: (phase: Phase | null) => void; disabled: boolean; pauseFollow: () => void; readOnly?: boolean;
 }) {
     const t = de.briefing;
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -153,7 +153,7 @@ export default function BriefingPanel({ project, map, change, onPhase, disabled,
             <div className="actions">
                 <button aria-pressed={drawing} onClick={() => setDrawing(!drawing)}>{drawing ? t.cancelDrawing : t.draw}</button>
                 <button disabled={!strokes.length || drawing} onClick={() => setStrokes([])}>{t.clear}</button>
-                <button disabled={!strokes.length || drawing} onClick={() => {
+                <button disabled={readOnly || !strokes.length || drawing} onClick={() => {
                     try {
                         const elements = strokes.map((points) => ({ ...makeElement(project.id, 'freehand', points, t.annotation), phaseIds: [phase.id] }));
                         const commands: Command[] = [...elements.map((element): Command => ({ kind: 'element', id: element.id, value: element })), { kind: 'phase', id: phase.id, value: { ...phase, visibleElementIds: [...phase.visibleElementIds, ...elements.map((element) => element.id)] } }];

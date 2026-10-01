@@ -8,7 +8,7 @@ Status: AST-004–006 als Preview implementiert; AST-001-Geräteabnahme offen. S
 4. [Plan](plan.md): Architekturgrenzen, Reihenfolge und Prüfstrategie.
 5. [Aufgaben](tasks.md): geordnete Arbeitspakete mit Fertigkriterien.
 
-**Nächster Auftrag: AST-007.** Vollständige portable Projektpakete mit begrenzter ZIP-Verarbeitung, Hash-/Schema-Prüfung und unabhängiger, standardmässig schreibgeschützter Importkopie. AST-004–006 liefern Gebietspakete, Karteneditor sowie Teams/Phasen/Offline-Briefing; Vorabversionen liegen auf `testing`. Die reale AST-001-Abnahme bleibt separat offen.
+**Aktueller Stack: AST-007 und AST-008.** Vollständige portable Projektpakete mit begrenzter ZIP-Verarbeitung, Hash-/Schema-Prüfung und unabhängiger, standardmässig schreibgeschützter Importkopie. AST-004–006 liefern Gebietspakete, Karteneditor sowie Teams/Phasen/Offline-Briefing; Vorabversionen liegen auf `testing`. Die reale AST-001-Abnahme bleibt separat offen.
 
 Verbindlich aus dem Nutzerauftrag: Privatprojekt, Astro, Offline-/Online-Karten, eigene GPS-Position, präzise Vorbereitung und Verteilung, Briefings, mehrere gleichzeitig schreibende Admins, schreibgeschützte Mitglieder sowie Credits für @rwolffgang.
 

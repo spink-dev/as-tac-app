@@ -127,3 +127,7 @@ Unter „Teams & Phasen“ Teams mit Kürzel/Farbe und geordnete Phasen anlegen.
 „Briefing starten“ zeigt die erste Phase samt Kamera und sichtbaren Elementen. Vor/Zurück oder Pfeiltasten wechseln Phasen; Escape bzw. „Briefing beenden“ verlässt die Präsentation. „Temporär zeichnen“ markiert per Maus/Finger, ohne den Plan zu schreiben. Phasenwechsel/Verlassen verwirft Markierungen. „In Plan übernehmen“ erzeugt ausdrücklich persistierte Freihandelemente mit Phasenzuordnung; diese Aktion ist rückgängig machbar. Es gibt noch keine Online-Präsentationsleitung oder Kommunikation zwischen Geräten.
 
 Nächster Arbeitsschritt: AST-007, vollständige portable Projektpakete. Produktionsbranch `main` bleibt bei v0.1.0; die versionierten Checkpoints alpha.1 (Gebiete), alpha.2 (Editor) und alpha.3 (Briefing) sind über `testing` für Review vorgesehen.
+
+### Projektdateien (AST-007)
+
+Unter „Projekt teilen & importieren“ vollständige `.astac.zip` sichern. Auf einem Gerät mit vorbereiteter App öffnen: Karte und Plan werden zusammen als neue schreibgeschützte Kopie gespeichert. „Bearbeitbare Kopie erstellen“ startet einen eigenen lokalen Plan. Enthält keine GPS-Historie oder Online-Zugriffsrechte. Details und Grenzen in `specs/001-foundation/contracts.md`.
