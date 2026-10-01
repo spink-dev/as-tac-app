@@ -134,6 +134,16 @@ export class ProjectDatabase {
             tx.objectStore('projects').add(record);
             await done;
             return record;
+        } catch (error) {
+            try {
+                tx.abort();
+            } catch {
+                // The browser may already have aborted the transaction.
+            }
+            await done.catch(() => {
+                // Preserve the original enqueue or transaction error.
+            });
+            throw error;
         } finally {
             signal.removeEventListener('abort', abort);
         }

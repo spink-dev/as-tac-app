@@ -105,11 +105,10 @@ test('hash corruption and transaction failure install neither project nor map', 
     await page.evaluate(() => {
         const add = IDBObjectStore.prototype.add;
         IDBObjectStore.prototype.add = function (...args) {
-            const result = add.apply(this, args);
             if (this.name === 'projects') {
-                this.transaction.abort();
+                throw new DOMException('Injected enqueue failure', 'DataCloneError');
             }
-            return result;
+            return add.apply(this, args);
         };
     });
     await input.setInputFiles({ name: 'valid.astac.zip', mimeType: 'application/zip', buffer: Buffer.from(bytes) });

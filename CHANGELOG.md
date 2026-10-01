@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-alpha.2 — 2026-10-01 (testing)
+
+- AST-008: GPS pausiert im Hintergrund und fordert nach Rückkehr einen neuen Fix an.
+- Alte Watch-Callbacks, rückwärts laufende Zeitstempel und unrealistische Zukunftszeitstempel werden verworfen; ungenaue Positionen klar gekennzeichnet.
+- Projektimport rollt auch synchrone Fehler beim Einreihen von Schreiboperationen zurück.
+- Expliziter GPS-Stopp und verweigerte Freigabe bleiben auch nach App-Wechsel wirksam.
+
+
 ## 0.3.0-alpha.1 — 2026-10-01 (testing)
 
 - AST-007: vollständige Projektpakete mit Karte und Credits, begrenzter ZIP-Import und atomare Installation.

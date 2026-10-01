@@ -95,6 +95,8 @@ export const de = {
         },
     },
     location: {
+        suspended: 'GPS im Hintergrund pausiert. Bei Rückkehr wird ein neuer Fix angefordert.',
+        imprecise: 'Ungenaue Position: über 50 m Unsicherheit. Genauigkeitskreis beachten und unter freiem Himmel auf einen besseren Fix warten.',
         idle: 'GPS ist ausgeschaltet.', waiting: 'Warte auf GPS-Fix …',
         unsupported: 'GPS benötigt HTTPS und Standortunterstützung.', invalid: 'Ungültiger GPS-Fix.',
         received: 'GPS-Fix empfangen', denied: 'Standortfreigabe verweigert. In den Browser-Einstellungen erlauben.',

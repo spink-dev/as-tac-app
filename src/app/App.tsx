@@ -99,6 +99,7 @@ export default function App() {
                 <p role="status">{gps}</p>
                 {fix && <p className="coordinates">{fix.latitude.toFixed(6)}, {fix.longitude.toFixed(6)}<br />
                     ± {Math.round(fix.accuracy)} m · {de.location.age(Math.max(0, Math.floor((now - fix.timestamp) / 1000)), stale)}</p>}
+                {fix && !stale && fix.accuracy > 50 && <p role="status">{de.location.imprecise}</p>}
                 {fix && area && outside(fix, area.bounds) && <p role="status">{de.location.outside}</p>}
                 <div className="actions"><button className="primary" onClick={() => {
                     setFollow(true);

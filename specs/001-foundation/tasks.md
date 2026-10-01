@@ -1,6 +1,6 @@
 # Geordnete Arbeitspakete
 
-AST-004–006 als Preview implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nach jedem Paket Ergebnis, Prüfkommando und verbleibende Grenzen kurz dokumentieren. Priorität P0 bis zum vollständigen Nutzerauftrag, P1 für spätere Erweiterungen.
+AST-004–006 in 0.2.0 integriert; AST-007/008 als Preview implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nach jedem Paket Ergebnis, Prüfkommando und verbleibende Grenzen kurz dokumentieren. Priorität P0 bis zum vollständigen Nutzerauftrag, P1 für spätere Erweiterungen.
 
 | ID | Prio / Phase | Aufgabe | Abhängigkeit | Fertigkriterium |
 | --- | --- | --- | --- | --- |
@@ -11,7 +11,7 @@ AST-004–006 als Preview implementiert; AST-001-Geräteabnahme weiterhin offen 
 | AST-005 | P0 / M1 | Karteneditor und präzise Ergänzungen — implementiert, Geräteabnahme offen | 003, 004 | Punkte, Linien, Flächen/Kreise, Text, Freihand, Attribute, Koordinaten und Messung; Desktop/Touch geprüft |
 | AST-006 | P0 / M1 | Teams, Phasen und lokales Briefing — implementiert | 005 | Zuordnung, Vor/Zurück, Kamera, temporäre Zeichnungen und klare Feldansicht |
 | AST-007 | P0 / M1 | Portables Paket und Teilen — implementiert, iOS-Abnahme offen | 004, 006 | Vollständiger Roundtrip auf zweitem Gerät; begrenzte Dekompression, Hash-/Schemafehler, iOS-Dateiimport |
-| AST-008 | P0 / M1 | GPS und mobile Feldnutzung härten | 001, 004 | Genauigkeit/Alter, denied/timeout/stale, Follow/Explore, ausserhalb Gebiet; offline auf Telefon getestet |
+| AST-008 | P0 / M1 | GPS und mobile Feldnutzung härten — implementiert, Feldabnahme offen | 001, 004 | Genauigkeit/Alter, denied/timeout/stale, Follow/Explore, ausserhalb Gebiet; offline auf Telefon getestet |
 | AST-009 | P0 / M2 | Backend wählen, Auth/Membership und dauerhafte Sync-Basis | 003 | Backend-ADR, Rollenmatrix, API-/Storage-/Subscription-Schutz, transaktionale Objektversionen/Sequenzen |
 | AST-010 | P0 / M2 | Gleichzeitige Bearbeitung und Live-Mitgliederansicht | 005, 009 | Zwei Admins bearbeiten unabhängig, Viewer sieht bestätigte Änderungen; direkte Viewer-Mutation scheitert |
 | AST-011 | P0 / M2 | Konflikte, Offline-Entwürfe und Reconnect | 010 | Konflikt-UI, deduplizierte Wiederholung, Event-Lücken, Snapshot-Replay, Rollenentzug; A04–A06 bestanden |
@@ -66,3 +66,7 @@ Teams/Phasen bearbeiten, zuordnen, atomar bereinigen und rückgängig machen. Of
 ## AST-007 — Preview-Checkpoint
 
 Vollständiger Datei-Roundtrip in isolierten Chromium-Profilen einschliesslich Offline-Neustart. Begrenzter ZIP-Leser, Hash-/Schema-Prüfung, atomarer Import und schreibgeschützte Kopie. Geräteabnahme offen; siehe `evidence/ast-007-portable.md`.
+
+## AST-008 — Preview-Checkpoint
+
+GPS-Watch im Hintergrund stoppen, expliziten Nutzerwunsch im Speicher behalten und im Vordergrund genau einmal neu starten. Bis zum neuen Fix bleibt die letzte Position veraltet. Alte Watch-Callbacks, rückläufige und mehr als fünf Sekunden zukünftige Zeitstempel werden verworfen; bei über 50 m Genauigkeitsradius erscheint eine Warnung. Stop/Freigabeentzug starten nach Rückkehr nicht automatisch neu. Sensorautomation bestanden, reale Geräteprüfung weiterhin offen (`evidence/ast-008-mobile.md`). Nächster Implementierungsschritt: AST-009.
