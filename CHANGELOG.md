@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0-alpha.1 — 2026-10-01 (testing)
+
+- AST-009: Supabase/PostgreSQL-Grundlage mit Rollen, serverseitiger Validierung, Objektversionen, atomaren Sequenzen und idempotentem Operationsprotokoll.
+- Anmeldung, leere Online-Projekte und Mitgliederverwaltung bei konfiguriertem Backend. Lokaler Editor bleibt unverändert offlinefähig.
+- Supabase-Deployment, echte Auth-/Realtime-Integration und parallele Datenbank-Sessions noch offen.
+
+
 ## 0.3.0 — 2026-10-01
 
 - AST-007/008 und Kartenkorrekturen aus der Preview integriert. Reale Geräteabnahme weiterhin offen.

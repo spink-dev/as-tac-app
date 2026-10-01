@@ -12,7 +12,7 @@ AST-004–006 in 0.2.0 integriert; AST-007/008 als Preview implementiert; AST-00
 | AST-006 | P0 / M1 | Teams, Phasen und lokales Briefing — implementiert | 005 | Zuordnung, Vor/Zurück, Kamera, temporäre Zeichnungen und klare Feldansicht |
 | AST-007 | P0 / M1 | Portables Paket und Teilen — implementiert, iOS-Abnahme offen | 004, 006 | Vollständiger Roundtrip auf zweitem Gerät; begrenzte Dekompression, Hash-/Schemafehler, iOS-Dateiimport |
 | AST-008 | P0 / M1 | GPS und mobile Feldnutzung härten — implementiert, Feldabnahme offen | 001, 004 | Genauigkeit/Alter, denied/timeout/stale, Follow/Explore, ausserhalb Gebiet; offline auf Telefon getestet |
-| AST-009 | P0 / M2 | Backend wählen, Auth/Membership und dauerhafte Sync-Basis | 003 | Backend-ADR, Rollenmatrix, API-/Storage-/Subscription-Schutz, transaktionale Objektversionen/Sequenzen |
+| AST-009 | P0 / M2 | Backend, Auth/Membership und Sync-Basis — Implementierungsstand vorhanden, Supabase-Integration offen | 003 | Backend-ADR, Rollenmatrix, API-/Storage-/Subscription-Schutz, transaktionale Objektversionen/Sequenzen |
 | AST-010 | P0 / M2 | Gleichzeitige Bearbeitung und Live-Mitgliederansicht | 005, 009 | Zwei Admins bearbeiten unabhängig, Viewer sieht bestätigte Änderungen; direkte Viewer-Mutation scheitert |
 | AST-011 | P0 / M2 | Konflikte, Offline-Entwürfe und Reconnect | 010 | Konflikt-UI, deduplizierte Wiederholung, Event-Lücken, Snapshot-Replay, Rollenentzug; A04–A06 bestanden |
 | AST-012 | P0 / M2 | Gemeinsames Online-Briefing | 006, 010 | Ein Präsentationsleiter, freiwilliges Folgen, unabhängige Ansicht; Reconnect verändert Plan nicht |
@@ -70,3 +70,7 @@ Vollständiger Datei-Roundtrip in isolierten Chromium-Profilen einschliesslich O
 ## AST-008 — Preview-Checkpoint
 
 GPS-Watch im Hintergrund stoppen, expliziten Nutzerwunsch im Speicher behalten und im Vordergrund genau einmal neu starten. Bis zum neuen Fix bleibt die letzte Position veraltet. Alte Watch-Callbacks, rückläufige und mehr als fünf Sekunden zukünftige Zeitstempel werden verworfen; bei über 50 m Genauigkeitsradius erscheint eine Warnung. Stop/Freigabeentzug starten nach Rückkehr nicht automatisch neu. Sensorautomation bestanden, reale Geräteprüfung weiterhin offen (`evidence/ast-008-mobile.md`). Nächster Implementierungsschritt: AST-009.
+
+## AST-009 — Integrationsstand
+
+SQL-/Client-Grundlage und Mitgliederoberfläche implementiert. Vier echte PostgreSQL-Logiktests unter PGlite; konfigurierter Browserflow mit kontrollierten API-Antworten. Echter Supabase-/Mehrverbindungs-/Subscription-Nachweis offen. Nächster UI-Schritt AST-010; Produktionsfreigabe des Backends erst nach Integrationsgate. Siehe ADR-002 und `evidence/ast-009-online.md`.

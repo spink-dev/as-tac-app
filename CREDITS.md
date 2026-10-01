@@ -39,3 +39,8 @@ Eigene Gebietspaket- und Downloadimplementierung, kein kopierter Referenzcode. o
 ## AST-007
 
 - Eigenes Projektpaketformat und begrenzter ZIP-Leser; fflate 0.8.3 (MIT) für ZIP-Export. Lizenz unter `public/licenses/dependencies.txt`. Keine weitere Referenzcodeübernahme.
+
+## AST-009
+
+- Supabase JavaScript-Client und Laufzeitabhängigkeiten: MIT/Apache-2.0-Lizenztexte unter `public/licenses/dependencies.txt`. Keine Übernahme von TacMap-Backend-Code.
+- PGlite dient ausschliesslich als PostgreSQL-Testlaufzeit in Node; wird nicht mit der App ausgeliefert. Lizenz im npm-Paket (`@electric-sql/pglite/LICENSE`).

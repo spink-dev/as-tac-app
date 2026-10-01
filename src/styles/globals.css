@@ -67,3 +67,5 @@ fieldset { border: 1px solid #cbd2c6; border-radius: 6px; padding: 12px; margin:
 .map-label-options { position: absolute; left: 16px; bottom: 42px; display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 4px 8px; background: #fffef5ed; border-radius: 4px; }
 .map-label-options label { display: flex; align-items: center; gap: 6px; font-size: 11px; min-height: 32px; cursor: pointer; }
 .map-label-options input { width: 16px; min-height: 16px; margin: 0; }
+
+.online-panel code { overflow-wrap: anywhere; font-size: 11px; }

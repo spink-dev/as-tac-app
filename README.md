@@ -2,7 +2,7 @@
 
 Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Die Kartenfunktionalität aus **AST-001** ist integriert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
 
-**Stand 2026-10-01:** AST-004–006 als Preview mit Gebietspaketen, Editor und lokalem Briefing implementiert; Produktions-Browsertests vorhanden; reale Abnahme auf iPhone 16 Pro und Samsung Galaxy A24 noch ausstehend. Vollständige portable Projektpakete und Online-Kollaboration sind noch nicht implementiert.
+**Stand 2026-10-01:** 0.3.0 auf main umfasst Offline-Karten, Editor, Teams/Phasen, Briefing und portable Projektpakete. 0.4.0-alpha.1 auf testing ergänzt die AST-009-Online-Grundlage. Echte Supabase-Integration und gemeinsame Live-Bearbeitung sowie Geräteabnahme auf iPhone 16 Pro und Samsung Galaxy A24 bleiben offen.
 
 ## Starten
 
@@ -87,7 +87,7 @@ Der Service Worker aktiviert Updates erst auf ausdrücklichen Klick. Ein fehlerh
 
 Die URL-Zuordnung ist die Vorgabe des Nutzers. `testing` wird als Git-Deploy-Quelle bereitgestellt; Hosting-Provider, Domain-/TLS-Anbindung und automatische Deploy-Trigger sind hier nicht eingerichtet oder verifiziert. Beide Umgebungen verwenden denselben Build-Befehl `npm ci && npm run build` und das Verzeichnis `dist/`. Beim Docker-Build wird dieses Verzeichnis über Port 80 ausgeliefert; HTTPS übernimmt der Host/Proxy. Die Origins besitzen getrennte Offline-Caches und Standortfreigaben.
 
-[AST-002-Nachweis](specs/001-foundation/evidence/ast-002-foundation.md) · [AST-003-Nachweis](specs/001-foundation/evidence/ast-003-local-projects.md). Weitere Nachweise: [AST-004](specs/001-foundation/evidence/ast-004-packages.md), [AST-005](specs/001-foundation/evidence/ast-005-editor.md), [AST-006](specs/001-foundation/evidence/ast-006-briefing.md). Weitere Nachweise: [AST-007](specs/001-foundation/evidence/ast-007-portable.md), [AST-008](specs/001-foundation/evidence/ast-008-mobile.md). Nächster Umsetzungsschritt: **AST-009 — Backend und dauerhafte Sync-Basis**.
+[AST-002-Nachweis](specs/001-foundation/evidence/ast-002-foundation.md) · [AST-003-Nachweis](specs/001-foundation/evidence/ast-003-local-projects.md). Weitere Nachweise: [AST-004](specs/001-foundation/evidence/ast-004-packages.md), [AST-005](specs/001-foundation/evidence/ast-005-editor.md), [AST-006](specs/001-foundation/evidence/ast-006-briefing.md). Weitere Nachweise: [AST-007](specs/001-foundation/evidence/ast-007-portable.md), [AST-008](specs/001-foundation/evidence/ast-008-mobile.md). AST-009 als Integrationsstand vorhanden; nächster UI-Schritt **AST-010 — gemeinsamer Online-Editor**.
 
 ## Lokale Projekte (AST-003)
 
@@ -102,7 +102,7 @@ IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und
 
 ## Versionierung und Releases
 
-`package.json` ist die Quelle der App-Version; `package-lock.json`, die Anzeige unter „Über & Quellen“ und `offline-manifest.json.appVersion` stimmen damit überein. Release **v0.2.0** integriert AST-002 bis AST-006; **0.3.0-alpha.2** erweitert `testing` um AST-007 und AST-008. Änderungen stehen im [Changelog](CHANGELOG.md).
+`package.json` ist die Quelle der App-Version; `package-lock.json`, die Anzeige unter „Über & Quellen“ und `offline-manifest.json.appVersion` stimmen damit überein. Release **v0.3.0** integriert den Offline-Stack bis AST-008; **0.4.0-alpha.1** ergänzt AST-009 auf `testing`. Änderungen stehen im [Changelog](CHANGELOG.md).
 
 Release-Stände auf `main` erhalten einen annotierten Git-Tag `vX.Y.Z`. Neue Funktionen erhöhen vor 1.0 die Minor-Version, Fehlerkorrekturen die Patch-Version; inkompatible Änderungen werden ausdrücklich dokumentiert und gegebenenfalls migriert. `testing` enthält die nächste Integration für die Preview. Der vollständige lokale MVP ist mit 0.1.0 noch nicht abgeschlossen.
 
@@ -135,3 +135,7 @@ Unter „Projekt teilen & importieren“ vollständige `.astac.zip` sichern. Auf
 ### Mobiler GPS-Betrieb (AST-008)
 
 GPS pausiert bei App-Wechsel/Bildschirmsperre und startet nach Rückkehr nur bei zuvor aktivierter Positionsanzeige wieder. Ein alter Fix bleibt bis zum neuen Signal als veraltet markiert. Stopp oder verweigerte Freigabe werden nicht automatisch aufgehoben. Feldtest-Anleitung: `specs/001-foundation/evidence/ast-008-mobile.md`.
+
+## Online-Grundlage (AST-009)
+
+Optionaler Supabase-Integrationsstand: Anmeldung, leere Online-Projekte und Owner/Admin/Viewer-Verwaltung. Einrichtung und Prüfgrenzen unter [supabase/README.md](supabase/README.md), Entscheidung unter [ADR-002](specs/001-foundation/adr-002-online-backend.md). Keine automatische Übertragung lokaler Pläne oder GPS. Der gemeinsame Karteneditor folgt mit AST-010.

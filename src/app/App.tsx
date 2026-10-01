@@ -1,3 +1,4 @@
+import OnlinePanel from '../features/online/OnlinePanel';
 import PortablePanel from '../features/portable/PortablePanel';
 import { de } from '../i18n/de';
 import { version } from '../../package.json';
@@ -111,6 +112,7 @@ export default function App() {
                     }}>{follow ? de.location.pause : de.location.follow}</button>}</div>
                 <p className="muted">{de.location.privacy}</p>
             </section>
+            <OnlinePanel />
             <details><summary>{de.app.sources}</summary>
                 <p>AS-TAC · v{version}</p>
                 <p>{area?.name ?? selectedAreaId}</p>

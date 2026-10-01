@@ -8,7 +8,9 @@ Status: AST-004–006 in 0.2.0 integriert; AST-007 und AST-008 als Preview imple
 4. [Plan](plan.md): Architekturgrenzen, Reihenfolge und Prüfstrategie.
 5. [Aufgaben](tasks.md): geordnete Arbeitspakete mit Fertigkriterien.
 
-**Nächster Umsetzungsschritt: AST-009.** Backend-Entscheidung, Auth/Membership und dauerhafte Sync-Basis gemäss Verträgen. AST-007 liefert vollständige portable Projektpakete, AST-008 härtet den Vordergrund-GPS-Lebenszyklus. Beide liegen als 0.3.0-alpha.2 auf `testing`; reale Datei-/GPS-Prüfungen auf iPhone 16 Pro und Galaxy A24 bleiben offen. Details in `evidence/ast-007-portable.md` und `evidence/ast-008-mobile.md`.
+**Aktuell: AST-009 als Integrationsstand auf testing.** Backend-ADR, SQL-Rollen/Transaktionen und Online-Mitgliederoberfläche sind implementiert. Supabase-Projektkonfiguration und echte Auth-/Mehrverbindungs-/Subscription-Prüfungen stehen aus. Nächster UI-Schritt: AST-010 (gemeinsamer Editor). AS-TAC bleibt Produktfokus; Zivilschutz-Spezialisierung folgt später.
+
+AST-007/008 und Kartenkorrekturen sind in 0.3.0 auf main integriert. Reale Datei-/GPS-Prüfungen auf iPhone 16 Pro und Galaxy A24 bleiben offen.
 
 Verbindlich aus dem Nutzerauftrag: Privatprojekt, Astro, Offline-/Online-Karten, eigene GPS-Position, präzise Vorbereitung und Verteilung, Briefings, mehrere gleichzeitig schreibende Admins, schreibgeschützte Mitglieder sowie Credits für @rwolffgang.
 
