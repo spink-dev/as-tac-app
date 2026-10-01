@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0 — 2026-10-01 (main)
+
+- Freigegebene Integration des Kartenarbeitsplatzes, Event-Katalogs, Root-Studios und AS-TAC-Brandings samt Tag-/Dunkel-/Rotlichtmodus.
+- Anschliessender Performance- und FieldMaps-Datenabgleich wird separat dokumentiert.
+
 ## 0.5.0-alpha.2 — 2026-10-01
 
 - Eigenes AS-TAC-Branding mit geometrischem Zeichen, exportierbarer Vektor-Wortmarke und neuen App-Icons; graphitfarbene Panels, orangefarbener Akzent und einheitliche Navigationsicons.
