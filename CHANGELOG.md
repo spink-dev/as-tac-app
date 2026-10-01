@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0-alpha.2 — 2026-10-01
+
+- Eigenes AS-TAC-Branding mit geometrischem Zeichen, exportierbarer Vektor-Wortmarke und neuen App-Icons; graphitfarbene Panels, orangefarbener Akzent und einheitliche Navigationsicons.
+- Tag-, Dunkel- und Rotlichtmodus direkt im Kartenarbeitsplatz. Lokale Speicherung, Systemeinstellung als Startvorgabe und frühe Initialisierung auch beim Offline-Neustart.
+- Eigene Kartenpaletten und monochrome Rotlichtdarstellung einschliesslich Plan-/Teamfarben, GPS, Labels und Briefing-Markierungen. Projektfarben, Kartenausschnitt, Zeichnungen und offene Eingaben bleiben erhalten.
+- Rotlicht vermeidet helle Aktionsflächen; Gerätehelligkeit und Systemdialoge bleiben Sache des Betriebssystems. Reale Nachtprüfung auf iPhone 16 Pro / Galaxy A24 steht aus.
+
 ## 0.5.0-alpha.1 — 2026-10-01
 
 - Neuer Kartenarbeitsplatz für Orientierung, Planung, Briefing, Karten und Projekt: volle Kartenfläche, schliessbare Panels, mobile Tabs, Tastaturnavigation und Safe Areas.

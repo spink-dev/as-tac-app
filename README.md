@@ -2,7 +2,7 @@
 
 Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Die Kartenfunktionalität aus **AST-001** ist integriert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
 
-**Stand 2026-10-01:** v0.4.0 auf `main` integriert AST-001–012. v0.5.0-alpha.1 auf `testing` ergänzt den Kartenarbeitsplatz, Ebenen, sechs Mahlwinkel-Eventvorlagen und das Root-Kartenstudio. Echte Supabase-Bereitstellung und Geräteabnahme auf iPhone 16 Pro / Samsung Galaxy A24 bleiben offen.
+**Stand 2026-10-01:** v0.4.0 auf `main` integriert AST-001–012. v0.5.0-alpha.2 auf `testing` ergänzt den Kartenarbeitsplatz, Ebenen, sechs Mahlwinkel-Eventvorlagen und das Root-Kartenstudio sowie AS-TAC-Branding mit Tag-/Dunkel-/Rotlichtmodus. Echte Supabase-Bereitstellung und Geräteabnahme auf iPhone 16 Pro / Samsung Galaxy A24 bleiben offen.
 
 ## Starten
 
