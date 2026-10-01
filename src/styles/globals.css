@@ -38,3 +38,8 @@ summary { cursor: pointer; min-height: 48px; font-weight: 600; }
 
 select { width: 100%; min-height: 48px; font: inherit; color: inherit; background: #fffef8; border: 1px solid #acb8ad; border-radius: 6px; margin: 8px 0 24px; padding: 10px; }
 label { font-size: 13px; font-weight: 600; }
+
+input { width: 100%; min-height: 48px; font: inherit; color: inherit; background: #fffef8; border: 1px solid #acb8ad; border-radius: 6px; padding: 10px; margin: 8px 0 12px; }
+.panel form { margin-bottom: 24px; }
+button:disabled, select:disabled, input:disabled { opacity: .55; cursor: not-allowed; }
+.project-warning { background: #fff1e5; color: #7e2d16; padding: 12px; border-radius: 6px; }

@@ -1,6 +1,6 @@
 # Umsetzungsplan
 
-2026-10-01 · Status: AST-002 implementiert; reale AST-001-Geräteabnahme weiterhin offen.
+2026-10-01 · Status: AST-003 implementiert; reale AST-001-Geräteabnahme weiterhin offen.
 
 ## Reihenfolge
 
@@ -18,7 +18,7 @@ M0 beweist die schwierigen Plattformannahmen. M1 liefert einen vollständigen lo
 - `src/core/sync/`: Operationsvertrag, Reconnect und Backend-Adapter.
 - `src/features/members/`, `src/features/credits/`: Rollenverwaltung und Herkunft.
 
-Ordner erst bei Bedarf anlegen. Keine vollständige Framework-/Store-Portierung aus TacMap. Domain-Funktionen gezielt übernehmen, Herkunft dokumentieren und pixelabhängige Annahmen isolieren.
+AST-003 bündelt die zunächst kleinen Domänen-, Command- und Speichermodule in `src/core/projects/` sowie die Oberfläche in `src/features/projects/`. Weitere Ordner erst bei Bedarf anlegen. Keine vollständige Framework-/Store-Portierung aus TacMap. Domain-Funktionen gezielt übernehmen, Herkunft dokumentieren und pixelabhängige Annahmen isolieren.
 
 ## Technische Gates
 

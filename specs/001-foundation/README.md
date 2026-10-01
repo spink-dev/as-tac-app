@@ -1,6 +1,6 @@
 # 001 — Offline-Planung und gemeinsame Online-Karte
 
-Status: AST-002-App-Grundstruktur implementiert; AST-001-Geräteabnahme offen. Stand: 2026-10-01.
+Status: AST-003 lokale Projekte implementiert; AST-001-Geräteabnahme offen. Stand: 2026-10-01.
 
 1. [Spec](spec.md): Nutzeranforderungen, MVP und messbare Abnahme.
 2. [UX](ux.md): Kartenoberfläche und vollständige Abläufe inklusive Fehlerzuständen.
@@ -8,7 +8,7 @@ Status: AST-002-App-Grundstruktur implementiert; AST-001-Geräteabnahme offen. S
 4. [Plan](plan.md): Architekturgrenzen, Reihenfolge und Prüfstrategie.
 5. [Aufgaben](tasks.md): geordnete Arbeitspakete mit Fertigkriterien.
 
-**Nächster Auftrag: AST-003.** Validierte WGS84-Domäne, Commands und lokale Speicherung mit Transaktionen, Autosave-Status, Undo/Redo und Migrationstests. Die reale AST-001-Abnahme bleibt separat offen; Fortsetzung wurde vom Nutzer ausdrücklich beauftragt.
+**Nächster Auftrag: AST-004.** Gebietspakete mit freier Gebietsauswahl, Import/Download, Grösse/Quota, Hashprüfung und atomarem Wechsel. AST-003 liefert lokale Projekte, validierte WGS84-Domäne, Commands, Transaktionen, Autosave, Undo/Redo und Migrationstests. Die reale AST-001-Abnahme bleibt separat offen; Fortsetzung wurde vom Nutzer ausdrücklich beauftragt.
 
 Verbindlich aus dem Nutzerauftrag: Privatprojekt, Astro, Offline-/Online-Karten, eigene GPS-Position, präzise Vorbereitung und Verteilung, Briefings, mehrere gleichzeitig schreibende Admins, schreibgeschützte Mitglieder sowie Credits für @rwolffgang.
 

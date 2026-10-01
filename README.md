@@ -2,7 +2,7 @@
 
 Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Die Kartenfunktionalität aus **AST-001** ist integriert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
 
-**Stand 2026-10-01:** AST-002-App-Grundstruktur implementiert; Produktions-Browsertests vorhanden; reale Abnahme auf iPhone 16 Pro und Samsung Galaxy A24 noch ausstehend. Editor, Planpakete und Online-Kollaboration sind noch nicht implementiert.
+**Stand 2026-10-01:** AST-003 mit lokalen Projekten, Autosave und Undo/Redo implementiert; Produktions-Browsertests vorhanden; reale Abnahme auf iPhone 16 Pro und Samsung Galaxy A24 noch ausstehend. Editor, Planpakete und Online-Kollaboration sind noch nicht implementiert.
 
 ## Starten
 
@@ -87,4 +87,14 @@ Der Service Worker aktiviert Updates erst auf ausdrücklichen Klick. Ein fehlerh
 
 Die URL-Zuordnung ist die Vorgabe des Nutzers. `testing` wird als Git-Deploy-Quelle bereitgestellt; Hosting-Provider, Domain-/TLS-Anbindung und automatische Deploy-Trigger sind hier nicht eingerichtet oder verifiziert. Beide Umgebungen verwenden denselben Build-Befehl `npm ci && npm run build` und das Verzeichnis `dist/`. Beim Docker-Build wird dieses Verzeichnis über Port 80 ausgeliefert; HTTPS übernimmt der Host/Proxy. Die Origins besitzen getrennte Offline-Caches und Standortfreigaben.
 
-[AST-002-Nachweis](specs/001-foundation/evidence/ast-002-foundation.md). Nächster Umsetzungsschritt: **AST-003 — Domäne, Commands und lokale Speicherung**.
+[AST-002-Nachweis](specs/001-foundation/evidence/ast-002-foundation.md) · [AST-003-Nachweis](specs/001-foundation/evidence/ast-003-local-projects.md). Nächster Umsetzungsschritt: **AST-004 — Gebietspakete mit freier Gebietsauswahl**.
+
+## Lokale Projekte (AST-003)
+
+Gebiet auswählen, Projektnamen eingeben und „Projekt erstellen“. Das Projekt lässt sich ohne Konto öffnen, umbenennen, duplizieren oder nach Bestätigung löschen. Name und Gebiet speichern automatisch; „Auf diesem Gerät gespeichert“ erscheint erst nach erfolgreicher Transaktion. Undo/Redo umfasst die letzten 50 Aktionen der geöffneten Sitzung (zusammenhängendes Tippen zählt als eine Aktion). Nach erneutem Öffnen beginnt die Undo-Historie neu; beim App-Start öffnet sich das alphabetisch erste lesbare Projekt.
+
+`src/core/projects/` enthält das WGS84-Modell, reversible Commands, die IndexedDB-Transaktionen und den Sitzungszustand. `src/features/projects/` enthält die Oberfläche. Der erste lokale Datenstand nutzt Schema 1; keine erfundene Migration für AST-001/002, die keine Projekte gespeichert haben. Explizite spätere Migrationen sichern den Originaldatensatz in derselben Transaktion und ersetzen ihn nur nach Validierung. Unbekannte Formate bleiben unangetastet und können als Original-JSON gesichert werden.
+
+Speicherfehler und Änderungen in einem anderen Tab verhindern stilles Überschreiben. Der ungespeicherte Entwurf bleibt im aktuellen Tab; Wiederholen, eine neue Projektkopie oder eine JSON-Notfallsicherung sind möglich. Projektwechsel, Löschen und Update-Neustart sind bis zum erfolgreichen Speichern gesperrt. Eine Notfallsicherung ist noch **kein portables Kartenpaket** und besitzt noch keinen Importdialog (AST-007). Browser-/Betriebssystem-Abbruch kann ungespeicherte Änderungen verlieren.
+
+IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und localhost teilen keine Projekte. GPS wird weiterhin weder in Projekte geschrieben noch übertragen. Geometrie-, Team- und Phasenmodelle sind vorbereitet; ihre Bearbeitungsoberflächen folgen in AST-005/006.

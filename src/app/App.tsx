@@ -1,28 +1,60 @@
 import { de } from '../i18n/de';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import MapView from '../features/map/MapView';
 import { useLocation } from '../core/location/useLocation';
 import { outside } from '../core/location/position';
 import { useOfflineApp } from '../core/useOfflineApp';
 import areas from '../config/maps.json';
+import { ProjectSession } from '../core/projects/session';
+import ProjectPanel from '../features/projects/ProjectPanel';
 
 export default function App() {
     const [areaId, setAreaId] = useState(areas[0].id);
-    const area = areas.find((item) => item.id === areaId)!;
+    const [session] = useState(() => new ProjectSession());
+    const projects = useSyncExternalStore(session.subscribe, session.getSnapshot);
+    const selectedAreaId = projects.project?.mapPackageId ?? areaId;
+    const area = areas.find((item) => item.id === selectedAreaId);
+    useEffect(() => {
+        void session.start();
+        const guard = (event: BeforeUnloadEvent) => {
+            if (!session.canLeave()) {
+                event.preventDefault();
+            }
+        };
+        const flushWhenHidden = () => {
+            if (document.visibilityState === 'hidden') {
+                void session.flush();
+            }
+        };
+        document.addEventListener('visibilitychange', flushWhenHidden);
+        window.addEventListener('beforeunload', guard);
+        return () => {
+            window.removeEventListener('beforeunload', guard);
+            document.removeEventListener('visibilitychange', flushWhenHidden);
+            session.dispose();
+        };
+    }, [session]);
     const [follow, setFollow] = useState(true);
     const pauseFollow = useCallback(() => setFollow(false), []);
     const { fix, now, gps, active, stale, startGps, stopGps } = useLocation();
-    const { online, offline, offlineText, registration, update, storage, verify, checkStorage, applyUpdate } = useOfflineApp();
+    const { online, offline, offlineText, registration, update, storage, verify, checkStorage, applyUpdate } = useOfflineApp(session.canLeave);
     return <main className="app-shell">
         <header><div><span className="eyebrow">AS-TAC</span><h1>{de.app.title}</h1></div>
             <span className="connection">{online ? de.app.online : de.app.offline}</span></header>
-        <MapView areaId={areaId} fix={fix} stale={stale} follow={follow} onExplore={pauseFollow} />
+        <MapView areaId={selectedAreaId} fix={fix} stale={stale} follow={follow} onExplore={pauseFollow} />
         <aside className="panel">
-            <section><label htmlFor="area">{de.app.area}</label><select id="area" value={areaId} onChange={(event) => setAreaId(event.target.value)}>{areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><h2>{offline.ready ? de.app.available : de.app.prepare}</h2>
+            <ProjectPanel session={session} state={projects} areaId={selectedAreaId} />
+            <section><label htmlFor="area">{de.app.area}</label><select id="area" value={selectedAreaId} disabled={projects.busy} onChange={(event) => {
+                if (projects.project) {
+                    session.change([{ kind: 'project', mapPackageId: event.target.value }]);
+                } else {
+                    setAreaId(event.target.value);
+                }
+            }}>{!area && <option value={selectedAreaId}>{selectedAreaId}</option>}{areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><h2>{offline.ready ? de.app.available : de.app.prepare}</h2>
                 <p role="status">{offlineText}</p>
                 <div className="actions"><button onClick={() => verify()}>{de.app.verify}</button><button onClick={checkStorage}>{de.app.storage}</button></div>
                 {storage && <p>{storage}</p>}
-                {update && <button onClick={applyUpdate}>{de.app.update}</button>}
+                {update && <button disabled={!session.canLeave()} onClick={applyUpdate}>{de.app.update}</button>}
                 {registration && !offline.ready && <button onClick={() => verify(true)}>{de.app.repair}</button>}
             </section>
             <section><h2>{stale ? de.location.last : de.location.title}</h2>
@@ -41,7 +73,7 @@ export default function App() {
                 <p className="muted">{de.location.privacy}</p>
             </section>
             <details><summary>{de.app.sources}</summary>
-                <p>{area.name}</p>
+                <p>{area?.name ?? selectedAreaId}</p>
                 <p>© OpenStreetMap contributors · ODbL 1.0. <a href="/licenses/ODbL-1.0.txt">{de.app.license}</a></p>
                 <p>{de.app.thanks} <a href="https://github.com/rwolffgang/FieldMaps">FieldMaps / @rwolffgang</a> {de.app.reference}</p>
                 <p><a href="/licenses/CREDITS.md">{de.app.provenance}</a> · <a href="/licenses/dependencies.txt">{de.app.libraries}</a></p>

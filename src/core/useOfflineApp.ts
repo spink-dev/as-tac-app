@@ -2,7 +2,7 @@ import { de } from '../i18n/de';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { verifyOffline, type OfflineStatus } from './offline';
 
-export function useOfflineApp() {
+export function useOfflineApp(canReload: () => boolean) {
     const [online, setOnline] = useState(true);
     const [offline, setOffline] = useState<OfflineStatus>({ ready: false });
     const [offlineText, setOfflineText] = useState(de.offline.unchecked);
@@ -14,7 +14,9 @@ export function useOfflineApp() {
 
     const verify = useCallback(async (repair = false) => {
         if (repair && !navigator.serviceWorker?.controller) {
-            location.reload();
+            if (canReload()) {
+                location.reload();
+            }
             return;
         }
         const status = await verifyOffline(repair);
@@ -22,7 +24,7 @@ export function useOfflineApp() {
             setOffline(status);
             setOfflineText(status.ready ? de.offline.ready : (status.error ?? de.offline.incomplete));
         }
-    }, []);
+    }, [canReload]);
 
     useEffect(() => {
         alive.current = true;
@@ -48,7 +50,7 @@ export function useOfflineApp() {
             return cleanupAll;
         }
         const controllerChanged = () => {
-            if (reloadRequested.current) {
+            if (reloadRequested.current && canReload()) {
                 location.reload();
                 return;
             }
@@ -103,7 +105,7 @@ export function useOfflineApp() {
             }
         });
         return cleanupAll;
-    }, [verify]);
+    }, [verify, canReload]);
 
     async function checkStorage() {
         try {
@@ -120,7 +122,7 @@ export function useOfflineApp() {
     }
 
     function applyUpdate() {
-        if (update) {
+        if (update && canReload()) {
             reloadRequested.current = true;
             update.postMessage({ type: 'ACTIVATE' });
         }

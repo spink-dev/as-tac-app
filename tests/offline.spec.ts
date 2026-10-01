@@ -112,6 +112,9 @@ test('browser process restarts offline using its persisted profile', async () =>
         await page.goto('http://localhost:4000/');
         await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
         await expect(page.locator('.map-label:visible').first()).toBeVisible();
+        await page.getByLabel('Name des neuen Projekts').fill('Neustart-Nachweis');
+        await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
+        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
         await context.close();
         context = await chromium.launchPersistentContext(profile, { headless: true, offline: true });
         const coldPage = await context.newPage();
@@ -119,6 +122,7 @@ test('browser process restarts offline using its persisted profile', async () =>
         await expect(coldPage.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
         await expect(coldPage.locator('.map-label:visible').first()).toBeVisible();
         await expect(coldPage.locator('.map')).toHaveAttribute('aria-busy', 'false');
+        await expect(coldPage.getByLabel('Projektname', { exact: true })).toHaveValue('Neustart-Nachweis');
     } finally {
         await context.close();
         await rm(profile, { recursive: true, force: true });
@@ -179,9 +183,31 @@ test('app updates wait for consent and a broken update preserves the offline ver
             navigator.serviceWorker.controller!.postMessage({ type: 'VERIFY' }, [channel.port2]);
             return message;
         })).toBe(manifest.version);
+        await page.getByLabel('Name des neuen Projekts').fill('Update-Nachweis');
+        await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
+        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
+        await page.evaluate(() => {
+            const put = IDBObjectStore.prototype.put;
+            (window as any).restoreStorage = () => {
+                IDBObjectStore.prototype.put = put;
+            };
+            IDBObjectStore.prototype.put = function (value: unknown) {
+                if (this.name === 'projects') {
+                    throw new DOMException('Full', 'QuotaExceededError');
+                }
+                return put.call(this, value);
+            };
+        });
+        await page.getByLabel('Projektname', { exact: true }).fill('Update-Entwurf');
+        await expect(page.getByText('Nicht gespeichert', { exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Update installieren und neu starten' })).toBeDisabled();
+        await page.evaluate(() => (window as any).restoreStorage());
+        await page.getByRole('button', { name: 'Erneut versuchen', exact: true }).click();
+        await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
         await page.getByRole('button', { name: 'Update installieren und neu starten' }).click();
         await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
-        await expect(page.getByLabel('Vorbereitetes Gebiet')).toHaveValue('mahlwinkel');
+        await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Update-Entwurf');
+        await expect(page.getByLabel('Vorbereitetes Gebiet')).toHaveValue('benglen');
         await expect(page.getByRole('button', { name: 'Update installieren und neu starten' })).toHaveCount(0);
 
         const broken = { ...next, version: 'test-broken-update',
