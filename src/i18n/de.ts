@@ -119,7 +119,7 @@ export const de = {
         retry: 'GPS erneut versuchen', start: 'Meine Position', stop: 'GPS stoppen',
         pause: 'Folgen pausieren', follow: 'Position folgen',
         outside: 'Ausserhalb des geladenen Gebiets. Der Kartenausschnitt bleibt sichtbar.',
-        privacy: 'Keine Übertragung oder Speicherung der Position. GPS benötigt Freigabe; ein Fix ohne Internet ist nicht garantiert. Nur Vordergrundbetrieb.',
+        privacy: 'Keine automatische Übertragung der Position. Pfade werden nur nach bewusstem Start aufgenommen und auf Wunsch lokal gespeichert. GPS benötigt Freigabe; nur Vordergrundbetrieb.',
         age: (seconds: number, stale: boolean) => `Fix vor ${seconds} s${stale ? ' · VERALTET' : ''}`,
     },
     map: {

@@ -111,7 +111,7 @@ export default function WorkspaceShell({
                 <div
                     className="sheet-content"
                     onClick={(event) => {
-                        const tool = (event.target as HTMLElement).closest('[data-draw-tool]');
+                        const tool = (event.target as HTMLElement).closest('[data-draw-tool],[data-map-pick]');
                         if (tool) {
                             setOpen(false);
                         }

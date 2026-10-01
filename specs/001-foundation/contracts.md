@@ -69,3 +69,7 @@ Anwesenheit, Cursor und Präsentationskamera sind flüchtige Sitzungsevents mit 
 Für Mobilgeräte enger als der ursprüngliche Vorschlag: 100 MiB Archiv, 32 MiB pro Datei, 64 MiB insgesamt entpackt. Nur Store/Deflate, keine Verschlüsselung, ZIP64, Data-Descriptors oder ZIP-Kommentare. Zentralverzeichnis und lokale Header müssen übereinstimmen; feste Pfadliste verhindert Traversal/Extras/Duplikate. Streaming-Dekompression prüft tatsächliche Ausgabebytes vor Zusammenführung. Ressourcen werden mit SHA-256 geprüft, Projekt/Karte nach Schema.
 
 Import remappt Projekt-/Objekt-/Team-/Phasen-IDs und Karten-ID. Karte und Projekt entstehen in einer gemeinsamen IndexedDB-Transaktion. Schreibschutz ist lokale Datensatz-Metadaten (`readOnly`), keine Online-Berechtigung; Öffnen und Briefing möglich, Bearbeitung nur als bewusst erstellte neue Kopie. Exporte enthalten keine dieser Rechte-Metadaten.
+
+## Explizite Geländeaufnahme (0.6.0)
+
+Der Nutzer kann eine lokale GPS-Spur bewusst als normale Planlinien übernehmen. Dies ist die ausdrückliche Ausnahme zur bisherigen ausschliesslichen Positionsanzeige. Rohmessungen, Zeitreihen und Bewegungssensordaten werden nicht automatisch persistiert oder synchronisiert. Details: [Feldwerkzeuge](../003-field-navigation/spec.md).

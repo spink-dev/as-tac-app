@@ -1,3 +1,7 @@
+import { useFieldNavigation } from '../features/field/useFieldNavigation';
+import FieldPanel from '../features/field/FieldPanel';
+import { makeElement } from '../features/editor/geometry';
+import type { Coordinate } from '../core/projects/model';
 import CatalogPanel from '../features/catalog/CatalogPanel';
 import StudioPanel from '../features/catalog/StudioPanel';
 import WorkspaceShell, { type WorkspaceTab } from '../features/workspace/WorkspaceShell';
@@ -43,6 +47,7 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
     const pauseFollow = useCallback(() => setFollow(false), []);
     const [mapInstance, setMapInstance] = useState<LibreMap | null>(null);
     const [briefingPhase, setBriefingPhase] = useState<Phase | null>(null);
+    const { fix, now, gps, active, stale, startGps, stopGps } = useLocation();
     const editor = useEditor(
         mapInstance,
         maps.current?.id === selectedAreaId ? projects.project : null,
@@ -50,6 +55,7 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
         pauseFollow,
         briefingPhase?.visibleElementIds ?? null,
     );
+    const navigation = useFieldNavigation(mapInstance, fix, stale, now, selectedAreaId, pauseFollow);
     const handleBriefingPhase = useCallback(
         (phase: Phase | null) => {
             setBriefingPhase(phase);
@@ -66,10 +72,10 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
         editor.setEditing(tab === 'plan' && !!projects.project && !projects.readOnly);
     }, [tab, projects.project?.id, projects.readOnly, editor.setEditing]);
     const drawingPending = useRef(false);
-    drawingPending.current = packageBusy || editor.hasDraft || editor.hasUnsavedForm || !!briefingPhase;
+    drawingPending.current = packageBusy || editor.hasDraft || editor.hasUnsavedForm || navigation.pending || !!briefingPhase;
     const canReload = useCallback(
-        () => session.canLeave() && !packageBusy && !(editor.hasDraft || editor.hasUnsavedForm) && !briefingPhase,
-        [session, packageBusy, editor.hasDraft || editor.hasUnsavedForm, briefingPhase],
+        () => session.canLeave() && !packageBusy && !(editor.hasDraft || editor.hasUnsavedForm || navigation.pending) && !briefingPhase,
+        [session, packageBusy, editor.hasDraft || editor.hasUnsavedForm || navigation.pending, briefingPhase],
     );
     const selectArea = (id: string) => {
         if (projects.project) {
@@ -98,14 +104,13 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
             session.dispose();
         };
     }, [session]);
-    const { fix, now, gps, active, stale, startGps, stopGps } = useLocation();
     const { online, offline, offlineText, registration, update, storage, verify, checkStorage, applyUpdate } = useOfflineApp(canReload);
     const map = (
         <MapView
             mapPackage={maps.current}
             onViewport={setViewport}
             onReady={setMapInstance}
-            fix={fix}
+            fix={navigation.displayFix}
             stale={stale}
             follow={follow}
             onExplore={pauseFollow}
@@ -136,7 +141,9 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
                     project={projects.project}
                     map={mapInstance}
                     change={session.change}
-                    disabled={projects.readOnly || projects.busy || editor.hasDraft || editor.hasUnsavedForm || packageBusy}
+                    disabled={
+                        projects.readOnly || projects.busy || editor.hasDraft || editor.hasUnsavedForm || navigation.pending || packageBusy
+                    }
                 />
             )}
         </>
@@ -150,7 +157,15 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
                 map={mapInstance}
                 change={session.change}
                 onPhase={handleBriefingPhase}
-                disabled={!session.canLeave() || editor.hasDraft || editor.hasUnsavedForm || packageBusy || maps.loading || maps.error}
+                disabled={
+                    !session.canLeave() ||
+                    editor.hasDraft ||
+                    editor.hasUnsavedForm ||
+                    navigation.pending ||
+                    packageBusy ||
+                    maps.loading ||
+                    maps.error
+                }
                 pauseFollow={pauseFollow}
             />
         </>
@@ -164,7 +179,13 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
                     id="area"
                     value={selectedAreaId}
                     disabled={
-                        projects.readOnly || projects.busy || packageBusy || editor.hasDraft || editor.hasUnsavedForm || !!briefingPhase
+                        projects.readOnly ||
+                        projects.busy ||
+                        packageBusy ||
+                        editor.hasDraft ||
+                        editor.hasUnsavedForm ||
+                        navigation.pending ||
+                        !!briefingPhase
                     }
                     onChange={(event) => selectArea(event.target.value)}
                 >
@@ -201,7 +222,13 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
                 refresh={maps.refresh}
                 select={selectArea}
                 disabled={
-                    projects.readOnly || packageBusy || !session.canLeave() || editor.hasDraft || editor.hasUnsavedForm || !!briefingPhase
+                    projects.readOnly ||
+                    packageBusy ||
+                    !session.canLeave() ||
+                    editor.hasDraft ||
+                    editor.hasUnsavedForm ||
+                    navigation.pending ||
+                    !!briefingPhase
                 }
                 busyChanged={setPackageBusy}
             />
@@ -222,7 +249,7 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
             <ProjectPanel
                 session={session}
                 state={projects}
-                locked={packageBusy || editor.hasDraft || editor.hasUnsavedForm || !!briefingPhase}
+                locked={packageBusy || editor.hasDraft || editor.hasUnsavedForm || navigation.pending || !!briefingPhase}
                 areaId={selectedAreaId}
             />{' '}
             <PortablePanel
@@ -231,7 +258,9 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
                 map={maps.current}
                 refresh={maps.refresh}
                 busyChanged={setPackageBusy}
-                disabled={!session.canLeave() || packageBusy || editor.hasDraft || editor.hasUnsavedForm || !!briefingPhase}
+                disabled={
+                    !session.canLeave() || packageBusy || editor.hasDraft || editor.hasUnsavedForm || navigation.pending || !!briefingPhase
+                }
             />{' '}
             <OnlinePanel onOpen={onOpen} locked={!canReload()} />
             <details>
@@ -289,6 +318,35 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
                 <p className="muted">{de.location.privacy}</p>
             </section>
             {!projects.project && <p>Unter Karten findest du vorbereitete Gebiete. Unter Projekt legst du einen eigenen Plan an.</p>}
+            <FieldPanel
+                navigation={navigation}
+                onSave={
+                    !projects.readOnly && projects.project && !projects.busy && !packageBusy
+                        ? (parts) => {
+                              const project = session.getSnapshot().project;
+                              if (!project) {
+                                  return false;
+                              }
+                              const elements = parts.map((coordinates, index) =>
+                                  makeElement(project.id, 'line', coordinates as Coordinate[], `Aufgenommener Pfad ${index + 1}`),
+                              );
+                              session.change(
+                                  elements.map((element) => ({
+                                      kind: 'element',
+                                      id: element.id,
+                                      value: {
+                                          ...element,
+                                          notes: 'Bewusst aus lokaler GPS-Aufnahme übernommen; keine vermessene Wegbreite.',
+                                      },
+                                  })),
+                              );
+                              return elements.every((element) =>
+                                  session.getSnapshot().project?.elements.some((stored) => stored.id === element.id),
+                              );
+                          }
+                        : undefined
+                }
+            />
             {tab === 'field' && projects.project && (
                 <EditorPanel editor={editor} project={projects.project} session={session} state={projects} disabled />
             )}
@@ -296,13 +354,19 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
     );
     return (
         <WorkspaceShell
-            revealKey={editor.selected ? `${editor.selected.id}:${editor.selected.version}` : undefined}
+            revealKey={
+                navigation.target
+                    ? `reference:${navigation.target.join(':')}`
+                    : editor.selected
+                      ? `${editor.selected.id}:${editor.selected.version}`
+                      : undefined
+            }
             title={projects.project?.name ?? area?.name ?? 'Gebiet wählen'}
             subtitle={area?.name ?? selectedAreaId}
             status={online ? 'Netz verfügbar' : 'Offline'}
             map={map}
             tab={tab}
-            blocked={editor.hasDraft || editor.hasUnsavedForm || packageBusy || !!briefingPhase}
+            blocked={editor.hasDraft || editor.hasUnsavedForm || navigation.pending || packageBusy || !!briefingPhase}
             onTab={(next) => {
                 editor.cancel();
                 editor.setEditing(next === 'plan' && !!projects.project && !projects.readOnly);
@@ -321,7 +385,19 @@ function LocalApp({ onOpen }: { onOpen: (target: OnlineTarget) => void }) {
                 </button>
             }
             alert={
-                editor.hasUnsavedForm ? (
+                navigation.pending ? (
+                    <>
+                        <span>
+                            {navigation.recording
+                                ? `Pfadaufnahme · ${navigation.count} Messpunkte`
+                                : navigation.picking || navigation.target
+                                  ? 'Standortabgleich · Punkt wählen und ruhig stehen'
+                                  : `GPS-Pfad · ${navigation.count} Messpunkte noch im Arbeitsspeicher`}
+                        </span>
+                        {navigation.recording && <button onClick={navigation.pause}>Pausieren</button>}
+                        {(navigation.picking || navigation.target) && <button onClick={navigation.cancelPoint}>Punkt abbrechen</button>}
+                    </>
+                ) : editor.hasUnsavedForm ? (
                     <>
                         <span>Angaben noch nicht übernommen</span>
                         <button onClick={editor.cancel}>Verwerfen</button>

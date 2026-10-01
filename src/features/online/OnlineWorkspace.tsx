@@ -1,3 +1,5 @@
+import { useFieldNavigation } from '../field/useFieldNavigation';
+import FieldPanel from '../field/FieldPanel';
 import WorkspaceShell, { type WorkspaceTab } from '../workspace/WorkspaceShell';
 import { exportProject } from '../../core/portable/project';
 import { de } from '../../i18n/de';
@@ -68,6 +70,7 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
         pauseEditor,
         phase?.visibleElementIds ?? null,
     );
+    const navigation = useFieldNavigation(map, gps.fix, gps.stale, gps.now, state.project?.mapPackageId ?? 'benglen', pauseFollow);
     editing.current = editor.editing;
     const [exporting, setExporting] = useState(false);
     const [exportStatus, setExportStatus] = useState('');
@@ -145,13 +148,20 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
     }, [session, target, close]);
     useEffect(() => {
         const guard = (event: BeforeUnloadEvent) => {
-            if (state.busy || state.held || state.status === 'storage-error' || editor.hasDraft || editor.hasUnsavedForm) {
+            if (
+                state.busy ||
+                state.held ||
+                state.status === 'storage-error' ||
+                editor.hasDraft ||
+                editor.hasUnsavedForm ||
+                navigation.pending
+            ) {
                 event.preventDefault();
             }
         };
         window.addEventListener('beforeunload', guard);
         return () => window.removeEventListener('beforeunload', guard);
-    }, [state.busy, state.held, state.status, editor.hasDraft || editor.hasUnsavedForm]);
+    }, [state.busy, state.held, state.status, editor.hasDraft || editor.hasUnsavedForm || navigation.pending]);
     const projectTools = (
         <>
             {' '}
@@ -302,7 +312,12 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
             </details>
             <button
                 disabled={
-                    (state.busy && !lockError) || state.held || state.status === 'storage-error' || editor.hasDraft || editor.hasUnsavedForm
+                    (state.busy && !lockError) ||
+                    state.held ||
+                    state.status === 'storage-error' ||
+                    editor.hasDraft ||
+                    editor.hasUnsavedForm ||
+                    navigation.pending
                 }
                 onClick={close}
             >
@@ -379,7 +394,7 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
                         <input
                             type="checkbox"
                             checked={presentation.following}
-                            disabled={!presentation.state || editor.hasDraft || editor.hasUnsavedForm}
+                            disabled={!presentation.state || editor.hasDraft || editor.hasUnsavedForm || navigation.pending}
                             onChange={(e) => {
                                 editor.cancel();
                                 editor.setEditing(false);
@@ -399,7 +414,7 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
                 map={map}
                 change={session.change}
                 onPhase={onPhase}
-                disabled={state.busy || editor.hasDraft || editor.hasUnsavedForm || maps.loading || maps.error}
+                disabled={state.busy || editor.hasDraft || editor.hasUnsavedForm || navigation.pending || maps.loading || maps.error}
                 pauseFollow={pauseFollow}
                 readOnly={disabled}
             />
@@ -430,6 +445,7 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
                 )}
                 {gps.fix && !gps.stale && gps.fix.accuracy > 50 && <p>{de.location.imprecise}</p>}
             </section>
+            <FieldPanel navigation={navigation} />
             {tab === 'field' && (
                 <EditorPanel
                     editor={editor}
@@ -466,14 +482,20 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
                     project={state.project}
                     map={map}
                     change={session.change}
-                    disabled={disabled || editor.hasDraft || editor.hasUnsavedForm}
+                    disabled={disabled || editor.hasDraft || editor.hasUnsavedForm || navigation.pending}
                 />
             )}
         </div>
     );
     return (
         <WorkspaceShell
-            revealKey={editor.selected ? `${editor.selected.id}:${editor.selected.version}` : undefined}
+            revealKey={
+                navigation.target
+                    ? `reference:${navigation.target.join(':')}`
+                    : editor.selected
+                      ? `${editor.selected.id}:${editor.selected.version}`
+                      : undefined
+            }
             title={state.project?.name ?? 'Gemeinsamer Plan'}
             subtitle={`${state.role === 'viewer' ? 'Mitglied' : state.role === 'owner' ? 'Eigentümer' : 'Admin'} · Gemeinsamer Plan`}
             status={state.status === 'live' ? 'Verbunden' : state.status === 'offline' ? 'Offline' : 'Abgleich offen'}
@@ -482,14 +504,16 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
                     onViewport={onViewport}
                     mapPackage={maps.current}
                     onReady={setMap}
-                    fix={gps.fix}
+                    fix={navigation.displayFix}
                     stale={gps.stale}
                     follow={follow}
                     onExplore={pauseFollow}
                 />
             }
             tab={tab}
-            blocked={editor.hasDraft || editor.hasUnsavedForm || !!phase || presentation.following || presentation.isLeader}
+            blocked={
+                editor.hasDraft || editor.hasUnsavedForm || navigation.pending || !!phase || presentation.following || presentation.isLeader
+            }
             onTab={(next) => {
                 editor.cancel();
                 editor.setEditing(next === 'plan' && !disabled);
@@ -508,7 +532,19 @@ export default function OnlineWorkspace({ target, close }: { target: OnlineTarge
                 </button>
             }
             alert={
-                editor.hasUnsavedForm ? (
+                navigation.pending ? (
+                    <>
+                        <span>
+                            {navigation.recording
+                                ? `Pfadaufnahme · ${navigation.count} Messpunkte`
+                                : navigation.picking || navigation.target
+                                  ? 'Standortabgleich · Punkt wählen und ruhig stehen'
+                                  : `GPS-Pfad · ${navigation.count} Messpunkte noch im Arbeitsspeicher`}
+                        </span>
+                        {navigation.recording && <button onClick={navigation.pause}>Pausieren</button>}
+                        {(navigation.picking || navigation.target) && <button onClick={navigation.cancelPoint}>Punkt abbrechen</button>}
+                    </>
+                ) : editor.hasUnsavedForm ? (
                     <>
                         <span>Angaben noch nicht übernommen</span>
                         <button onClick={editor.cancel}>Verwerfen</button>

@@ -35,7 +35,8 @@ export function useLocation() {
                 return;
             }
             const next = { longitude: position.coords.longitude, latitude: position.coords.latitude,
-                accuracy: position.coords.accuracy, timestamp: position.timestamp };
+                accuracy: position.coords.accuracy, timestamp: position.timestamp,
+                speed: Number.isFinite(position.coords.speed) && position.coords.speed !== null && position.coords.speed >= 0 ? position.coords.speed : null };
             if (!validFix(next) || next.timestamp > Date.now() + 5_000) {
                 setGps(de.location.invalid);
                 setGpsError(true);

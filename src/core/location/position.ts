@@ -3,12 +3,14 @@ export interface Fix {
     latitude: number;
     accuracy: number;
     timestamp: number;
+    speed?: number | null;
 }
 
 export const STALE_MS = 30_000;
 
 export function validFix(fix: Fix): boolean {
-    return Object.values(fix).every(Number.isFinite)
+    return [fix.longitude, fix.latitude, fix.accuracy, fix.timestamp].every(Number.isFinite)
+        && (fix.speed == null || Number.isFinite(fix.speed) && fix.speed >= 0)
         && Math.abs(fix.longitude) <= 180 && Math.abs(fix.latitude) <= 90
         && fix.accuracy >= 0 && fix.timestamp > 0;
 }
