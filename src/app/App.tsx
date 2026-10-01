@@ -1,4 +1,5 @@
 import { de } from '../i18n/de';
+import { version } from '../../package.json';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import MapView from '../features/map/MapView';
 import { useLocation } from '../core/location/useLocation';
@@ -73,6 +74,7 @@ export default function App() {
                 <p className="muted">{de.location.privacy}</p>
             </section>
             <details><summary>{de.app.sources}</summary>
+                <p>AS-TAC · v{version}</p>
                 <p>{area?.name ?? selectedAreaId}</p>
                 <p>© OpenStreetMap contributors · ODbL 1.0. <a href="/licenses/ODbL-1.0.txt">{de.app.license}</a></p>
                 <p>{de.app.thanks} <a href="https://github.com/rwolffgang/FieldMaps">FieldMaps / @rwolffgang</a> {de.app.reference}</p>

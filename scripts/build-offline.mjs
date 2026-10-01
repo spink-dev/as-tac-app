@@ -27,10 +27,11 @@ for (const { id, name, bounds } of areas) {
         throw new Error(`Kartenmanifest und Daten stimmen nicht überein: ${id}`);
     }
 }
+const { version: appVersion } = JSON.parse(await readFile('package.json', 'utf8'));
 const resources = await inventory('dist');
 const worker = await readFile('src/core/service-worker.js', 'utf8');
-const version = createHash('sha256').update(JSON.stringify(resources)).update(worker).digest('hex').slice(0, 16);
-const manifest = { version, resources, byteSize: resources.reduce((sum, r) => sum + r.bytes, 0) };
+const version = createHash('sha256').update(appVersion).update(JSON.stringify(resources)).update(worker).digest('hex').slice(0, 16);
+const manifest = { appVersion, version, resources, byteSize: resources.reduce((sum, r) => sum + r.bytes, 0) };
 await writeFile('dist/offline-manifest.json', JSON.stringify(manifest, null, 2));
 await writeFile('dist/sw.js', `const MANIFEST = ${JSON.stringify(manifest)};\n${worker}`);
 console.log(`Offline build ${version}: ${resources.length} resources, ${manifest.byteSize} bytes`);

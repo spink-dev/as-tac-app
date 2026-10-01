@@ -98,3 +98,12 @@ Gebiet auswählen, Projektnamen eingeben und „Projekt erstellen“. Das Projek
 Speicherfehler und Änderungen in einem anderen Tab verhindern stilles Überschreiben. Der ungespeicherte Entwurf bleibt im aktuellen Tab; Wiederholen, eine neue Projektkopie oder eine JSON-Notfallsicherung sind möglich. Projektwechsel, Löschen und Update-Neustart sind bis zum erfolgreichen Speichern gesperrt. Eine Notfallsicherung ist noch **kein portables Kartenpaket** und besitzt noch keinen Importdialog (AST-007). Browser-/Betriebssystem-Abbruch kann ungespeicherte Änderungen verlieren.
 
 IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und localhost teilen keine Projekte. GPS wird weiterhin weder in Projekte geschrieben noch übertragen. Geometrie-, Team- und Phasenmodelle sind vorbereitet; ihre Bearbeitungsoberflächen folgen in AST-005/006.
+
+
+## Versionierung und Releases
+
+`package.json` ist die Quelle der App-Version; `package-lock.json`, die Anzeige unter „Über & Quellen“ und `offline-manifest.json.appVersion` stimmen damit überein. Release **v0.1.0** integriert AST-002 und AST-003. Änderungen stehen im [Changelog](CHANGELOG.md).
+
+Release-Stände auf `main` erhalten einen annotierten Git-Tag `vX.Y.Z`. Neue Funktionen erhöhen vor 1.0 die Minor-Version, Fehlerkorrekturen die Patch-Version; inkompatible Änderungen werden ausdrücklich dokumentiert und gegebenenfalls migriert. `testing` enthält die nächste Integration für die Preview. Der vollständige lokale MVP ist mit 0.1.0 noch nicht abgeschlossen.
+
+App-Version, inhaltsbasierte Offline-Cache-Version und Projekt-Schema sind getrennt: Ein Release erhöht das Projektschema nicht automatisch. Schema 1 bleibt in v0.1.0 unverändert. Der Offline-Build berücksichtigt App-Version, Ressourcen und Service-Worker-Code bei seiner Hashbildung.
