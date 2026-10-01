@@ -1,6 +1,6 @@
 # 001 — Offline-Planung und gemeinsame Online-Karte
 
-Status: AST-004–006 in 0.2.0 integriert; AST-007 und AST-008 als Preview implementiert; AST-001-Geräteabnahme offen. Stand: 2026-10-01.
+Status: Offline-Stack bis AST-008 in 0.3.0 integriert; AST-009–012 auf testing; AST-001-Geräteabnahme offen. Stand: 2026-10-01.
 
 1. [Spec](spec.md): Nutzeranforderungen, MVP und messbare Abnahme.
 2. [UX](ux.md): Kartenoberfläche und vollständige Abläufe inklusive Fehlerzuständen.
@@ -8,7 +8,7 @@ Status: AST-004–006 in 0.2.0 integriert; AST-007 und AST-008 als Preview imple
 4. [Plan](plan.md): Architekturgrenzen, Reihenfolge und Prüfstrategie.
 5. [Aufgaben](tasks.md): geordnete Arbeitspakete mit Fertigkriterien.
 
-**Aktuell: AST-009 als Integrationsstand auf testing.** Backend-ADR, SQL-Rollen/Transaktionen und Online-Mitgliederoberfläche sind implementiert. Supabase-Projektkonfiguration und echte Auth-/Mehrverbindungs-/Subscription-Prüfungen stehen aus. Nächster UI-Schritt: AST-010 (gemeinsamer Editor). AS-TAC bleibt Produktfokus; Zivilschutz-Spezialisierung folgt später.
+**Aktuell: AST-009–012 als Integrationsstand auf testing (0.4.0-alpha.2).** Gemeinsamer Editor, dauerhafte Offline-Entwürfe, expliziter Konfliktabgleich und exklusive Briefing-Leitung sind implementiert. SQL-/Browsernachweis: [AST-010–012](evidence/ast-010-012-collaboration.md). Echte Supabase-Konfiguration/Mehrverbindungsprüfung und [AST-014-Feldabnahme](evidence/ast-014-field-acceptance.md) stehen aus. AS-TAC bleibt Produktfokus; Zivilschutz-Spezialisierung folgt später.
 
 AST-007/008 und Kartenkorrekturen sind in 0.3.0 auf main integriert. Reale Datei-/GPS-Prüfungen auf iPhone 16 Pro und Galaxy A24 bleiben offen.
 

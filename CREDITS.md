@@ -44,3 +44,7 @@ Eigene Gebietspaket- und Downloadimplementierung, kein kopierter Referenzcode. o
 
 - Supabase JavaScript-Client und Laufzeitabhängigkeiten: MIT/Apache-2.0-Lizenztexte unter `public/licenses/dependencies.txt`. Keine Übernahme von TacMap-Backend-Code.
 - PGlite dient ausschliesslich als PostgreSQL-Testlaufzeit in Node; wird nicht mit der App ausgeliefert. Lizenz im npm-Paket (`@electric-sql/pglite/LICENSE`).
+
+## AST-010–012
+
+Eigene Client-Synchronisierung, Konfliktoberfläche und PostgreSQL-Briefing-Leases. Keine zusätzliche Referenzcodeübernahme und keine neuen Laufzeitabhängigkeiten. Quellen-/Lizenzansicht und vollständiger Paketexport stehen auch im gemeinsamen Workspace zur Verfügung.

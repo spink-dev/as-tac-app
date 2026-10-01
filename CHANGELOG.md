@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0-alpha.2 — 2026-10-01 (testing)
+
+- AST-010: Gemeinsamer Karteneditor für Owner/Admin, schreibgeschützte Mitgliederansicht, bestätigte Snapshot-Aktualisierung und serverversioniertes Undo/Redo.
+- AST-011: Dauerhafte Offline-Entwürfe, kontofreie Offline-Kopien, Konfliktvergleich, stabile Wiederholungs-IDs, Rollenentzug und Schutz laufender Eingaben.
+- AST-012: Exklusive, ablaufende Briefing-Leitung und freiwilliges Folgen von Phase/Kamera, getrennt vom Plan.
+- Vollständiger Paketexport und Credits auch im gemeinsamen Workspace; öffentliche Supabase-Build-Argumente für Docker.
+- SQL-/Chromium-Integration lokal geprüft. Echter Supabase-/Mehrverbindungsnachweis und iPhone-/Galaxy-Feldabnahme bleiben offen. Keine neue Produktionsfreigabe.
+
 ## 0.4.0-alpha.1 — 2026-10-01 (testing)
 
 - AST-009: Supabase/PostgreSQL-Grundlage mit Rollen, serverseitiger Validierung, Objektversionen, atomaren Sequenzen und idempotentem Operationsprotokoll.

@@ -1,6 +1,6 @@
 # Umsetzungsplan
 
-2026-10-01 · Status: Offline-Stack bis AST-008 in 0.3.0; AST-009 als Integrationsstand auf testing; reale AST-001-Geräteabnahme weiterhin offen.
+2026-10-01 · Status: Offline-Stack bis AST-008 in 0.3.0; AST-009–012 als Integrationsstand auf testing; reale AST-001-Geräteabnahme weiterhin offen.
 
 ## Reihenfolge
 

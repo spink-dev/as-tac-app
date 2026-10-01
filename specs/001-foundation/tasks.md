@@ -1,6 +1,6 @@
 # Geordnete Arbeitspakete
 
-AST-004–006 in 0.2.0 integriert; AST-007/008 als Preview implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nach jedem Paket Ergebnis, Prüfkommando und verbleibende Grenzen kurz dokumentieren. Priorität P0 bis zum vollständigen Nutzerauftrag, P1 für spätere Erweiterungen.
+Offline-Stack bis AST-008 in 0.3.0 integriert; AST-009–012 als Preview implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nach jedem Paket Ergebnis, Prüfkommando und verbleibende Grenzen kurz dokumentieren. Priorität P0 bis zum vollständigen Nutzerauftrag, P1 für spätere Erweiterungen.
 
 | ID | Prio / Phase | Aufgabe | Abhängigkeit | Fertigkriterium |
 | --- | --- | --- | --- | --- |
@@ -13,9 +13,9 @@ AST-004–006 in 0.2.0 integriert; AST-007/008 als Preview implementiert; AST-00
 | AST-007 | P0 / M1 | Portables Paket und Teilen — implementiert, iOS-Abnahme offen | 004, 006 | Vollständiger Roundtrip auf zweitem Gerät; begrenzte Dekompression, Hash-/Schemafehler, iOS-Dateiimport |
 | AST-008 | P0 / M1 | GPS und mobile Feldnutzung härten — implementiert, Feldabnahme offen | 001, 004 | Genauigkeit/Alter, denied/timeout/stale, Follow/Explore, ausserhalb Gebiet; offline auf Telefon getestet |
 | AST-009 | P0 / M2 | Backend, Auth/Membership und Sync-Basis — Implementierungsstand vorhanden, Supabase-Integration offen | 003 | Backend-ADR, Rollenmatrix, API-/Storage-/Subscription-Schutz, transaktionale Objektversionen/Sequenzen |
-| AST-010 | P0 / M2 | Gleichzeitige Bearbeitung und Live-Mitgliederansicht | 005, 009 | Zwei Admins bearbeiten unabhängig, Viewer sieht bestätigte Änderungen; direkte Viewer-Mutation scheitert |
-| AST-011 | P0 / M2 | Konflikte, Offline-Entwürfe und Reconnect | 010 | Konflikt-UI, deduplizierte Wiederholung, Event-Lücken, Snapshot-Replay, Rollenentzug; A04–A06 bestanden |
-| AST-012 | P0 / M2 | Gemeinsames Online-Briefing | 006, 010 | Ein Präsentationsleiter, freiwilliges Folgen, unabhängige Ansicht; Reconnect verändert Plan nicht |
+| AST-010 | P0 / M2 | Gleichzeitige Bearbeitung und Live-Mitgliederansicht — implementiert, Live-Integration offen | 005, 009 | Zwei Admins bearbeiten unabhängig, Viewer sieht bestätigte Änderungen; direkte Viewer-Mutation scheitert |
+| AST-011 | P0 / M2 | Konflikte, Offline-Entwürfe und Reconnect — implementiert, Live-Integration offen | 010 | Konflikt-UI, deduplizierte Wiederholung, Event-Lücken, Snapshot-Replay, Rollenentzug; A04–A06 bestanden |
+| AST-012 | P0 / M2 | Gemeinsames Online-Briefing — implementiert, Live-Integration offen | 006, 010 | Ein Präsentationsleiter, freiwilliges Folgen, unabhängige Ansicht; Reconnect verändert Plan nicht |
 | AST-013 | P0 / M1–M3 | Credits und Quellen pflegen | Ab erster Übernahme | CREDITS-Inventar, FieldMaps/@rwolffgang in App/README, OSM-Attribution und lokale Lizenzhinweise |
 | AST-014 | P0 / M3 | End-to-End-Feldabnahme | 007, 008, 011, 012, 013 | A01–A10 auf Produktionsbuild; Gerätematrix und Messwerte; offene Fehler vor Ablösung bewertet |
 | AST-015 | P1 | Alte `.tacmap`-Projekte importieren | 007 | Explizite Format-/Koordinatenmigration, unkalibrierte Bildkarte korrekt behandeln; vor Bedarf prüfen |
@@ -74,3 +74,7 @@ GPS-Watch im Hintergrund stoppen, expliziten Nutzerwunsch im Speicher behalten u
 ## AST-009 — Integrationsstand
 
 SQL-/Client-Grundlage und Mitgliederoberfläche implementiert. Vier echte PostgreSQL-Logiktests unter PGlite; konfigurierter Browserflow mit kontrollierten API-Antworten. Echter Supabase-/Mehrverbindungs-/Subscription-Nachweis offen. Nächster UI-Schritt AST-010; Produktionsfreigabe des Backends erst nach Integrationsgate. Siehe ADR-002 und `evidence/ast-009-online.md`.
+
+## AST-010–012 — Preview-Stack 0.4.0-alpha.2
+
+Gemeinsamer Editor, sequenzierte Snapshots, Offline-Kopien/Entwürfe, ausdrücklicher Konfliktabgleich, Rechteentzug und exklusive Briefing-Leitung mit freiwilligem Folgen. Nachweis unter `evidence/ast-010-012-collaboration.md`. Der bisherige nächste UI-Schritt AST-010 ist damit umgesetzt. Offen bleiben echte Supabase-Integration, Mehrverbindungs-/Lastmessung und die vorbereitete AST-014-Feldabnahme. Keine bestandene Telefonprüfung aus Browserautomation ableiten.
