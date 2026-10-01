@@ -58,3 +58,7 @@ button[aria-pressed="true"] { background: #dbe5d3; border-color: #253d32; box-sh
 .edit-handle { width: 48px; height: 48px; min-height: 48px; border: 2px solid #d55216; border-radius: 50%; background: #fffdf3dd; color: #9b3509; font-size: 24px; padding: 0; cursor: grab; }
 .notes { white-space: pre-wrap; overflow-wrap: anywhere; }
 .map-label { pointer-events: none; }
+
+fieldset { border: 1px solid #cbd2c6; border-radius: 6px; padding: 12px; margin: 12px 0; min-width: 0; }
+.management-fields { border: 0; padding: 0; }
+.phase-card { border-bottom: 1px solid #cbd2c6; }

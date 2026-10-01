@@ -14,6 +14,9 @@ import type { Bounds } from '../core/packages/maps';
 import type { Map as LibreMap } from 'maplibre-gl';
 import { useEditor } from '../features/editor/useEditor';
 import EditorPanel from '../features/editor/EditorPanel';
+import ManagementPanel from '../features/briefing/ManagementPanel';
+import BriefingPanel from '../features/briefing/BriefingPanel';
+import type { Phase } from '../core/projects/model';
 
 export default function App() {
     const [areaId, setAreaId] = useState(areas[0].id);
@@ -27,10 +30,20 @@ export default function App() {
     const [follow, setFollow] = useState(true);
     const pauseFollow = useCallback(() => setFollow(false), []);
     const [mapInstance, setMapInstance] = useState<LibreMap | null>(null);
-    const editor = useEditor(mapInstance, maps.current?.id === selectedAreaId ? projects.project : null, session.change, pauseFollow);
+    const [briefingPhase, setBriefingPhase] = useState<Phase | null>(null);
+    const editor = useEditor(mapInstance, maps.current?.id === selectedAreaId ? projects.project : null, session.change, pauseFollow, briefingPhase?.visibleElementIds ?? null);
+    const handleBriefingPhase = useCallback((phase: Phase | null) => {
+        setBriefingPhase(phase);
+        if (phase) {
+            editor.cancel();
+            editor.setEditing(false);
+            editor.setVisible(true);
+            pauseFollow();
+        }
+    }, [editor.cancel, editor.setEditing, editor.setVisible, pauseFollow]);
     const drawingPending = useRef(false);
-    drawingPending.current = editor.hasDraft;
-    const canReload = useCallback(() => session.canLeave() && !packageBusy && !editor.hasDraft, [session, packageBusy, editor.hasDraft]);
+    drawingPending.current = editor.hasDraft || !!briefingPhase;
+    const canReload = useCallback(() => session.canLeave() && !packageBusy && !editor.hasDraft && !briefingPhase, [session, packageBusy, editor.hasDraft, briefingPhase]);
     const selectArea = (id: string) => {
         if (projects.project) {
             session.change([{ kind: 'project', mapPackageId: id }]);
@@ -65,9 +78,11 @@ export default function App() {
             <span className="connection">{online ? de.app.online : de.app.offline}</span></header>
         <MapView mapPackage={maps.current} onViewport={setViewport} onReady={setMapInstance} fix={fix} stale={stale} follow={follow} onExplore={pauseFollow} />
         <aside className="panel">
-            <EditorPanel editor={editor} project={projects.project} session={session} state={projects} disabled={projects.busy || packageBusy || maps.loading || maps.error} />
-            <ProjectPanel session={session} state={{ ...projects, busy: projects.busy || packageBusy || editor.hasDraft }} areaId={selectedAreaId} />
-            <section><label htmlFor="area">{de.app.area}</label><select id="area" value={selectedAreaId} disabled={projects.busy || packageBusy || editor.hasDraft} onChange={(event) => selectArea(event.target.value)}>{!area && <option value={selectedAreaId}>{selectedAreaId}</option>}{maps.areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+            {!briefingPhase && <EditorPanel editor={editor} project={projects.project} session={session} state={projects} disabled={projects.busy || packageBusy || maps.loading || maps.error} />}
+            <BriefingPanel project={projects.project} map={mapInstance} change={session.change} onPhase={handleBriefingPhase} disabled={!session.canLeave() || editor.hasDraft || packageBusy || maps.loading || maps.error} pauseFollow={pauseFollow} />
+            {!briefingPhase && <ManagementPanel project={projects.project} map={mapInstance} change={session.change} disabled={projects.busy || editor.hasDraft || packageBusy} />}
+            <ProjectPanel session={session} state={projects} locked={packageBusy || editor.hasDraft || !!briefingPhase} areaId={selectedAreaId} />
+            <section><label htmlFor="area">{de.app.area}</label><select id="area" value={selectedAreaId} disabled={projects.busy || packageBusy || editor.hasDraft || !!briefingPhase} onChange={(event) => selectArea(event.target.value)}>{!area && <option value={selectedAreaId}>{selectedAreaId}</option>}{maps.areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
                 {maps.loading && <p role="status">{de.packages.loading}</p>}
                 {maps.error && <p role="alert">{de.packages.missing}</p>}
                 <h2>{offline.ready ? de.app.available : de.app.prepare}</h2>
@@ -77,7 +92,7 @@ export default function App() {
                 {update && <button disabled={!canReload()} onClick={applyUpdate}>{de.app.update}</button>}
                 {registration && !offline.ready && <button onClick={() => verify(true)}>{de.app.repair}</button>}
             </section>
-            <PackagePanel current={maps.current} viewport={viewport} refresh={maps.refresh} select={selectArea} disabled={!session.canLeave() || editor.hasDraft} busyChanged={setPackageBusy} />
+            <PackagePanel current={maps.current} viewport={viewport} refresh={maps.refresh} select={selectArea} disabled={!session.canLeave() || editor.hasDraft || !!briefingPhase} busyChanged={setPackageBusy} />
             <section><h2>{stale ? de.location.last : de.location.title}</h2>
                 <p role="status">{gps}</p>
                 {fix && <p className="coordinates">{fix.latitude.toFixed(6)}, {fix.longitude.toFixed(6)}<br />

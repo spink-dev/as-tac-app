@@ -2,7 +2,7 @@
 
 Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings mit Astro. Die Kartenfunktionalität aus **AST-001** ist integriert: React + MapLibre, lokale OSM-Gebiete Mahlwinkel und Zürich/Benglen, installierbare PWA, kontrollierter Offline-Cache und eigene GPS-Position ohne Standortübertragung.
 
-**Stand 2026-10-01:** AST-003 mit lokalen Projekten, Autosave und Undo/Redo implementiert; Produktions-Browsertests vorhanden; reale Abnahme auf iPhone 16 Pro und Samsung Galaxy A24 noch ausstehend. Editor, Planpakete und Online-Kollaboration sind noch nicht implementiert.
+**Stand 2026-10-01:** AST-004–006 als Preview mit Gebietspaketen, Editor und lokalem Briefing implementiert; Produktions-Browsertests vorhanden; reale Abnahme auf iPhone 16 Pro und Samsung Galaxy A24 noch ausstehend. Vollständige portable Projektpakete und Online-Kollaboration sind noch nicht implementiert.
 
 ## Starten
 
@@ -53,7 +53,7 @@ Eigene kleine Gebiete lassen sich bereits zur Build-Zeit vorbereiten:
 MAP_BOUNDS='[8.52,47.36,8.55,47.38]' MAP_NAME='Zürich Zentrum' npm run map:fetch -- zuerich-zentrum
 ```
 
-Das neue Gebiet mit ID, Name und Bounds in `src/config/maps.json` aufnehmen. Diese Datei steuert Auswahl, Downloader-Presets und Build-Prüfung gemeinsam. Die UI bietet derzeit ausschliesslich Mahlwinkel und Zürich/Benglen. Freie Gebietsauswahl mit Download/Quota/Abbruch folgt in AST-004. Der Downloader bezieht ausgewählte OSM-Objektklassen über Overpass, keine Standard-OSM-Tiles. Metadaten/Hashes stehen neben den GeoJSON-Dateien.
+Das neue Gebiet mit ID, Name und Bounds in `src/config/maps.json` aufnehmen. Diese Datei steuert Auswahl, Downloader-Presets und Build-Prüfung gemeinsam. Mahlwinkel und Zürich/Benglen sind mitgelieferte Voreinstellungen. Eigene Gebiete lassen sich seit AST-004 auch direkt in der UI herunterladen oder importieren. Der Downloader bezieht ausgewählte OSM-Objektklassen über Overpass, keine Standard-OSM-Tiles. Metadaten/Hashes stehen neben den GeoJSON-Dateien.
 
 ## Projektwissen
 
@@ -74,7 +74,7 @@ Danke an **[FieldMaps](https://github.com/rwolffgang/FieldMaps) von [@rwolffgang
 - `src/config/maps.json`: gemeinsame Konfiguration vorbereiteter Gebiete.
 - `src/i18n/de.ts`: deutsche App-Texte; weitere Sprache noch nicht implementiert.
 
-Der Service Worker aktiviert Updates erst auf ausdrücklichen Klick. Ein fehlerhaftes Ressourcenpaket ersetzt keine gültige Version. Alte Caches bleiben für offene Tabs erhalten; Bereinigung und dynamische Gebietspakete folgen in AST-004. Keine Projektpersistenz oder Editor-Funktion in AST-002 vorgezogen.
+Der Service Worker aktiviert Updates erst auf ausdrücklichen Klick. Ein fehlerhaftes Ressourcenpaket ersetzt keine gültige Version. Alte App-Caches bleiben für offene Tabs erhalten; ihre sichere Bereinigung ist noch offen. Dynamische Gebietspakete liegen seit AST-004 separat in IndexedDB. Keine Projektpersistenz oder Editor-Funktion in AST-002 vorgezogen.
 
 ## Branches und Deployment
 
@@ -87,7 +87,7 @@ Der Service Worker aktiviert Updates erst auf ausdrücklichen Klick. Ein fehlerh
 
 Die URL-Zuordnung ist die Vorgabe des Nutzers. `testing` wird als Git-Deploy-Quelle bereitgestellt; Hosting-Provider, Domain-/TLS-Anbindung und automatische Deploy-Trigger sind hier nicht eingerichtet oder verifiziert. Beide Umgebungen verwenden denselben Build-Befehl `npm ci && npm run build` und das Verzeichnis `dist/`. Beim Docker-Build wird dieses Verzeichnis über Port 80 ausgeliefert; HTTPS übernimmt der Host/Proxy. Die Origins besitzen getrennte Offline-Caches und Standortfreigaben.
 
-[AST-002-Nachweis](specs/001-foundation/evidence/ast-002-foundation.md) · [AST-003-Nachweis](specs/001-foundation/evidence/ast-003-local-projects.md). Nächster Umsetzungsschritt: **AST-004 — Gebietspakete mit freier Gebietsauswahl**.
+[AST-002-Nachweis](specs/001-foundation/evidence/ast-002-foundation.md) · [AST-003-Nachweis](specs/001-foundation/evidence/ast-003-local-projects.md). Weitere Nachweise: [AST-004](specs/001-foundation/evidence/ast-004-packages.md), [AST-005](specs/001-foundation/evidence/ast-005-editor.md), [AST-006](specs/001-foundation/evidence/ast-006-briefing.md). Nächster Umsetzungsschritt: **AST-007 — vollständige portable Projektpakete**.
 
 ## Lokale Projekte (AST-003)
 
@@ -97,7 +97,7 @@ Gebiet auswählen, Projektnamen eingeben und „Projekt erstellen“. Das Projek
 
 Speicherfehler und Änderungen in einem anderen Tab verhindern stilles Überschreiben. Der ungespeicherte Entwurf bleibt im aktuellen Tab; Wiederholen, eine neue Projektkopie oder eine JSON-Notfallsicherung sind möglich. Projektwechsel, Löschen und Update-Neustart sind bis zum erfolgreichen Speichern gesperrt. Eine Notfallsicherung ist noch **kein portables Kartenpaket** und besitzt noch keinen Importdialog (AST-007). Browser-/Betriebssystem-Abbruch kann ungespeicherte Änderungen verlieren.
 
-IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und localhost teilen keine Projekte. GPS wird weiterhin weder in Projekte geschrieben noch übertragen. Geometrie-, Team- und Phasenmodelle sind vorbereitet; ihre Bearbeitungsoberflächen folgen in AST-005/006.
+IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und localhost teilen keine Projekte. GPS wird weiterhin weder in Projekte geschrieben noch übertragen. Geometrie-, Team- und Phasenmodelle werden inzwischen durch die AST-005/006-Oberflächen bearbeitet.
 
 
 ## Versionierung und Releases
@@ -118,4 +118,12 @@ Zusätzliche Gebiete liegen in IndexedDB, getrennt von den gebündelten App-Ress
 
 Projekt öffnen und „Plan bearbeiten“ wählen. Punkt/Text per Tap, Linien/Flächen per Eckpunkten und „Zeichnung abschliessen“, Kreis mit Mittelpunkt und Rand, Freihand per Ziehen. Nach jeder Zeichnung wieder Auswahlmodus. Escape oder „Zeichnung abbrechen“ verwirft den laufenden Entwurf; Kartenbewegung in Auswahl/Feldansicht erzeugt keine Objekte.
 
-Elemente über Karte oder Liste auswählen. Beschriftung/Notizen/Farbe/Breite und WGS84-Koordinaten pro Zeile unter „Übernehmen“ anwenden. Kreuz verschiebt das ganze Objekt, Punktgriffe verschieben Eckpunkte (bis 200 sichtbare Griffe; längere Linien über die Koordinatenliste). Distanz und Fläche sind sphärische Näherungen, keine Vermessungszusage. Planänderungen speichern über AST-003 und lassen sich rückgängig machen. Sichtbarkeit und Auswahl bleiben lokal. Teams/Phasen folgen in AST-006.
+Elemente über Karte oder Liste auswählen. Beschriftung/Notizen/Farbe/Breite und WGS84-Koordinaten pro Zeile unter „Übernehmen“ anwenden. Kreuz verschiebt das ganze Objekt, Punktgriffe verschieben Eckpunkte (bis 200 sichtbare Griffe; längere Linien über die Koordinatenliste). Distanz und Fläche sind sphärische Näherungen, keine Vermessungszusage. Planänderungen speichern über AST-003 und lassen sich rückgängig machen. Sichtbarkeit und Auswahl bleiben lokal. Teams/Phasen ergänzt AST-006 (siehe unten).
+
+## Preview 0.2.0-alpha.3 — AST-006
+
+Unter „Teams & Phasen“ Teams mit Kürzel/Farbe und geordnete Phasen anlegen. Eine neue Phase übernimmt die aktuelle Kamera und zunächst alle Elemente. Im Phasendetail Notizen, sichtbare Elemente und Kamera anpassen; Änderungen bewusst übernehmen. Im Elementdetail Team/Phasen zuordnen. Löschen entfernt Zuordnungen atomar; Undo stellt sie wieder her. Teamkürzel und -farbe erscheinen an der Planbeschriftung.
+
+„Briefing starten“ zeigt die erste Phase samt Kamera und sichtbaren Elementen. Vor/Zurück oder Pfeiltasten wechseln Phasen; Escape bzw. „Briefing beenden“ verlässt die Präsentation. „Temporär zeichnen“ markiert per Maus/Finger, ohne den Plan zu schreiben. Phasenwechsel/Verlassen verwirft Markierungen. „In Plan übernehmen“ erzeugt ausdrücklich persistierte Freihandelemente mit Phasenzuordnung; diese Aktion ist rückgängig machbar. Es gibt noch keine Online-Präsentationsleitung oder Kommunikation zwischen Geräten.
+
+Nächster Arbeitsschritt: AST-007, vollständige portable Projektpakete. Produktionsbranch `main` bleibt bei v0.1.0; die versionierten Checkpoints alpha.1 (Gebiete), alpha.2 (Editor) und alpha.3 (Briefing) sind über `testing` für Review vorgesehen.

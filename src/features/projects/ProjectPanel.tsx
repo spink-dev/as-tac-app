@@ -3,13 +3,13 @@ import { de } from '../../i18n/de';
 import { ProjectError } from '../../core/projects/model';
 import { type ProjectSession, type ProjectState } from '../../core/projects/session';
 
-export default function ProjectPanel({ session, state, areaId }: { session: ProjectSession; state: ProjectState; areaId: string }) {
+export default function ProjectPanel({ session, state, areaId, locked: navigationLocked = false }: { session: ProjectSession; state: ProjectState; areaId: string; locked?: boolean }) {
     const [name, setName] = useState('');
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [backupId, setBackupId] = useState('');
     const [downloadError, setDownloadError] = useState(false);
     const t = de.projects;
-    const locked = !state.ready || state.busy || !session.canLeave();
+    const locked = !state.ready || state.busy || navigationLocked || !session.canLeave();
     const project = state.project;
     const errorCode = state.error instanceof ProjectError ? state.error.code : 'storage';
     async function download(id?: string) {
@@ -47,13 +47,13 @@ export default function ProjectPanel({ session, state, areaId }: { session: Proj
         </form>
         {project && <>
             <label htmlFor="project-name">{t.name}</label>
-            <input id="project-name" value={project.name} maxLength={120} disabled={state.busy} onChange={(event) => {
+            <input id="project-name" value={project.name} maxLength={120} disabled={state.busy || navigationLocked} onChange={(event) => {
                 session.change([{ kind: 'project', name: event.target.value }], 'name');
             }} />
             <p role="status" aria-live="polite">{t.states[state.saveState]}</p>
             <div className="actions">
-                <button disabled={state.busy || !state.canUndo} onClick={session.undo}>{t.undo}</button>
-                <button disabled={state.busy || !state.canRedo} onClick={session.redo}>{t.redo}</button>
+                <button disabled={state.busy || navigationLocked || !state.canUndo} onClick={session.undo}>{t.undo}</button>
+                <button disabled={state.busy || navigationLocked || !state.canRedo} onClick={session.redo}>{t.redo}</button>
                 <button disabled={locked} onClick={() => {
                     setConfirmDelete(false);
                     void session.duplicate(t.copyName(project.name));
@@ -68,14 +68,15 @@ export default function ProjectPanel({ session, state, areaId }: { session: Proj
                 }}>{t.deleteConfirm}</button><button onClick={() => setConfirmDelete(false)}>{t.cancel}</button></div>
             </div>}
         </>}
+        {navigationLocked && <p className="muted">{t.actionLocked}</p>}
         {state.busy && <p role="status">{t.loading}</p>}
         {state.error != null && <div role="alert" className="project-warning">
             <p>{t.errors[errorCode]}</p>
             {state.saveState === 'error' && <>
                 <p>{t.keepOpen}</p>
                 <div className="actions">
-                    <button disabled={state.busy} onClick={() => void session.flush()}>{t.retry}</button>
-                    <button disabled={state.busy} onClick={() => void session.recoverCopy()}>{t.recoverCopy}</button>
+                    <button disabled={state.busy || navigationLocked} onClick={() => void session.flush()}>{t.retry}</button>
+                    <button disabled={state.busy || navigationLocked} onClick={() => void session.recoverCopy()}>{t.recoverCopy}</button>
                     <button onClick={() => void download()}>{t.downloadDraft}</button>
                 </div>
             </>}

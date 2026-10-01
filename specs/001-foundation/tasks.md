@@ -1,6 +1,6 @@
 # Geordnete Arbeitspakete
 
-AST-003 implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nach jedem Paket Ergebnis, Prüfkommando und verbleibende Grenzen kurz dokumentieren. Priorität P0 bis zum vollständigen Nutzerauftrag, P1 für spätere Erweiterungen.
+AST-004–006 als Preview implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nach jedem Paket Ergebnis, Prüfkommando und verbleibende Grenzen kurz dokumentieren. Priorität P0 bis zum vollständigen Nutzerauftrag, P1 für spätere Erweiterungen.
 
 | ID | Prio / Phase | Aufgabe | Abhängigkeit | Fertigkriterium |
 | --- | --- | --- | --- | --- |
@@ -9,7 +9,7 @@ AST-003 implementiert; AST-001-Geräteabnahme weiterhin offen · 2026-10-01. Nac
 | AST-003 | P0 / M1 | Domäne, Commands, lokale Speicherung — implementiert | 002 | WGS84-Schema, Transaktionen, Autosave-Status, Undo/Redo und Migrationstests |
 | AST-004 | P0 / M1 | Gebietspakete verwalten — implementiert, Anbieter-/Geräteprüfung offen | 003 | Import/Download, Grösse/Quota, Hashprüfung, atomarer Wechsel, Attribution; Abbruch erhält gültigen Stand |
 | AST-005 | P0 / M1 | Karteneditor und präzise Ergänzungen — implementiert, Geräteabnahme offen | 003, 004 | Punkte, Linien, Flächen/Kreise, Text, Freihand, Attribute, Koordinaten und Messung; Desktop/Touch geprüft |
-| AST-006 | P0 / M1 | Teams, Phasen und lokales Briefing | 005 | Zuordnung, Vor/Zurück, Kamera, temporäre Zeichnungen und klare Feldansicht |
+| AST-006 | P0 / M1 | Teams, Phasen und lokales Briefing — implementiert | 005 | Zuordnung, Vor/Zurück, Kamera, temporäre Zeichnungen und klare Feldansicht |
 | AST-007 | P0 / M1 | Portables Paket und Teilen | 004, 006 | Vollständiger Roundtrip auf zweitem Gerät; begrenzte Dekompression, Hash-/Schemafehler, iOS-Dateiimport |
 | AST-008 | P0 / M1 | GPS und mobile Feldnutzung härten | 001, 004 | Genauigkeit/Alter, denied/timeout/stale, Follow/Explore, ausserhalb Gebiet; offline auf Telefon getestet |
 | AST-009 | P0 / M2 | Backend wählen, Auth/Membership und dauerhafte Sync-Basis | 003 | Backend-ADR, Rollenmatrix, API-/Storage-/Subscription-Schutz, transaktionale Objektversionen/Sequenzen |
@@ -49,7 +49,7 @@ Fortsetzung trotz noch offener AST-001-Geräteabnahme ausdrücklich vom Nutzer b
 
 Validiertes WGS84-Modell, atomare reversible Commands, lokale Projekte mit Autosave nach Commit, sitzungsbezogenes Undo/Redo und Revisionsprüfung gegen parallele Tabs. Speicherfehler bewahren den Entwurf; Migrationstransaktionen sichern Originale und rollen Fehler vollständig zurück. 16 automatisierte Tests einschliesslich realer Browser-IndexedDB und Offline-Prozessneustart bestanden. [Nachweis](evidence/ast-003-local-projects.md).
 
-Nächster Auftrag: **AST-004**, Gebietspakete verwalten und freie Gebietsauswahl vorbereiten. AST-001-Geräteabnahme und Hosting-Nachweis bleiben offen. AST-003 enthält noch keine Zeichenwerkzeuge, Team-/Phasenoberfläche oder portable Paketimporte.
+Auf AST-003 folgte **AST-004**, Gebietspakete und freie Gebietsauswahl. AST-001-Geräteabnahme und Hosting-Nachweis bleiben offen. AST-003 enthält noch keine Zeichenwerkzeuge, Team-/Phasenoberfläche oder portable Paketimporte.
 
 ## AST-004 — Preview-Checkpoint
 
@@ -58,3 +58,7 @@ Freie Bounds/Ausschnittsauswahl, begrenzter Download, importierbare OSM-GeoJSON-
 ## AST-005 — Preview-Checkpoint
 
 Sechs Geometrietypen, Planungs-/Feldmodus, Attribute/Koordinaten, Messungen, Auswahl/Suche, lokale Sichtbarkeit, Objekt-/Vertexverschieben und Undo/Redo. Desktop und Chromium-Touchautomation geprüft, keine reale Geräteabnahme. Siehe `evidence/ast-005-editor.md`. Weiter mit AST-006.
+
+## AST-006 — Preview-Checkpoint
+
+Teams/Phasen bearbeiten, zuordnen, atomar bereinigen und rückgängig machen. Offline-Briefing mit Kamera, Elementsichtbarkeit, Reihenfolge und temporären Markierungen; nur bewusste Übernahme schreibt den Plan. Nächster Umsetzungsschritt ist AST-007 (portables vollständiges Projektpaket). AST-008/014 benötigen weiterhin echte Telefone und Feldabnahme. Siehe `evidence/ast-006-briefing.md`.

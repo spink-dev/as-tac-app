@@ -5,10 +5,12 @@ import { de } from '../../i18n/de';
 import { measurements, vertices, withVertices } from './geometry';
 import type { Editor, Tool } from './useEditor';
 
-function Inspector({ element, editor }: { element: PlanElement; editor: Editor }) {
+function Inspector({ element, editor, project }: { element: PlanElement; editor: Editor; project: Project }) {
     const t = de.editor;
     const [label, setLabel] = useState(element.label);
     const [notes, setNotes] = useState(element.notes);
+    const [teamId, setTeamId] = useState(element.teamId ?? '');
+    const [phaseIds, setPhaseIds] = useState(element.phaseIds);
     const [colour, setColour] = useState(element.style.colour);
     const [width, setWidth] = useState(String(element.style.width));
     const [radius, setRadius] = useState(element.geometry.type === 'Circle' ? String(element.geometry.radiusMeters) : '');
@@ -30,11 +32,17 @@ function Inspector({ element, editor }: { element: PlanElement; editor: Editor }
             if (geometry.type === 'Circle') {
                 geometry = { ...geometry, radiusMeters: Number(radius) };
             }
-            const success = editor.commit({ ...element, label, notes, geometry, style: { ...element.style, colour, width: Number(width) }, version: element.version + 1 });
+            const success = editor.commit({ ...element, label, notes, teamId: teamId || undefined, phaseIds, geometry, style: { ...element.style, colour, width: Number(width) }, version: element.version + 1 });
             setInvalid(!success);
         }}>
             <label>{t.label}<input maxLength={200} value={label} onChange={(event) => setLabel(event.target.value)} /></label>
             <label>{t.notes}<textarea aria-label={t.notes} maxLength={10_000} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
+            <label>{de.briefing.assignment}<select aria-label={de.briefing.assignment} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
+                <option value="">{de.briefing.noTeam}</option>{project.teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+            </select></label>
+            {project.phases.length > 0 && <fieldset><legend>{de.briefing.phaseAssignment}</legend>{project.phases.map((phase) => <label className="check-label" key={phase.id}>
+                <input type="checkbox" checked={phaseIds.includes(phase.id)} onChange={(event) => setPhaseIds(event.target.checked ? [...phaseIds, phase.id] : phaseIds.filter((id) => id !== phase.id))} />{phase.title}
+            </label>)}</fieldset>}
             <div className="coordinate-grid">
                 <label>{t.colour}<input type="color" value={colour} onChange={(event) => setColour(event.target.value)} /></label>
                 <label>{t.width}<input type="number" min="1" max="20" step="1" value={width} onChange={(event) => setWidth(event.target.value)} /></label>
@@ -82,6 +90,6 @@ export default function EditorPanel({ editor, project, session, state, disabled 
         <label>{t.search}<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         <ul className="element-list">{elements.map((element) => <li key={element.id}><button disabled={editor.hasDraft} aria-pressed={editor.selected?.id === element.id} onClick={() => editor.select(element)}>{element.label || t.tools[element.type]} <small>· {t.tools[element.type]}</small></button></li>)}</ul>
         {!elements.length && <p>{t.empty}</p>}
-        {editor.selected && !editor.hasDraft && <Inspector key={`${editor.selected.id}:${editor.selected.version}:${editor.editing}`} element={editor.selected} editor={editor} />}
+        {editor.selected && !editor.hasDraft && <Inspector key={`${editor.selected.id}:${editor.selected.version}:${editor.editing}`} element={editor.selected} editor={editor} project={project} />}
     </section>;
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-alpha.3 — 2026-10-01 (testing)
+
+- AST-006: Teams mit Kürzel/Farbe, Elementzuordnung, Phasen mit Notizen/Kamera/Elementsichtbarkeit und Reihenfolge.
+- Lokales Offline-Briefing mit Vor/Zurück und Pfeiltasten. Temporäre Zeichnungen verändern den Plan erst bei expliziter Übernahme; Verlassen/Phasenwechsel verwirft sie.
+- Zuordnungsänderungen, Löschungen und Übernahme der Briefing-Zeichnungen sind atomar und rückgängig machbar.
+
 ## 0.2.0-alpha.2 — 2026-10-01 (testing)
 
 - AST-005: bewusster Planungsmodus, Punkte/Linien/Flächen/Kreise/Text/Freihand, Auswahl/Elementsuche und lokale Layer-Sichtbarkeit.

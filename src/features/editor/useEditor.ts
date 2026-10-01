@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as LibreMap } from 'maplibre-gl';
 import type { Coordinate, PlanElement, Project } from '../../core/projects/model';
-import { validateProject } from '../../core/projects/model';
+import { execute } from '../../core/projects/commands';
+import { saveElement } from '../briefing/commands';
 import type { Command } from '../../core/projects/commands';
 import { center, displayGeometry, distance, makeElement, translate, vertices, withVertices } from './geometry';
 import { de } from '../../i18n/de';
 export type Tool = 'select' | PlanElement['type'];
-export function useEditor(map: LibreMap | null, project: Project | null, change: (commands: Command[]) => void, pauseFollow: () => void) {
+export function useEditor(map: LibreMap | null, project: Project | null, change: (commands: Command[]) => void, pauseFollow: () => void, visibleIds: string[] | null = null) {
     const [editing, setEditing] = useState(false);
     const [visible, setVisible] = useState(true);
     const [tool, setTool] = useState<Tool>('select');
@@ -33,9 +34,9 @@ export function useEditor(map: LibreMap | null, project: Project | null, change:
             return false;
         }
         try {
-            const elements = project.elements.filter((item) => item.id !== element.id);
-            validateProject({ ...project, elements: [...elements, element] });
-            change([{ kind: 'element', id: element.id, value: element }]);
+            const commands = saveElement(project, element);
+            execute(project, commands);
+            change(commands);
             setError('');
             return true;
         } catch {
@@ -128,14 +129,18 @@ export function useEditor(map: LibreMap | null, project: Project | null, change:
         if (!map?.getSource('plan')) {
             return;
         }
-        const elements = visible ? project?.elements.filter((element) => !element.deletedAt) ?? [] : [];
+        const elements = visible ? project?.elements.filter((element) => !element.deletedAt && (!visibleIds || visibleIds.includes(element.id))) ?? [] : [];
         (map.getSource('plan') as GeoJSONSource).setData({ type: 'FeatureCollection', features: elements.map((element) => ({ type: 'Feature', geometry: displayGeometry(element.geometry), properties: { id: element.id, ...element.style, selected: element.id === selectedId } })) });
         const markers: maplibregl.Marker[] = [];
         for (const element of elements) {
             if (element.label) {
                 const label = document.createElement('span');
                 label.className = 'plan-label';
-                label.textContent = element.label;
+                const team = project?.teams.find((item) => item.id === element.teamId);
+                if (team) {
+                    label.style.borderColor = team.colour;
+                }
+                label.textContent = `${team ? `[${team.shortLabel}] ` : ''}${element.label}`;
                 markers.push(new maplibregl.Marker({ element: label, anchor: 'bottom', offset: [0, -12] }).setLngLat(center(element.geometry)).addTo(map));
             }
         }
@@ -166,7 +171,7 @@ export function useEditor(map: LibreMap | null, project: Project | null, change:
             }
         }
         return () => markers.forEach((marker) => marker.remove());
-    }, [map, project, visible, selectedId, editing, selected, pauseFollow]);
+    }, [map, project, visible, visibleIds, selectedId, editing, selected, pauseFollow]);
     useEffect(() => {
         if (!map?.getSource('drawing')) {
             return;

@@ -1,6 +1,6 @@
 # Umsetzungsplan
 
-2026-10-01 · Status: AST-003 implementiert; reale AST-001-Geräteabnahme weiterhin offen.
+2026-10-01 · Status: AST-004–006 als Preview implementiert; reale AST-001-Geräteabnahme weiterhin offen.
 
 ## Reihenfolge
 
