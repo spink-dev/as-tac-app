@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0-alpha.2 — 2026-10-01
+
+- Zusammenhängendes Offline-Testgebiet Zürich-West/Zentrum bis Benglen, einschliesslich ZHAW Lagerstrasse und Toni-Areal.
+- Kartenübergreifende HQ-, Safe-/Zivilzonen- und Gefahrensymbole; Beschriftung ausblendbar, ohne das gewählte Symbol zu verlieren.
+- Zoomabhängige Gebäude und Wege, gestrichelte Fusswege, kompakte Eventzeichen und begrenzte, sichtbereichsabhängige Basiskartenlabels.
+- Vorbereitete/portable Pakete bis 0,2° × 0,1°, 100000 Objekte und 750000 Koordinaten bei weiterhin 25 MiB; interaktive Downloads bleiben auf kleine Ausschnitte beschränkt.
+- Online-Karte Zürich benötigt Migration 202610010005_zurich.sql.
+
 ## 0.6.0-alpha.1 — 2026-10-01
 
 - Offline-Symbole, diagonale/Kreuz-/Punktmuster, Umrissmodus und eigene Label-Einstellungen; HQs priorisiert, keine automatische Beschriftung mitten in der Spielfeldgrenze.

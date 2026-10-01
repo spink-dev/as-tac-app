@@ -6,7 +6,9 @@ Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings m
 
 **Enthalten seit 0.5.1-alpha.1:** Mahlwinkel-Ausgabe r2 erweitert den Offline-Ausschnitt und korrigiert Dark Emergency mit fünf Safe-Zone-Polygonen über den Gelände-Flächen. Bestehende Projektkopien bleiben unverändert; unter Karten die Eventkarte erneut speichern. [Datenabgleich und offene Erfassungslücken](docs/reviews/2026-10-01-fieldmaps.md) · [Performance-Review](docs/reviews/2026-10-01-performance.md).
 
-**Testing 0.6.0-alpha.1:** [Kartensymbole, Schraffuren, Pfadaufnahme, Standortabgleich und Tastenkürzel](specs/003-field-navigation/spec.md). Freiwillige lokale Aufnahme; keine autonome GPS-/IMU-Navigation. Online-Betrieb benötigt zusätzlich Migration `202610010004_symbols.sql`.
+**Seit 0.6.0-alpha.1:** [Kartensymbole, Schraffuren, Pfadaufnahme, Standortabgleich und Tastenkürzel](specs/003-field-navigation/spec.md). Freiwillige lokale Aufnahme; keine autonome GPS-/IMU-Navigation. Online-Betrieb benötigt zusätzlich Migration `202610010004_symbols.sql`.
+
+**Testing 0.6.0-alpha.2:** Einheitliche Kartenzeichen und Wege-/Gebäudedarstellung auf allen Karten. Unter **Karten → Vorbereitetes Gebiet → Zürich Stadt · bis Benglen** liegt ein zusammenhängendes OSM-Paket für Zürich-West, Zentrum und Benglen (ca. 24 MB). Enthält beide ZHAW-Standorte Lagerstrasse und Toni-Areal. Einmal online vollständig vorbereiten und „Offline bereit“ abwarten. [Umfang und Prüfung](docs/reviews/2026-10-01-map-presentation.md).
 
 ## Starten
 
