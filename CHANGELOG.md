@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0-alpha.1 — 2026-10-01
+
+- Offline-Symbole, diagonale/Kreuz-/Punktmuster, Umrissmodus und eigene Label-Einstellungen; HQs priorisiert, keine automatische Beschriftung mitten in der Spielfeldgrenze.
+- Freiwillige GPS-Pfadaufnahme mit Pausen/Lücken, GeoJSON-Export und Übernahme als lokale Planlinien. GPS-Geschwindigkeit und freiwillige Gerätebewegungserkennung.
+- Geführter Standortabgleich mit ein bis drei Punkten; zeitlich/räumlich begrenzter lokaler Versatz ohne erfundene Genauigkeit oder inertiale Navigation.
+- Desktop-Zeichentasten ausserhalb von Formularen; Enter/Escape/Rücktaste für Zeichnungen.
+- Online-Styles benötigen Migration 202610010004_symbols.sql; keine automatische Übertragung von Aufnahmen.
+
 ## 0.5.1-alpha.1 — 2026-10-01
 
 - Mahlwinkel: vollständigerer OSM-Ausschnitt für alle sechs Eventvorlagen.

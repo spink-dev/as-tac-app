@@ -4,7 +4,9 @@ Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings m
 
 **Stand 2026-10-01:** v0.5.0 auf `main` integriert AST-001–012 und ergänzt den Kartenarbeitsplatz, Ebenen, sechs Mahlwinkel-Eventvorlagen und das Root-Kartenstudio sowie AS-TAC-Branding mit Tag-/Dunkel-/Rotlichtmodus. Echte Supabase-Bereitstellung und Geräteabnahme auf iPhone 16 Pro / Samsung Galaxy A24 bleiben offen.
 
-**Testing 0.5.1-alpha.1:** Mahlwinkel-Ausgabe r2 erweitert den Offline-Ausschnitt und korrigiert Dark Emergency mit fünf Safe-Zone-Polygonen über den Gelände-Flächen. Bestehende Projektkopien bleiben unverändert; unter Karten die Eventkarte erneut speichern. [Datenabgleich und offene Erfassungslücken](docs/reviews/2026-10-01-fieldmaps.md) · [Performance-Review](docs/reviews/2026-10-01-performance.md).
+**Enthalten seit 0.5.1-alpha.1:** Mahlwinkel-Ausgabe r2 erweitert den Offline-Ausschnitt und korrigiert Dark Emergency mit fünf Safe-Zone-Polygonen über den Gelände-Flächen. Bestehende Projektkopien bleiben unverändert; unter Karten die Eventkarte erneut speichern. [Datenabgleich und offene Erfassungslücken](docs/reviews/2026-10-01-fieldmaps.md) · [Performance-Review](docs/reviews/2026-10-01-performance.md).
+
+**Testing 0.6.0-alpha.1:** [Kartensymbole, Schraffuren, Pfadaufnahme, Standortabgleich und Tastenkürzel](specs/003-field-navigation/spec.md). Freiwillige lokale Aufnahme; keine autonome GPS-/IMU-Navigation. Online-Betrieb benötigt zusätzlich Migration `202610010004_symbols.sql`.
 
 ## Starten
 
@@ -35,7 +37,7 @@ Für Telefone muss `dist/` über vertrauenswürdiges HTTPS erreichbar sein. Eine
 3. Browser/App vollständig schliessen, Flugmodus und WLAN aus, erneut öffnen. Beide Gebiete bleiben auswählbar.
 4. Draussen „Meine Position“ drücken. Genauigkeit, Fix-Alter und Fehlerzustände beobachten. Manuelles Verschieben pausiert Follow. Positionen ausserhalb des vorbereiteten Gebiets werden als solche gemeldet.
 
-GPS-Daten werden weder gespeichert noch übertragen. Nach 30 Sekunden ohne Fix oder bei Fehler/Stop erscheint die letzte Position als veraltet. Hintergrundtracking ist nicht zugesagt. Browser können lokale Daten löschen; „Offline bereit“ bestätigt die momentane Integritätsprüfung, keine dauerhafte Speicherzusage.
+GPS wird nicht automatisch gespeichert oder übertragen. Eine bewusst gestartete Pfadaufnahme bleibt bis zum ausdrücklichen Export oder Übernehmen als lokale Planlinien im Arbeitsspeicher. Nach 30 Sekunden ohne Fix oder bei Fehler/Stop erscheint die letzte Position als veraltet. Hintergrundtracking ist nicht zugesagt. Browser können lokale Daten löschen; „Offline bereit“ bestätigt die momentane Integritätsprüfung, keine dauerhafte Speicherzusage.
 
 [Geräteprotokoll und Messwerte](specs/001-foundation/evidence/ast-001-mobile.md) · [Renderer-/Paket-ADR](specs/001-foundation/adr-001-offline-renderer.md).
 
@@ -99,7 +101,7 @@ Gebiet auswählen, Projektnamen eingeben und „Projekt erstellen“. Das Projek
 
 Speicherfehler und Änderungen in einem anderen Tab verhindern stilles Überschreiben. Der ungespeicherte Entwurf bleibt im aktuellen Tab; Wiederholen, eine neue Projektkopie oder eine JSON-Notfallsicherung sind möglich. Projektwechsel, Löschen und Update-Neustart sind bis zum erfolgreichen Speichern gesperrt. Eine Notfallsicherung ist noch **kein portables Kartenpaket** ; für den regulären Austausch den vollständigen `.astac.zip`-Export verwenden. Browser-/Betriebssystem-Abbruch kann ungespeicherte Änderungen verlieren.
 
-IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und localhost teilen keine Projekte. GPS wird weiterhin weder in Projekte geschrieben noch übertragen. Geometrie-, Team- und Phasenmodelle werden inzwischen durch die AST-005/006-Oberflächen bearbeitet.
+IndexedDB ist pro Origin getrennt: `test.as-tac.dev`, `test-prod.as-tac.dev` und localhost teilen keine Projekte. Live-GPS wird nicht automatisch in Projekte geschrieben oder übertragen; bewusst übernommene Pfadlinien sind normale lokale Planelemente. Geometrie-, Team- und Phasenmodelle werden inzwischen durch die AST-005/006-Oberflächen bearbeitet.
 
 
 ## Versionierung und Releases
@@ -132,7 +134,7 @@ Die folgenden AST-007/008 sind inzwischen in v0.3.0 integriert. Aktuelle Branch-
 
 ### Projektdateien (AST-007)
 
-Unter „Projekt teilen & importieren“ vollständige `.astac.zip` sichern. Auf einem Gerät mit vorbereiteter App öffnen: Karte und Plan werden zusammen als neue schreibgeschützte Kopie gespeichert. „Bearbeitbare Kopie erstellen“ startet einen eigenen lokalen Plan. Enthält keine GPS-Historie oder Online-Zugriffsrechte. Details und Grenzen in `specs/001-foundation/contracts.md`.
+Unter „Projekt teilen & importieren“ vollständige `.astac.zip` sichern. Auf einem Gerät mit vorbereiteter App öffnen: Karte und Plan werden zusammen als neue schreibgeschützte Kopie gespeichert. „Bearbeitbare Kopie erstellen“ startet einen eigenen lokalen Plan. Enthält keine automatische GPS-Messzeitreihe oder Online-Zugriffsrechte; bewusst übernommene Pfadlinien werden wie andere Planlinien exportiert. Details und Grenzen in `specs/001-foundation/contracts.md`.
 
 ### Mobiler GPS-Betrieb (AST-008)
 
