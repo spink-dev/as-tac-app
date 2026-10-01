@@ -49,3 +49,7 @@ insert into ast_private.roots(user_id) values ('ROOT-AUTH-USER-UUID');
 ```
 
 Kein Client-RPC zum Ernennen weiterer Roots. Keine Root-Konten automatisch angelegt. `ast_catalog` / `ast_catalog_package` liefern ausschliesslich bereits veröffentlichte Daten. Gleiche Gelände-/Event-/Ausgabe-Kombinationen lassen sich auch durch Root nicht überschreiben. Der aktuelle Client erfasst Metadaten und editiert Geometrie lokal; Publikation geschieht ausdrücklich über „Diese Ausgabe veröffentlichen“. Backend, Auth-Konto, Migrationen und Hosting sind in dieser Arbeitsumgebung nicht bereitgestellt worden.
+
+## Darstellungsoptionen (0.6.0)
+
+Vor neuen Online-Clients zusätzlich `202610010004_symbols.sql` anwenden. Die Migration erweitert nur das validierte Styleschema; Rollen/RLS bleiben unverändert. Alte Dokumente sind weiterhin gültig, ältere App-Versionen können Dokumente mit neuen Stilfeldern jedoch nicht lesen. Client-Versionen gemeinsam aktualisieren. GPS-Aufnahme und Abgleich erzeugen keine neuen Backend-Endpunkte.

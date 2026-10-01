@@ -1,3 +1,4 @@
+import { symbols, patterns, labelModes } from './presentation';
 import LayerPanel from './LayerPanel';
 import { useState } from 'react';
 import type { Coordinate, PlanElement, Project } from '../../core/projects/model';
@@ -12,6 +13,9 @@ function Inspector({ element, editor, project }: { element: PlanElement; editor:
     const [notes, setNotes] = useState(element.notes);
     const [teamId, setTeamId] = useState(element.teamId ?? '');
     const [phaseIds, setPhaseIds] = useState(element.phaseIds);
+    const [symbol, setSymbol] = useState(element.style.symbol ?? 'auto');
+    const [pattern, setPattern] = useState(element.style.pattern ?? 'auto');
+    const [labelMode, setLabelMode] = useState(element.style.labelMode ?? 'auto');
     const [colour, setColour] = useState(element.style.colour);
     const [opacity, setOpacity] = useState(element.style.opacity);
     const [layerId, setLayerId] = useState(element.layerId ?? '');
@@ -66,7 +70,7 @@ function Inspector({ element, editor, project }: { element: PlanElement; editor:
                             teamId: teamId || undefined,
                             phaseIds,
                             geometry,
-                            style: { ...element.style, colour, opacity, width: Number(width) },
+                            style: { ...element.style, colour, opacity, width: Number(width), symbol, pattern, labelMode },
                             version: element.version + 1,
                         });
                         setInvalid(!success);
@@ -137,6 +141,38 @@ function Inspector({ element, editor, project }: { element: PlanElement; editor:
                             onChange={(event) => setOpacity(Number(event.target.value))}
                         />
                     </label>
+                    <label>
+                        Symbol
+                        <select aria-label="Symbol" value={symbol} onChange={(event) => setSymbol(event.target.value as typeof symbol)}>
+                            {Object.entries(symbols).map(([value, name]) => (
+                                <option key={value} value={value}>
+                                    {name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <label>
+                        Beschriftung anzeigen
+                        <select value={labelMode} onChange={(event) => setLabelMode(event.target.value as typeof labelMode)}>
+                            {Object.entries(labelModes).map(([value, name]) => (
+                                <option key={value} value={value}>
+                                    {name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    {['Polygon', 'Circle'].includes(element.geometry.type) && (
+                        <label>
+                            Flächenmuster
+                            <select value={pattern} onChange={(event) => setPattern(event.target.value as typeof pattern)}>
+                                {Object.entries(patterns).map(([value, name]) => (
+                                    <option key={value} value={value}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
                     <div className="coordinate-grid">
                         <label>
                             {t.colour}
@@ -233,6 +269,13 @@ export default function EditorPanel({
             </label>
             {editor.editing && (
                 <>
+                    <details>
+                        <summary>Tastenkürzel</summary>
+                        <p>
+                            V Auswahl · P Punkt · L Linie · A Fläche · C Kreis · T Text · F Freihand. Enter abschliessen, Rücktaste letzten
+                            Eckpunkt entfernen, Escape abbrechen. Beim Schreiben in Feldern bleiben die Tasten normale Texteingaben.
+                        </p>
+                    </details>
                     <div className="actions" role="group" aria-label={t.toolsLabel}>
                         {(Object.keys(t.tools) as Tool[]).map((tool) => (
                             <button

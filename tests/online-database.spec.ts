@@ -38,6 +38,7 @@ test.beforeAll(async () => {
     await db.exec(readFileSync('supabase/migrations/202610010001_online.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/202610010002_briefing.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/202610010003_workspace.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/202610010004_symbols.sql', 'utf8'));
 });
 test.afterAll(async () => {
     await db.close();
@@ -606,4 +607,14 @@ test('briefing rejects out-of-range zoom and malformed center arrays', async () 
     for (const camera of [{ center: [8, 47], zoom: 100, bearing: 0, pitch: 0 }, { center: [8, 47, 1], zoom: 15, bearing: 0, pitch: 0 }]) {
         await expect(db.query('select public.ast_present($1,$2,$3,$4,$5)', [id, crypto.randomUUID(), 'claim', null, camera])).rejects.toThrow('invalid_camera');
     }
+});
+
+test('optional map symbols roundtrip and invalid style values roll back atomically', async () => {
+    const id = await create();
+    const element = makeElement(id, 'polygon', [[8.63, 47.36], [8.631, 47.36], [8.631, 47.361]], 'Safe');
+    element.style = { ...element.style, symbol: 'shield', pattern: 'hatch', labelMode: 'always' };
+    await apply(id, crypto.randomUUID(), [{ kind: 'element', id: element.id, value: element, expectedVersion: 0 }]);
+    const snapshot = (await db.query<any>('select document from public.ast_projects where id=$1', [id])).rows[0].document;
+    expect(snapshot.elements[0].style).toEqual(element.style);
+    await expect(apply(id, crypto.randomUUID(), [{ kind: 'element', id: element.id, value: { ...element, version: 2, style: { ...element.style, pattern: 'url' } }, expectedVersion: 1 }])).rejects.toThrow();
 });

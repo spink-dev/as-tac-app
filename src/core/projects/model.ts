@@ -16,7 +16,14 @@ export interface PlanElement {
     sourceId?: string;
     teamId?: string;
     phaseIds: string[];
-    style: { colour: string; width: number; opacity: number };
+    style: {
+        colour: string;
+        width: number;
+        opacity: number;
+        symbol?: 'auto' | 'none' | 'pin' | 'flag' | 'shield' | 'warning' | 'building' | 'aid';
+        pattern?: 'auto' | 'solid' | 'hatch' | 'cross' | 'dots' | 'outline';
+        labelMode?: 'auto' | 'always' | 'hidden';
+    };
     version: number;
     deletedAt?: string;
 }
@@ -116,7 +123,16 @@ export function validateProject(value: unknown): asserts value is Project {
     if (value.schemaVersion !== 1 && value.schemaVersion !== 2) {
         throw new ProjectError('version');
     }
-    keys(value, ['id', 'schemaVersion', 'name', 'mapPackageId', 'teams', 'phases', 'elements', ...(value.schemaVersion === 2 ? ['workspace'] : [])]);
+    keys(value, [
+        'id',
+        'schemaVersion',
+        'name',
+        'mapPackageId',
+        'teams',
+        'phases',
+        'elements',
+        ...(value.schemaVersion === 2 ? ['workspace'] : []),
+    ]);
     const layers: PlanLayer[] = [];
     if (value.workspace !== undefined) {
         object(value.workspace);
@@ -146,7 +162,9 @@ export function validateProject(value: unknown): asserts value is Project {
     uniqueIds([...layers, ...value.teams, ...value.phases, ...value.elements]);
     const teams = new Set<string>(value.teams.map((team: Team) => team.id));
     const phases = new Set<string>(value.phases.map((phase: Phase) => phase.id));
-    const elements = new Set<string>(value.elements.filter((element: PlanElement) => !element.deletedAt).map((element: PlanElement) => element.id));
+    const elements = new Set<string>(
+        value.elements.filter((element: PlanElement) => !element.deletedAt).map((element: PlanElement) => element.id),
+    );
     for (const team of value.teams) {
         keys(team, ['id', 'name', 'shortLabel', 'colour']);
         text(team.name, 120, true);
@@ -171,7 +189,20 @@ export function validateProject(value: unknown): asserts value is Project {
     }
     let vertices = 0;
     for (const element of value.elements) {
-        keys(element, ['id', 'projectId', 'type', 'geometry', 'label', 'notes', 'teamId', 'phaseIds', 'style', 'version', 'deletedAt', ...(value.schemaVersion === 2 ? ['layerId', 'sourceId'] : [])]);
+        keys(element, [
+            'id',
+            'projectId',
+            'type',
+            'geometry',
+            'label',
+            'notes',
+            'teamId',
+            'phaseIds',
+            'style',
+            'version',
+            'deletedAt',
+            ...(value.schemaVersion === 2 ? ['layerId', 'sourceId'] : []),
+        ]);
         requireValid(element.layerId === undefined || layers.some((layer) => layer.id === element.layerId));
         if (element.sourceId !== undefined) {
             text(element.sourceId, 200, true);
@@ -187,13 +218,29 @@ export function validateProject(value: unknown): asserts value is Project {
         requireValid(element.teamId === undefined || teams.has(element.teamId));
         references(element.phaseIds, phases);
         object(element.style);
-        keys(element.style, ['colour', 'width', 'opacity']);
+        keys(element.style, ['colour', 'width', 'opacity', 'symbol', 'pattern', 'labelMode']);
+        for (const [key, allowed] of Object.entries({
+            symbol: ['auto', 'none', 'pin', 'flag', 'shield', 'warning', 'building', 'aid'],
+            pattern: ['auto', 'solid', 'hatch', 'cross', 'dots', 'outline'],
+            labelMode: ['auto', 'always', 'hidden'],
+        })) {
+            if (element.style[key] !== undefined) {
+                requireValid(allowed.includes(element.style[key]));
+            }
+        }
         colour(element.style.colour);
         number(element.style.width, 1, 20);
         number(element.style.opacity, 0, 1);
         const geometry = element.geometry;
         object(geometry);
-        const expected = { point: 'Point', text: 'Point', line: 'LineString', freehand: 'LineString', polygon: 'Polygon', circle: 'Circle' };
+        const expected = {
+            point: 'Point',
+            text: 'Point',
+            line: 'LineString',
+            freehand: 'LineString',
+            polygon: 'Polygon',
+            circle: 'Circle',
+        };
         requireValid(Object.hasOwn(expected, element.type) && geometry.type === expected[element.type as keyof typeof expected]);
         if (geometry.type === 'Circle') {
             keys(geometry, ['type', 'center', 'radiusMeters']);
@@ -234,7 +281,15 @@ export function createProject(name: string, mapPackageId: string): Project {
 export function duplicateProject(source: Project, name: string): Project {
     validateProject(source);
     const copy = structuredClone(source);
-    const ids = new Map([source.id, ...source.teams.map((team) => team.id), ...source.phases.map((phase) => phase.id), ...source.elements.map((element) => element.id), ...(source.workspace?.layers.map((layer) => layer.id) ?? [])].map((old) => [old, crypto.randomUUID()]));
+    const ids = new Map(
+        [
+            source.id,
+            ...source.teams.map((team) => team.id),
+            ...source.phases.map((phase) => phase.id),
+            ...source.elements.map((element) => element.id),
+            ...(source.workspace?.layers.map((layer) => layer.id) ?? []),
+        ].map((old) => [old, crypto.randomUUID()]),
+    );
     copy.id = ids.get(source.id)!;
     copy.name = name;
     for (const layer of copy.workspace?.layers ?? []) {

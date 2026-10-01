@@ -1,3 +1,4 @@
+import { presentation, symbolNode, labelPosition, patternImage } from './presentation';
 import { useTheme } from '../appearance/theme';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
@@ -118,7 +119,23 @@ export function useEditor(
             source: 'plan',
             filter: ['==', '$type', 'Polygon'],
             layout: { 'fill-sort-key': ['get', 'order'] },
-            paint: { 'fill-color': ['get', 'colour'], 'fill-opacity': ['*', ['get', 'opacity'], 0.25] },
+            paint: {
+                'fill-color': ['get', 'colour'],
+                'fill-opacity': ['*', ['get', 'opacity'], ['case', ['==', ['get', 'pattern'], 'outline'], 0, 0.18]],
+            },
+        });
+        for (const kind of ['hatch', 'cross', 'dots']) {
+            if (!map.hasImage(`plan-${kind}`)) {
+                map.addImage(`plan-${kind}`, patternImage(kind, false));
+            }
+        }
+        map.addLayer({
+            id: 'plan-pattern',
+            type: 'fill',
+            source: 'plan',
+            filter: ['all', ['==', '$type', 'Polygon'], ['in', 'pattern', 'hatch', 'cross', 'dots']],
+            layout: { 'fill-sort-key': ['get', 'order'] },
+            paint: { 'fill-pattern': ['concat', 'plan-', ['get', 'pattern']], 'fill-opacity': ['get', 'opacity'] },
         });
         map.addLayer({
             id: 'plan-line',
@@ -200,8 +217,38 @@ export function useEditor(
             }
         };
         const escape = (event: KeyboardEvent) => {
+            if (
+                event.repeat ||
+                event.isComposing ||
+                (event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable=true]'))
+            ) {
+                return;
+            }
+            const state = live.current;
+            if (!state.editing || state.hasUnsavedForm || event.ctrlKey || event.metaKey || event.altKey) {
+                return;
+            }
             if (event.key === 'Escape') {
                 cancel();
+            } else if (event.key === 'Enter' && pointsRef.current.length) {
+                event.preventDefault();
+                state.finish();
+            } else if (event.key === 'Backspace' && pointsRef.current.length) {
+                event.preventDefault();
+                pointsRef.current = pointsRef.current.slice(0, -1);
+                setPoints(pointsRef.current);
+            } else if (!pointsRef.current.length) {
+                const next = (
+                    { v: 'select', p: 'point', l: 'line', a: 'polygon', c: 'circle', t: 'text', f: 'freehand' } as Record<string, Tool>
+                )[event.key.toLowerCase()];
+                if (next) {
+                    event.preventDefault();
+                    cancel();
+                    setTool(next);
+                    setSelectedId(null);
+                    setVisible(true);
+                    pauseFollow();
+                }
             }
         };
         map.on('click', click);
@@ -213,7 +260,7 @@ export function useEditor(
                 return;
             }
             map.off('click', click);
-            for (const id of ['plan-point', 'plan-line', 'plan-fill', 'drawing-line', 'drawing-point']) {
+            for (const id of ['plan-point', 'plan-line', 'plan-pattern', 'plan-fill', 'drawing-line', 'drawing-point']) {
                 if (map.getLayer(id)) {
                     map.removeLayer(id);
                 }
@@ -230,12 +277,27 @@ export function useEditor(
             return;
         }
         const night = theme === 'red';
+        for (const kind of ['hatch', 'cross', 'dots']) {
+            if (map.hasImage(`plan-${kind}`)) {
+                map.updateImage(`plan-${kind}`, patternImage(kind, theme !== 'light'));
+            }
+        }
         // Display-only override: even a dark blue/black plan remains visible at night.
         // Do not change source features, stored colors, editing state or geometry.
         map.setPaintProperty('plan-fill', 'fill-color', night ? '#b0b0b0' : ['get', 'colour']);
-        map.setPaintProperty('plan-line', 'line-color', ['case', ['get', 'selected'], night ? '#eeeeee' : '#d55216', night ? '#b0b0b0' : ['get', 'colour']]);
+        map.setPaintProperty('plan-line', 'line-color', [
+            'case',
+            ['get', 'selected'],
+            night ? '#eeeeee' : '#d55216',
+            night ? '#b0b0b0' : ['get', 'colour'],
+        ]);
         map.setPaintProperty('plan-point', 'circle-color', night ? '#b0b0b0' : ['get', 'colour']);
-        map.setPaintProperty('plan-point', 'circle-stroke-color', ['case', ['get', 'selected'], night ? '#eeeeee' : '#d55216', night ? '#777777' : '#ffffff']);
+        map.setPaintProperty('plan-point', 'circle-stroke-color', [
+            'case',
+            ['get', 'selected'],
+            night ? '#eeeeee' : '#d55216',
+            night ? '#777777' : '#ffffff',
+        ]);
         map.setPaintProperty('drawing-line', 'line-color', night ? '#eeeeee' : '#d55216');
         map.setPaintProperty('drawing-point', 'circle-color', night ? '#eeeeee' : '#d55216');
     }, [map, theme]);
@@ -257,6 +319,7 @@ export function useEditor(
                     id: element.id,
                     reference: !!element.sourceId,
                     ...element.style,
+                    pattern: presentation(element).pattern,
                     opacity:
                         element.style.opacity *
                         (viewOpacity[element.layerId ?? ''] ?? layers.find((layer) => layer.id === element.layerId)?.opacity ?? 1),
@@ -266,38 +329,70 @@ export function useEditor(
             })),
         });
         const markers: maplibregl.Marker[] = [];
-        const labels: { node: HTMLElement; position: Coordinate; selected: boolean }[] = [];
+        const labels: {
+            node: HTMLElement;
+            text: HTMLElement;
+            position: Coordinate;
+            selected: boolean;
+            priority: number;
+            minZoom: number;
+            mode: string;
+        }[] = [];
         for (const element of elements) {
-            if (element.label) {
-                const label = document.createElement('span');
-                label.className = 'plan-label';
-                label.style.opacity = String(
-                    element.style.opacity *
-                        (viewOpacity[element.layerId ?? ''] ?? layers.find((layer) => layer.id === element.layerId)?.opacity ?? 1),
-                );
-                const team = project?.teams.find((item) => item.id === element.teamId);
-                if (team) {
-                    label.style.borderColor = team.colour;
-                }
-                label.textContent = `${team ? `[${team.shortLabel}] ` : ''}${element.label}`;
-                labels.push({ node: label, position: center(element.geometry), selected: element.id === selectedId });
-                markers.push(
-                    new maplibregl.Marker({ element: label, anchor: 'bottom', offset: [0, -12] })
-                        .setLngLat(center(element.geometry))
-                        .addTo(map),
-                );
+            const appearance = presentation(element);
+            if (appearance.labelMode === 'hidden' || (!element.label && appearance.symbol === 'none')) {
+                continue;
             }
+            const label = document.createElement('span');
+            label.className = `plan-label ${appearance.symbol === 'none' ? 'zone-label' : 'symbol-label'}`;
+            label.style.opacity = String(
+                element.style.opacity *
+                    (viewOpacity[element.layerId ?? ''] ?? layers.find((layer) => layer.id === element.layerId)?.opacity ?? 1),
+            );
+            label.title = element.label;
+            if (appearance.symbol !== 'none') {
+                label.append(symbolNode(appearance.symbol));
+            }
+            const text = document.createElement('span');
+            text.className = 'plan-label-text';
+            const team = project?.teams.find((item) => item.id === element.teamId);
+            text.textContent = `${team ? `[${team.shortLabel}] ` : ''}${element.label}`;
+            label.append(text);
+            const position = labelPosition(element);
+            labels.push({
+                node: label,
+                text,
+                position,
+                selected: element.id === selectedId,
+                priority: appearance.priority,
+                minZoom: appearance.minZoom,
+                mode: appearance.labelMode,
+            });
+            markers.push(new maplibregl.Marker({ element: label, anchor: 'bottom', offset: [0, -10] }).setLngLat(position).addTo(map));
         }
+        labels.sort((a, b) => Number(b.selected) - Number(a.selected) || b.priority - a.priority);
+        let frame = 0;
         const layoutLabels = () => {
-            if (!project?.workspace?.siteId) {
-                return;
-            }
             const occupied: { x: number; y: number; w: number; h: number }[] = [];
-            for (const label of [...labels].sort((a, b) => Number(b.selected) - Number(a.selected))) {
+            const width = map.getCanvas().clientWidth,
+                height = map.getCanvas().clientHeight;
+            const zoom = map.getZoom();
+            for (const label of labels) {
+                label.text.hidden = !label.selected && label.mode === 'auto' && zoom < label.minZoom;
+            }
+            for (const label of labels) {
+                if (!label.selected && label.mode === 'auto' && label.priority === 10 && zoom < 15) {
+                    label.node.style.visibility = 'hidden';
+                    continue;
+                }
                 const position = map.project(label.position);
+                if (position.x < 0 || position.y < 64 || position.x > width || position.y > height - 60) {
+                    label.node.style.visibility = 'hidden';
+                    continue;
+                }
                 const rect = {
                     x: position.x - label.node.offsetWidth / 2,
-                    y: position.y - label.node.offsetHeight - 12,
+                    y: position.y - label.node.offsetHeight - 10,
                     w: label.node.offsetWidth + 8,
                     h: label.node.offsetHeight + 6,
                 };
@@ -305,21 +400,24 @@ export function useEditor(
                     (other) =>
                         rect.x < other.x + other.w && rect.x + rect.w > other.x && rect.y < other.y + other.h && rect.y + rect.h > other.y,
                 );
-                const show =
-                    label.selected ||
-                    (!overlaps &&
-                        position.x >= 0 &&
-                        position.y >= 0 &&
-                        position.x < map.getCanvas().clientWidth &&
-                        position.y < map.getCanvas().clientHeight);
+                const show = label.selected || !overlaps;
                 label.node.style.visibility = show ? 'visible' : 'hidden';
                 if (show) {
                     occupied.push(rect);
                 }
             }
         };
+        const scheduleLabels = () => {
+            if (!frame) {
+                frame = requestAnimationFrame(() => {
+                    frame = 0;
+                    layoutLabels();
+                });
+            }
+        };
         layoutLabels();
-        map.on('move', layoutLabels);
+        map.on('move', scheduleLabels);
+        map.on('resize', scheduleLabels);
         if (editing && !hasUnsavedForm && selected && visible && shown(selected) && canEdit(selected)) {
             const addHandle = (position: Coordinate, name: string, update: (coordinate: Coordinate) => PlanElement) => {
                 const handle = document.createElement('button');
@@ -360,7 +458,9 @@ export function useEditor(
             }
         }
         return () => {
-            map.off('move', layoutLabels);
+            map.off('move', scheduleLabels);
+            map.off('resize', scheduleLabels);
+            cancelAnimationFrame(frame);
             markers.forEach((marker) => marker.remove());
         };
     }, [map, project, visible, visibleIds, selectedId, editing, selected, pauseFollow, hiddenLayers, viewOpacity, hasUnsavedForm]);
