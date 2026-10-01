@@ -258,7 +258,7 @@ test('local project lifecycle, map selection and undo/redo survive offline reope
     await expect(reopened.getByLabel('Projekt öffnen').locator('option')).toHaveCount(2);
     await reopened.getByLabel('Projekt öffnen').selectOption({ label: 'Übung Zürich' });
     await expect(reopened.getByLabel('Projektname', { exact: true })).toHaveValue('Übung Zürich');
-    await expect(reopened.locator('.map-label:visible').first()).toBeVisible();
+    await expect(reopened.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await expect(reopened.locator('.map')).toHaveAttribute('aria-busy', 'false');
     await reopened.screenshot({ path: 'test-results/projects-mobile.png', fullPage: true });
 });

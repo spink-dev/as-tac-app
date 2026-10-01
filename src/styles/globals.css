@@ -24,7 +24,6 @@ a { color: #146480; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
 .coordinates { font-variant-numeric: tabular-nums; font-weight: 600; }
 summary { cursor: pointer; min-height: 48px; font-weight: 600; }
-.map-label { display: block; background: #fffef0eb; color: #273b2b; padding: 3px 6px; border-radius: 3px; font: 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 180px; text-align: center; }
 .gps-dot { width: 20px; height: 20px; background: #176b89; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 0 2px #176b89; }
 .gps-dot.stale { background: #707070; box-shadow: 0 0 0 2px #707070; border-style: dashed; }
 .map-error { position: absolute; left: 16px; bottom: 50px; right: 16px; background: #fff1e5; color: #7e2d16; padding: 12px; }
@@ -57,8 +56,14 @@ button[aria-pressed="true"] { background: #dbe5d3; border-color: #253d32; box-sh
 .plan-label { background: #fffdf3; color: #16352b; border: 1px solid #253d32; border-radius: 4px; padding: 3px 6px; max-width: 200px; overflow-wrap: anywhere; font: 600 13px/1.3 -apple-system, BlinkMacSystemFont, sans-serif; pointer-events: none; }
 .edit-handle { width: 48px; height: 48px; min-height: 48px; border: 2px solid #d55216; border-radius: 50%; background: #fffdf3dd; color: #9b3509; font-size: 24px; padding: 0; cursor: grab; }
 .notes { white-space: pre-wrap; overflow-wrap: anywhere; }
-.map-label { pointer-events: none; }
 
 fieldset { border: 1px solid #cbd2c6; border-radius: 6px; padding: 12px; margin: 12px 0; min-width: 0; }
 .management-fields { border: 0; padding: 0; }
 .phase-card { border-bottom: 1px solid #cbd2c6; }
+
+.basemap-labels { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.basemap-labels text { fill: #586052; stroke: #fffdf2; stroke-width: 2.5px; paint-order: stroke; stroke-linejoin: round; font: 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.basemap-labels .place-name { fill: #67705f; font-size: 12px; }
+.map-label-options { position: absolute; left: 16px; bottom: 42px; display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 4px 8px; background: #fffef5ed; border-radius: 4px; }
+.map-label-options label { display: flex; align-items: center; gap: 6px; font-size: 11px; min-height: 32px; cursor: pointer; }
+.map-label-options input { width: 16px; min-height: 16px; margin: 0; }

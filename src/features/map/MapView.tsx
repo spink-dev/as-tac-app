@@ -1,3 +1,4 @@
+import { installLabels } from './labels';
 import { de } from '../../i18n/de';
 import { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
@@ -20,6 +21,13 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
     follow: boolean;
     onExplore: () => void;
 }) {
+    const [labelOptions, setLabelOptions] = useState({ roads: true, places: false });
+    const labelSettings = useRef(labelOptions);
+    labelSettings.current = labelOptions;
+    const labels = useRef<ReturnType<typeof installLabels> | null>(null);
+    useEffect(() => {
+        labels.current?.update(labelOptions);
+    }, [labelOptions]);
     const container = useRef<HTMLDivElement>(null);
     const map = useRef<LibreMap | null>(null);
     const marker = useRef<maplibregl.Marker | null>(null);
@@ -86,50 +94,7 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
                         if (disposed) {
                             return;
                         }
-                        const labels: { element: HTMLElement; coordinates: [number, number] }[] = [];
-                        // DOM text uses the installed system font; no remote glyphs or sprites.
-                        for (const feature of data.features) {
-                            if (!feature.properties?.name || !['Point', 'LineString'].includes(feature.geometry.type)) {
-                                continue;
-                            }
-                            const geometry = feature.geometry as GeoJSON.Point | GeoJSON.LineString;
-                            const coordinates = geometry.type === 'Point' ? geometry.coordinates
-                                : geometry.coordinates[Math.floor(geometry.coordinates.length / 2)];
-                            if (outside({ longitude: coordinates[0], latitude: coordinates[1], accuracy: 0, timestamp: 1 }, pkg.bounds)) {
-                                continue;
-                            }
-                            const label = document.createElement('span');
-                            label.className = 'map-label';
-                            label.textContent = `${feature.properties.natural === 'peak' ? '▲' : '●'} ${feature.properties.name}`;
-                            new maplibregl.Marker({ element: label, anchor: 'bottom' })
-                                .setLngLat(coordinates as [number, number]).addTo(instance);
-                            labels.push({ element: label, coordinates: coordinates as [number, number] });
-                        }
-                        const areaLabel = document.createElement('span');
-                        areaLabel.className = 'map-label';
-                        areaLabel.textContent = `◇ ${pkg.name}`;
-                        new maplibregl.Marker({ element: areaLabel, anchor: 'bottom' })
-                            .setLngLat([(pkg.bounds[0] + pkg.bounds[2]) / 2, (pkg.bounds[1] + pkg.bounds[3]) / 2]).addTo(instance);
-                        const placeLabels = () => {
-                            const occupied: { x: number; y: number; width: number; height: number }[] = [];
-                            for (const label of labels) {
-                                const point = instance.project(label.coordinates);
-                                const width = label.element.offsetWidth + 12;
-                                const height = label.element.offsetHeight + 8;
-                                const box = { x: point.x - width / 2, y: point.y - height, width, height };
-                                const hidden = box.x < 0 || box.y < 85 || box.x + width > instance.getContainer().clientWidth - 55
-                                    || box.y + height > instance.getContainer().clientHeight - 45
-                                    || occupied.some((other) => box.x < other.x + other.width && box.x + width > other.x
-                                        && box.y < other.y + other.height && box.y + height > other.y);
-                                label.element.style.visibility = hidden ? 'hidden' : 'visible';
-                                if (!hidden) {
-                                    occupied.push(box);
-                                }
-                            }
-                        };
-                        instance.on('move', placeLabels);
-                        instance.on('resize', placeLabels);
-                        placeLabels();
+                        labels.current = installLabels(instance, data, labelSettings.current);
                         instance.addSource('accuracy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
                         instance.addLayer({ id: 'accuracy-fill', type: 'fill', source: 'accuracy',
                             paint: { 'fill-color': '#176b89', 'fill-opacity': 0.16 } });
@@ -153,6 +118,8 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
         return () => {
             disposed = true;
             abort.abort();
+            labels.current?.destroy();
+            labels.current = null;
             marker.current?.remove();
             marker.current = null;
             onReady(null);
@@ -187,6 +154,10 @@ export default function MapView({ mapPackage, onViewport, onReady, fix, stale, f
         <section className="map-wrap" aria-label={de.map.label}>
             <div ref={container} className="map" aria-busy={!mapReady} />
             <div className="map-caption">{area?.name ?? de.map.loading}<span>{de.map.local}</span></div>
+            <div className="map-label-options" aria-label={de.map.labels}>
+                <label><input type="checkbox" checked={labelOptions.roads} onChange={(event) => setLabelOptions({ ...labelOptions, roads: event.target.checked })} />{de.map.roads}</label>
+                <label><input type="checkbox" checked={labelOptions.places} onChange={(event) => setLabelOptions({ ...labelOptions, places: event.target.checked })} />{de.map.places}</label>
+            </div>
             {mapError && <p className="map-error" role="alert">{mapError}</p>}
         </section>
     );

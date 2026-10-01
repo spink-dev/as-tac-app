@@ -7,3 +7,7 @@ Browsernachweise: alle sechs Typen erzeugt, Attribute/Koordinaten geändert, gel
 Gefundene Fehler behoben: nichtinteraktive OSM-Labels fangen keine Pointerereignisse mehr; Textarea-Namen sind stabil; Freihand verhindert native Touch-Scrollübernahme. Mobile Screenshotkontrolle unter `test-results/editor-mobile.png`; keine laufenden Browserfehler im vollständigen Zeichenablauf.
 
 Grenzen: Chromium ist kein iPhone-/Galaxy-Feldnachweis. Maximal 500 Planelemente, 5 000 Eckpunkte pro Element und 100 000 pro Projekt, 200 interaktive Vertexgriffe. Keine Topologie-/Selbstschnittreparatur und keine automatische Routenberechnung. Feldansicht ist momentan die kompakte Karten-/Panelansicht; Endgeräteergonomie bleibt Teil von AST-008/014. Inspector-Eingaben werden bewusst mit „Übernehmen“ abgeschlossen; Undo-Historie bleibt sitzungsbezogen.
+
+## Korrektur 0.3.0-alpha.3
+
+Aktive Zeichenwerkzeuge umgehen die Trefferprüfung vorhandener Objekte. Regression: Punkt innerhalb einer Fläche, Linie beginnend genau auf diesem Punkt. Auswahl im Auswahl-/Feldmodus bleibt erhalten. Basiskartennamen verwenden Systemschrift auf projizierten SVG-Strassenpfaden; Längen-/Krümmungs-/Kollisionsprüfung, Orts-/POI-Namen standardmässig aus. Screenshot `test-results/street-labels.png` und Offline-Labeltest; keine neuen Glyphen-/Font-Netzwerkanfragen.

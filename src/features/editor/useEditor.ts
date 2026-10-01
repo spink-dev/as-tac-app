@@ -77,14 +77,9 @@ export function useEditor(map: LibreMap | null, project: Project | null, change:
             if (!state.project || !state.visible || state.tool === 'freehand') {
                 return;
             }
-            const hits = map.queryRenderedFeatures([[event.point.x - 8, event.point.y - 8], [event.point.x + 8, event.point.y + 8]], { layers: ['plan-point', 'plan-line', 'plan-fill'] });
-            if (hits.length && pointsRef.current.length === 0) {
-                setSelectedId(String(hits[0].properties.id));
-                setTool('select');
-                return;
-            }
             if (!state.editing || state.tool === 'select') {
-                setSelectedId(null);
+                const hits = map.queryRenderedFeatures([[event.point.x - 8, event.point.y - 8], [event.point.x + 8, event.point.y + 8]], { layers: ['plan-point', 'plan-line', 'plan-fill'] });
+                setSelectedId(hits.length ? String(hits[0].properties.id) : null);
                 return;
             }
             pauseFollow();

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-alpha.3 — 2026-10-01 (testing)
+
+- Strassennamen folgen offline dem Strassenverlauf, ohne Punktmarker oder Textkästchen. Zu kurze/enge Abschnitte und überlappende Namen werden ausgeblendet.
+- Orts-/POI-Namen standardmässig aus; Strassen- und Punktnamen separat schaltbar. Doppelter Gebietsmarker entfernt.
+- Aktive Zeichenwerkzeuge zeichnen über bestehenden Objekten; Trefferprüfung nur bei Auswahl/Feldansicht.
+
+
 ## 0.3.0-alpha.2 — 2026-10-01 (testing)
 
 - AST-008: GPS pausiert im Hintergrund und fordert nach Rückkehr einen neuen Fix an.

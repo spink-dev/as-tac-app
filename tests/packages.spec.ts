@@ -11,7 +11,7 @@ async function importPackage(page: Page, pkg = fixture()) {
 }
 async function openPanel(page: Page) {
     await page.goto('/');
-    await expect(page.locator('.map-label:visible').first()).toBeVisible();
+    await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await page.getByText('Eigenes Gebiet laden oder importieren', { exact: true }).click();
 }
 
@@ -41,7 +41,7 @@ test('import, offline reopen, export and referenced-package deletion guard', asy
     await context.setOffline(true);
     await page.reload();
     await expect(page.locator('.map-caption')).toContainText('Eigenes Testgebiet');
-    await expect(page.locator('.map-label:visible').first()).toBeVisible();
+    await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Projekt mit eigenem Gebiet');
 });
 

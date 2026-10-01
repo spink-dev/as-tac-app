@@ -25,17 +25,17 @@ test('production shell, both maps and local labels survive offline new-page star
     });
     await page.goto('/');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
-    await expect(page.locator('.map-label:visible').first()).toBeVisible();
+    await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
     await context.setOffline(true);
     await page.close();
     const offlinePage = await context.newPage();
     await offlinePage.goto('/');
     await expect(offlinePage.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
-    await expect(offlinePage.locator('.map-label:visible').first()).toBeVisible();
+    await expect(offlinePage.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await offlinePage.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
     await expect(offlinePage.locator('.map-caption')).toContainText('Zürich');
-    await expect(offlinePage.locator('.map-label:visible').first()).toBeVisible();
+    await expect(offlinePage.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await offlinePage.screenshot({ path: 'test-results/offline-mobile.png', fullPage: true });
     expect(external).toEqual([]);
 });
@@ -87,7 +87,7 @@ test('permission denied and timeout are explicit', async ({ page }) => {
 test('removed cached resource invalidates offline readiness', async ({ page, context }) => {
     await page.goto('/');
     await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
-    await expect(page.locator('.map-label:visible').first()).toBeVisible();
+    await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await context.setOffline(true);
     await page.evaluate(async () => {
         for (const name of await caches.keys()) {
@@ -111,7 +111,7 @@ test('browser process restarts offline using its persisted profile', async () =>
         const page = await context.newPage();
         await page.goto('http://localhost:4000/');
         await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
-        await expect(page.locator('.map-label:visible').first()).toBeVisible();
+        await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
         await page.getByLabel('Name des neuen Projekts').fill('Neustart-Nachweis');
         await page.getByRole('button', { name: 'Projekt erstellen', exact: true }).click();
         await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toBeVisible();
@@ -120,7 +120,7 @@ test('browser process restarts offline using its persisted profile', async () =>
         const coldPage = await context.newPage();
         await coldPage.goto('http://localhost:4000/');
         await expect(coldPage.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
-        await expect(coldPage.locator('.map-label:visible').first()).toBeVisible();
+        await expect(coldPage.locator('.map[aria-busy=\"false\"]')).toBeVisible();
         await expect(coldPage.locator('.map')).toHaveAttribute('aria-busy', 'false');
         await expect(coldPage.getByLabel('Projektname', { exact: true })).toHaveValue('Neustart-Nachweis');
     } finally {
@@ -154,7 +154,7 @@ test('offline terrain does not require GeoJSON fetches from the map worker', asy
     await context.setOffline(true);
     await page.reload();
     await page.getByLabel('Vorbereitetes Gebiet').selectOption('benglen');
-    await expect(page.locator('.map-label:visible').first()).toBeVisible();
+    await expect(page.locator('.map[aria-busy=\"false\"]')).toBeVisible();
     await expect(page.locator('.map')).toHaveAttribute('aria-busy', 'false');
     await expect(page.locator('.map-error')).toHaveCount(0);
 });

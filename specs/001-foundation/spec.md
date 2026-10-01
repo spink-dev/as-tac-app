@@ -68,3 +68,7 @@ Ein exportiertes Paket ist eine Kopie; spätere Online-Rechteentzüge können be
 - Testgrenzen samt Gerät, Browser, Paketgrösse, Elementzahl und Netzwerk protokollieren. Dies sind Ziele, keine aktuellen Messwerte.
 
 Nicht im MVP: Mesh, Teamtracking, Chat, PDR, 3D, ATAK-Protokolle, automatische Navigation, vollständige Altformat-Kompatibilität. TacMap erst nach erfolgreichem Feldtest ablösen.
+
+## Erweiterter Nutzungskontext — Nutzerauftrag 2026-10-01
+
+Der Karten-/Planungs-/Briefing-Kern soll auch für ein Projekt für Zivilschutz und Landwirtschaft wiederverwendbar sein, beispielsweise bei Tierkrankheitsausbrüchen, Unfällen oder Naturkatastrophen. Offline-Karten, geografische Elemente, Teams, Phasen und portable Projekte bleiben domänenneutral. Mögliche Fachvorlagen wie Sperrzonen, Zufahrten, Sammelstellen und Zuständigkeiten sind noch zu spezifizieren. Produktaufteilung (separate App, Vorlagen oder allgemeine AS-TAC-App) ist offen; daraus folgt noch keine Umbenennung oder automatische Übernahme fachlicher Entscheidungsregeln.

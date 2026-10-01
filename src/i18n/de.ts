@@ -110,6 +110,7 @@ export const de = {
         age: (seconds: number, stale: boolean) => `Fix vor ${seconds} s${stale ? ' · VERALTET' : ''}`,
     },
     map: {
+        labels: 'Kartenbeschriftung', roads: 'Strassennamen', places: 'Orts- und POI-Namen',
         label: 'Offline-Karte', loading: 'Karte wird geladen …', local: 'OSM · lokales Gebiet',
         missingManifest: 'Kartenmanifest fehlt.', missingData: 'Gebietsdaten fehlen.',
         error: (message: string) => `Kartenfehler: ${message}`,

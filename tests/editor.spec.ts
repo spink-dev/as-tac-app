@@ -173,3 +173,24 @@ test('touch taps draw a closed polygon and field mode does not create elements',
     await saved(page);
     await context.close();
 });
+
+test('active tools draw over existing objects without selecting the object underneath', async ({ page }) => {
+    await prepare(page);
+    await tool(page, 'Fläche');
+    await point(page, 100, 180);
+    await point(page, 290, 180);
+    await point(page, 290, 330);
+    await point(page, 100, 330);
+    await page.getByRole('button', { name: 'Zeichnung abschliessen', exact: true }).click();
+    await expect(page.locator('.element-list li')).toHaveCount(1);
+    await tool(page, 'Punkt');
+    await point(page, 190, 250);
+    await expect(page.locator('.element-list li')).toHaveCount(2);
+    await tool(page, 'Linie');
+    await point(page, 190, 250);
+    await expect(page.getByRole('button', { name: 'Linie', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await point(page, 250, 290);
+    await page.getByRole('button', { name: 'Zeichnung abschliessen', exact: true }).click();
+    await expect(page.locator('.element-list li')).toHaveCount(3);
+    await saved(page);
+});
