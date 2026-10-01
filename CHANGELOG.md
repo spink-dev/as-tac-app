@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1-alpha.1 — 2026-10-01
+
+- Mahlwinkel: vollständigerer OSM-Ausschnitt für alle sechs Eventvorlagen.
+- Dark Emergency: Aussengrenze nach Originalkarte korrigiert, Miliz-Safe-Zone ergänzt und alle fünf Safe Zones als eigene Polygone über dem Gelände.
+- Nachvollziehbare Referenzgeometrie, Kalibrierung und Katalogrevision r2; bestehende Projekte bleiben erhalten.
+- Performance-Review und Datenabgleich dokumentiert; Optimierungsbefunde noch offen.
+- Update-Test wartet auf den tatsächlichen Dokument-Neustart, bevor er Tabs bedient.
+
 ## 0.5.0 — 2026-10-01 (main)
 
 - Freigegebene Integration des Kartenarbeitsplatzes, Event-Katalogs, Root-Studios und AS-TAC-Brandings samt Tag-/Dunkel-/Rotlichtmodus.

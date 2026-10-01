@@ -233,7 +233,12 @@ test('app updates wait for consent and a broken update preserves the offline ver
         await page.getByRole('button', { name: 'Erneut versuchen', exact: true }).click();
         await expect(page.getByText('Auf diesem Gerät gespeichert', { exact: true })).toHaveText('Auf diesem Gerät gespeichert');
         await openTab(page, 'Karten');
-        await page.getByRole('button', { name: 'Update installieren und neu starten' }).click();
+        // Activation reloads asynchronously after controllerchange. Wait for the new
+        // document before opening a tab, otherwise the click can target the old UI.
+        await Promise.all([
+            page.waitForEvent('domcontentloaded'),
+            page.getByRole('button', { name: 'Update installieren und neu starten' }).click(),
+        ]);
         await openTab(page, 'Karten');
         await expect(page.getByText('Offline bereit · Dateien geprüft')).toBeVisible();
         await expect(page.getByLabel('Projektname', { exact: true })).toHaveValue('Update-Entwurf');

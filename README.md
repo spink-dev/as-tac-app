@@ -4,6 +4,8 @@ Privates Projekt von Samuel Spink: Offline-/Online-Kartenplanung und Briefings m
 
 **Stand 2026-10-01:** v0.5.0 auf `main` integriert AST-001–012 und ergänzt den Kartenarbeitsplatz, Ebenen, sechs Mahlwinkel-Eventvorlagen und das Root-Kartenstudio sowie AS-TAC-Branding mit Tag-/Dunkel-/Rotlichtmodus. Echte Supabase-Bereitstellung und Geräteabnahme auf iPhone 16 Pro / Samsung Galaxy A24 bleiben offen.
 
+**Testing 0.5.1-alpha.1:** Mahlwinkel-Ausgabe r2 erweitert den Offline-Ausschnitt und korrigiert Dark Emergency mit fünf Safe-Zone-Polygonen über den Gelände-Flächen. Bestehende Projektkopien bleiben unverändert; unter Karten die Eventkarte erneut speichern. [Datenabgleich und offene Erfassungslücken](docs/reviews/2026-10-01-fieldmaps.md) · [Performance-Review](docs/reviews/2026-10-01-performance.md).
+
 ## Starten
 
 Node.js >=22.12.0. Installation anhand des Lockfiles:
