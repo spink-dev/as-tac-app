@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 — 2026-10-01
+
+- AST-004–006: Gebietspakete, geografischer Editor, Teams, Phasen und lokales Briefing.
+- Preview-Stand zur Integration freigegeben; reale Geräteabnahme bleibt offen.
+
 ## 0.2.0-alpha.3 — 2026-10-01 (testing)
 
 - AST-006: Teams mit Kürzel/Farbe, Elementzuordnung, Phasen mit Notizen/Kamera/Elementsichtbarkeit und Reihenfolge.
