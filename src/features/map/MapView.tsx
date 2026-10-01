@@ -49,6 +49,7 @@ export default function MapView({
     const marker = useRef<maplibregl.Marker | null>(null);
     const [area, setArea] = useState<MapPackage | null>(null);
     const [mapReady, setMapReady] = useState(false);
+    const [tilesReady, setTilesReady] = useState(false);
     const [mapError, setMapError] = useState('');
     useEffect(() => {
         if (!mapPackage) {
@@ -57,6 +58,7 @@ export default function MapView({
         let disposed = false;
         const abort = new AbortController();
         setMapReady(false);
+        setTilesReady(false);
         setMapError('');
         async function init() {
             try {
@@ -95,17 +97,37 @@ export default function MapView({
                                 id: 'areas',
                                 type: 'fill',
                                 source: 'terrain',
-                                filter: ['==', '$type', 'Polygon'],
+                                filter: ['all', ['==', '$type', 'Polygon'], ['!has', 'building']],
                                 paint: {
                                     'fill-color': [
                                         'case',
-                                        ['has', 'building'],
-                                        palette.building,
+                                        ['in', ['get', 'landuse'], ['literal', ['residential', 'commercial', 'industrial', 'retail']]],
+                                        palette.background,
                                         ['==', ['get', 'natural'], 'water'],
                                         palette.water,
                                         palette.land,
                                     ],
                                     'fill-opacity': 0.85,
+                                },
+                            },
+                            {
+                                id: 'buildings',
+                                type: 'fill',
+                                source: 'terrain',
+                                minzoom: 13,
+                                filter: ['all', ['==', '$type', 'Polygon'], ['has', 'building']],
+                                paint: { 'fill-color': palette.building, 'fill-opacity': 0.8 },
+                            },
+                            {
+                                id: 'paths',
+                                type: 'line',
+                                source: 'terrain',
+                                minzoom: 13,
+                                filter: ['in', 'highway', 'path', 'footway', 'cycleway', 'steps', 'track', 'bridleway'],
+                                paint: {
+                                    'line-color': palette.roadEdge,
+                                    'line-width': ['interpolate', ['linear'], ['zoom'], 13, 0.8, 17, 2.5],
+                                    'line-dasharray': [2, 2],
                                 },
                             },
                             {
@@ -119,21 +141,42 @@ export default function MapView({
                                 id: 'roads-outline',
                                 type: 'line',
                                 source: 'terrain',
-                                filter: ['has', 'highway'],
-                                paint: { 'line-color': palette.roadEdge, 'line-width': 5 },
+                                filter: [
+                                    'all',
+                                    ['has', 'highway'],
+                                    ['!in', 'highway', 'path', 'footway', 'cycleway', 'steps', 'track', 'bridleway'],
+                                ],
+                                paint: {
+                                    'line-color': palette.roadEdge,
+                                    'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 15, 4, 18, 9],
+                                },
                             },
                             {
                                 id: 'roads',
                                 type: 'line',
                                 source: 'terrain',
-                                filter: ['has', 'highway'],
-                                paint: { 'line-color': palette.road, 'line-width': 3 },
+                                filter: [
+                                    'all',
+                                    ['has', 'highway'],
+                                    ['!in', 'highway', 'path', 'footway', 'cycleway', 'steps', 'track', 'bridleway'],
+                                ],
+                                paint: {
+                                    'line-color': palette.road,
+                                    'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.5, 15, 2.5, 18, 7],
+                                },
                             },
                         ],
                     },
                     attributionControl: { compact: false },
                 });
                 map.current = instance;
+                instance.on('movestart', () => setTilesReady(false));
+                instance.on('sourcedataloading', () => setTilesReady(false));
+                instance.on('idle', () => {
+                    if (!disposed) {
+                        setTilesReady(instance.areTilesLoaded());
+                    }
+                });
                 instance.addControl(new maplibregl.NavigationControl(), 'top-right');
                 instance.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
                 instance.on('dragstart', onExplore);
@@ -205,12 +248,14 @@ export default function MapView({
         instance.setPaintProperty('background', 'background-color', palette.background);
         instance.setPaintProperty('areas', 'fill-color', [
             'case',
-            ['has', 'building'],
-            palette.building,
+            ['in', ['get', 'landuse'], ['literal', ['residential', 'commercial', 'industrial', 'retail']]],
+            palette.background,
             ['==', ['get', 'natural'], 'water'],
             palette.water,
             palette.land,
         ]);
+        instance.setPaintProperty('buildings', 'fill-color', palette.building);
+        instance.setPaintProperty('paths', 'line-color', palette.roadEdge);
         instance.setPaintProperty('water', 'line-color', palette.waterLine);
         instance.setPaintProperty('roads-outline', 'line-color', palette.roadEdge);
         instance.setPaintProperty('roads', 'line-color', palette.road);
@@ -249,7 +294,7 @@ export default function MapView({
                     </filter>
                 </defs>
             </svg>
-            <div ref={container} className="map" aria-busy={!mapReady} />
+            <div ref={container} className="map" aria-busy={!mapReady || !tilesReady} />
             <div className="map-caption">
                 {area?.name ?? de.map.loading}
                 <span>{de.map.local}</span>

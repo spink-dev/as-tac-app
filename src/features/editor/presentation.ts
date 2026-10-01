@@ -21,11 +21,13 @@ export const patterns = {
 export const labelModes = { auto: 'Nach Zoom', always: 'Immer', hidden: 'Ausblenden' } as const;
 export function presentation(element: PlanElement) {
     const source = element.sourceId ?? '';
-    const safe = source.includes(':zone:') && source.endsWith('-safe');
+    const name = element.label.trim().toLocaleLowerCase('de');
+    const safe = (source.includes(':zone:') && source.endsWith('-safe')) || /^(safe[ -]?zone|zivile zone)(\b|$)/.test(name);
     const boundary = source.endsWith(':boundary') || source.includes(':site:');
-    const hq = source.includes(':hq:');
+    const hq = source.includes(':hq:') || /^(hq|hauptquartier|vorposten)(\b|$)/.test(name);
     const poi = source.includes(':poi:');
-    const hazard = /:zone:(verstrahlt|sperrgebiet)$/.test(source);
+    const hazard =
+        /:zone:(verstrahlt|sperrgebiet)$/.test(source) || /^(gefahr|sperrgebiet|militärisches sperrgebiet|verstrahlt)(\b|$)/.test(name);
     const automatic = safe
         ? 'shield'
         : hq
@@ -44,6 +46,7 @@ export function presentation(element: PlanElement) {
         labelMode: element.style.labelMode && element.style.labelMode !== 'auto' ? element.style.labelMode : boundary ? 'hidden' : 'auto',
         priority: hq ? 90 : safe ? 80 : hazard ? 70 : poi ? 10 : 50,
         minZoom: poi ? 16 : safe ? 14 : 0,
+        category: boundary ? 'boundary' : hq ? 'hq' : safe ? 'safe' : hazard ? 'hazard' : poi ? 'building' : 'default',
     };
 }
 const paths: Record<string, string> = {

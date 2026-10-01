@@ -340,11 +340,12 @@ export function useEditor(
         }[] = [];
         for (const element of elements) {
             const appearance = presentation(element);
-            if (appearance.labelMode === 'hidden' || (!element.label && appearance.symbol === 'none')) {
+            if ((appearance.labelMode === 'hidden' && appearance.symbol === 'none') || (!element.label && appearance.symbol === 'none')) {
                 continue;
             }
             const label = document.createElement('span');
             label.className = `plan-label ${appearance.symbol === 'none' ? 'zone-label' : 'symbol-label'}`;
+            label.dataset.category = appearance.category;
             label.style.opacity = String(
                 element.style.opacity *
                     (viewOpacity[element.layerId ?? ''] ?? layers.find((layer) => layer.id === element.layerId)?.opacity ?? 1),
@@ -378,7 +379,8 @@ export function useEditor(
                 height = map.getCanvas().clientHeight;
             const zoom = map.getZoom();
             for (const label of labels) {
-                label.text.hidden = !label.selected && label.mode === 'auto' && zoom < label.minZoom;
+                label.text.hidden = label.mode === 'hidden' || (!label.selected && label.mode === 'auto' && zoom < label.minZoom);
+                label.node.classList.toggle('icon-only', label.text.hidden);
             }
             for (const label of labels) {
                 if (!label.selected && label.mode === 'auto' && label.priority === 10 && zoom < 15) {
@@ -386,7 +388,7 @@ export function useEditor(
                     continue;
                 }
                 const position = map.project(label.position);
-                if (position.x < 0 || position.y < 64 || position.x > width || position.y > height - 60) {
+                if (position.x < 0 || position.y < 64 || position.x + label.node.offsetWidth / 2 > width - 8 || position.x - label.node.offsetWidth / 2 < 8 || position.y > height - 60) {
                     label.node.style.visibility = 'hidden';
                     continue;
                 }

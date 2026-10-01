@@ -176,3 +176,12 @@ body { background: var(--ui-soft); color: var(--ui-ink); }
 .field-tools details { margin-block: 1rem; }
 .field-tools output { display: block; font-variant-numeric: tabular-nums; margin-block: .5rem; }
 .gps-dot { pointer-events: none; }
+
+/* Shared cartographic signs, equally legible across event and personal maps. */
+.plan-label { border-color: var(--ui-line); border-radius: 3px; gap: 5px; padding: 3px 6px; font-size: 12px; line-height: 1.25; box-shadow: 0 1px 2px #0005; }
+.plan-label[data-category=hq] { border-inline-start: 3px solid var(--ui-ink); font-weight: 750; }
+.plan-label[data-category=hazard] { border-style: dashed; }
+.plan-label.icon-only { padding: 3px; border-radius: 50%; }
+.plan-label svg { width: 18px; height: 18px; flex-basis: 18px; stroke-width: 1.7; }
+.basemap-labels .place-icon { fill: var(--ui-surface); stroke: var(--ui-ink); stroke-width: 1.8; }
+.basemap-labels .place-icon path { fill: none; }
