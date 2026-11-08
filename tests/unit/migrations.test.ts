@@ -11,7 +11,8 @@ import { verifyArea } from '../../src/core/areas/store';
 import { AREA_FORMAT_VERSION, AREA_STEPS } from '../../src/core/areas/types';
 import { migratePrefs, normalizePrefs, PREFS_VERSION } from '../../src/core/store/prefs';
 import { AsTacDatabase, db } from '../../src/core/storage/db';
-import { loadProject, loadStored, saveProject } from '../../src/core/storage/projects';
+import { deleteProject, loadProject, loadStored, restoreDeleted, saveProject, STORED_FORMAT, type StoredFormat } from '../../src/core/storage/projects';
+import { metaOf } from '../../src/core/store/diff';
 
 const DIR = new URL('../fixtures/formats/', import.meta.url);
 const read = (name: string) => readFileSync(new URL(name, DIR));
@@ -47,6 +48,9 @@ describe('frozen format samples', () => {
         if (result.kind === 'project') {
             expect(result.project.name).toBe('Formatprobe 1.0.0-alpha.2');
             expect(result.project.tracks).toHaveLength(1);
+            expect(result.project.images).toHaveLength(2);
+            expect(result.project.elements.some((e) => e.attachments?.length)).toBe(true);
+            expect(result.area?.id).toBe('probe-area');
             expect(result.missingAssets).toBe(0);
         }
     });
@@ -86,6 +90,9 @@ describe('newer formats are refused, never guessed', () => {
         expect(() => migrateProject({ ...sample, formatVersion: FORMAT_VERSION + 1 })).toThrow('project-newer');
         expect(presetTeams({ ...json('teams-v1.json'), projectFormatVersion: FORMAT_VERSION + 1 })).toBe('newer');
         expect(presetTeams({ ...json('teams-v1.json'), formatVersion: 2 })).toBe('newer');
+        // The version decides before the shape: a newer file may look different.
+        expect(presetTeams({ format: 'as-tac-teams', formatVersion: 2, members: [] })).toBe('newer');
+        expect(presetTeams({ format: 'as-tac-teams', formatVersion: 1, projectFormatVersion: FORMAT_VERSION + 1, teams: new Array(500).fill({}) })).toBe('newer');
         await expect(verifyArea({ ...json('area-v1.astac-map.json'), formatVersion: AREA_FORMAT_VERSION + 1 })).rejects.toThrow('area-newer');
     });
 
@@ -139,6 +146,33 @@ describe('migration steps', () => {
         expect(() => migrateEntity('elements', marker, 3, 2, future)).toThrow('entity-newer');
     });
 
+    it('give meta steps the same record in a plan as in a live session', () => {
+        const sample = json('project-v1.json');
+        const plain = { ...sample };
+        delete plain.event;
+        const seen: unknown[] = [];
+        const steps: Record<number, ProjectStep> = { 1: { entity: { meta: (m) => {
+            seen.push(m);
+            return { ...m, event: m.event ?? null };
+        } } } };
+        const migrated = migrateProjectRecord(plain, 2, steps);
+        // A plan without event keeps the field absent (null would fail validation).
+        expect('event' in migrated).toBe(false);
+        const live = metaOf(ProjectSchema.parse(plain) as Project) as unknown as Record<string, unknown>;
+        expect(seen[0]).toEqual(live);
+        expect(migrateEntity('meta', live, 1, 2, steps)).toEqual({ ...live, event: null });
+    });
+
+    it('leave live entities alone in plan-only steps (those must not touch entities)', () => {
+        const steps: Record<number, ProjectStep> = { 1: { project: (p) => ({ ...p, view: undefined }) } };
+        expect(migrateEntity('teams', { id: 't' }, 1, 2, steps)).toEqual({ id: 't' });
+    });
+
+    it('state the new version on the record after each step', () => {
+        const migrated = migrateRecord({ formatVersion: 1, a: 1 } as Record<string, unknown>, 1, 3, { 1: (r) => ({ ...r, b: 1 }), 2: (r) => r }, 'area', 'formatVersion');
+        expect(migrated).toEqual({ formatVersion: 3, a: 1, b: 1 });
+    });
+
     it('refuse a missing step instead of skipping it', () => {
         expect(() => migrateProjectRecord(json('project-v1.json'), 3, future)).toThrow('project-invalid');
         expect(() => migrateRecord({ formatVersion: 1 }, 1, 2, {}, 'area')).toThrow('area-invalid');
@@ -147,6 +181,20 @@ describe('migration steps', () => {
 
 describe('plans saved on this device', () => {
     const sample = () => ProjectSchema.parse(json('project-v1.json')) as Project;
+    // This app pretends to be format 2; a stored format-1 plan must be migrated.
+    const future = (onMigrate: () => void): StoredFormat => ({
+        current: 2,
+        migrate: (input) => {
+            onMigrate();
+            return { ...(ProjectSchema.parse(input) as Project), name: 'Migriert', formatVersion: 2 as 1 };
+        },
+        parse: (input) => input as Project,
+    });
+
+    it('are read with the real migration', () => {
+        expect(STORED_FORMAT.migrate).toBe(migrateProject);
+        expect(STORED_FORMAT.current).toBe(FORMAT_VERSION);
+    });
 
     it('open as they are in the current format', async () => {
         const project = sample();
@@ -160,29 +208,60 @@ describe('plans saved on this device', () => {
         const project = { ...sample(), id: 'prj_old_format' };
         await saveProject(project);
         let runs = 0;
-        // Pretend this app is format 2 and the stored plan format 1.
-        const migrate = (input: unknown) => {
+        const format = future(() => {
             runs += 1;
-            return { ...migrateProject(input), name: 'Migriert' } as Project;
-        };
-        const loaded = await loadStored(project.id, 2, migrate);
+        });
+        const loaded = await loadStored(project.id, format);
         expect(loaded.name).toBe('Migriert');
         const backup = await db.backups.get(`${project.id}@1`);
         expect((backup?.data as Project).name).toBe(project.name);
         expect((await db.projects.get(project.id))?.data.name).toBe('Migriert');
         expect((await db.projectIndex.get(project.id))?.name).toBe('Migriert');
         expect((await db.projectIndex.get(project.id))?.updatedAt).toBe(project.updatedAt);
+        await loadStored(project.id, format);
         expect(runs).toBe(1);
     });
 
-    it('from a newer app are refused and left untouched', async () => {
+    it('never overwrite an existing backup', async () => {
+        const project = { ...sample(), id: 'prj_backup_kept' };
+        await saveProject(project);
+        await db.backups.put({ id: `${project.id}@1`, projectId: project.id, formatVersion: 1, appVersion: 'old', createdAt: new Date().toISOString(), data: { original: true } });
+        await loadStored(project.id, future(() => undefined));
+        expect((await db.backups.get(`${project.id}@1`))?.data).toEqual({ original: true });
+    });
+
+    it('still open when the migrated plan cannot be written back', async () => {
+        const project = { ...sample(), id: 'prj_storage_full' };
+        await saveProject(project);
+        const refuse = () => {
+            throw new Error('QuotaExceededError');
+        };
+        db.projects.hook('updating', refuse);
+        try {
+            const loaded = await loadStored(project.id, future(() => undefined));
+            expect(loaded.name).toBe('Migriert');
+        } finally {
+            db.projects.hook('updating').unsubscribe(refuse);
+        }
+        expect((await db.projects.get(project.id))?.data.name).toBe(project.name);
+        expect(await db.backups.get(`${project.id}@1`)).toBeUndefined();
+    });
+
+    it('from a newer app are refused, never overwritten, and can be deleted with undo', async () => {
         const project = { ...sample(), id: 'prj_newer_format' };
         await saveProject(project);
         const newer = { ...project, formatVersion: FORMAT_VERSION + 1, futureField: true };
         await db.projects.put({ id: project.id, data: newer as unknown as Project });
         await expect(loadProject(project.id)).rejects.toThrow('newer');
+        await expect(saveProject({ ...project, name: 'Stale' })).rejects.toThrow('newer');
         expect((await db.projects.get(project.id))?.data).toEqual(newer);
         expect(await db.backups.where('projectId').equals(project.id).count()).toBe(0);
+
+        const removed = await deleteProject(project.id);
+        expect(await db.projects.get(project.id)).toBeUndefined();
+        await restoreDeleted(removed);
+        expect((await db.projects.get(project.id))?.data).toEqual(newer);
+        expect((await db.projectIndex.get(project.id))?.name).toBe(project.name);
     });
 
     it('that are damaged are refused', async () => {

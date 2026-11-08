@@ -1,7 +1,7 @@
 import osmtogeojson from 'osmtogeojson';
 import { boundsSizeM, type Bounds } from '../geo/geo';
 import { sha256Hex } from '../storage/assets';
-import type { AreaPackage } from './types';
+import { AREA_FORMAT_VERSION, type AreaPackage } from './types';
 import { MAX_FEATURES, validateBounds } from './store';
 
 /** Public Overpass instances; the second is only tried when the first is unreachable or overloaded. */
@@ -369,7 +369,7 @@ export async function downloadArea(options: DownloadOptions): Promise<AreaPackag
         const used = [...kept.endpoints];
         const pkg: AreaPackage = {
             format: 'as-tac-map',
-            formatVersion: 1,
+            formatVersion: AREA_FORMAT_VERSION,
             id: options.id,
             name: options.name,
             bounds,

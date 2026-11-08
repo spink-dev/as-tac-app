@@ -13,10 +13,19 @@
    "radioChannel": "3",
    "strength": 12,
    "leader": "Leiter A",
+   "unitNumber": "2-1",
+   "notes": "Funk prüfen",
    "planning": {
     "role": "Sturm",
     "mission": "Gebäude 4 nehmen",
-    "timing": "10:00–11:00"
+    "task": "Eingang sichern",
+    "objective": "Halle 4",
+    "startPoint": "Tor",
+    "rallyPoint": "Wald",
+    "timing": "10:00–11:00",
+    "actionsOnContact": "Deckung",
+    "contingency": "Rückzug",
+    "equipment": "Rauch"
    },
    "logoAsset": "96fd9c291c077985d68c63597abebe7529b71e0728c6d982de4062b6676609f5",
    "formationId": "frm_1",

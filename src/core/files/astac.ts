@@ -6,7 +6,7 @@ import { migrateProject } from '../model/migrations';
 import { duplicateProject } from '../model/factory';
 import { importAreaPackage } from '../areas/files';
 import { hasArea } from '../areas/store';
-import type { AreaMeta, AreaPackage } from '../areas/types';
+import { AREA_FORMAT_VERSION, type AreaMeta, type AreaPackage } from '../areas/types';
 import { convertOldProject, isOldProject } from '../legacy/astac';
 import { convertTacMap, isTacMapProject, tacMapNeedsPlacement, type TacMapAsset, type TacMapPlacement } from '../legacy/tacmap';
 import { APP_VERSION } from '../../version';
@@ -89,7 +89,7 @@ export async function exportAstac(source: Project, options: { includeArea: boole
     if (options.includeArea && project.areaId) {
         const row = await db.areas.get(project.areaId);
         if (row) {
-            const pkg: AreaPackage = { ...row.meta, format: 'as-tac-map', formatVersion: 1, data: row.data };
+            const pkg: AreaPackage = { ...row.meta, format: 'as-tac-map', formatVersion: AREA_FORMAT_VERSION, data: row.data };
             delete pkg.installedAt;
             const bytes = encoder.encode(JSON.stringify(pkg));
             const path = `area/${row.meta.id.replace(/[^A-Za-z0-9._-]/g, '_')}.astac-map.json`;

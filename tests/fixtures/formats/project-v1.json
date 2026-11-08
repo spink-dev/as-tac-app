@@ -4,7 +4,7 @@
  "name": "Formatprobe 1.0.0-alpha.2",
  "createdAt": "2026-11-08T10:00:00.000Z",
  "updatedAt": "2026-11-08T12:00:00.000Z",
- "areaId": "mahlwinkel",
+ "areaId": "probe-area",
  "view": {
   "center": [
    11.823,
@@ -15,14 +15,14 @@
  },
  "layers": [
   {
-   "id": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "name": "Gelände",
    "visible": true,
    "opacity": 1,
    "locked": true
   },
   {
-   "id": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "name": "Event",
    "visible": true,
    "opacity": 1,
@@ -39,8 +39,8 @@
  "elements": [
   {
    "kind": "zone",
-   "id": "el_d1da2017-a23f-48d1-a014-c49551730c11",
-   "layerId": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "el_b217e605-d8eb-4b42-9463-51ee90542c20",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "label": "Spielfeld",
    "category": "ao",
    "pattern": "none",
@@ -236,8 +236,8 @@
   },
   {
    "kind": "zone",
-   "id": "el_542523fe-76c7-4d78-9398-0b4652a2f687",
-   "layerId": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "el_c13c6596-6db0-43fb-b6c9-22f9902d54b1",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "label": "Zivile Zone",
    "category": "civil",
    "pattern": "solid",
@@ -297,8 +297,8 @@
   },
   {
    "kind": "route",
-   "id": "el_02f1f6b6-7f37-42c3-bef3-47d90a0bbbdc",
-   "layerId": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "el_5b804838-a6d1-49d1-952e-965599f2b49d",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "label": "Task Force Grenze",
    "style": "boundary",
    "arrow": false,
@@ -346,8 +346,8 @@
   },
   {
    "kind": "route",
-   "id": "el_1713635d-2277-4f78-acd4-1f8035f7e76c",
-   "layerId": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "el_7cf85ecc-2fa3-4c0a-84b2-05a479309f21",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "label": "Kartell kontrolliertes Gebiet",
    "style": "boundary",
    "arrow": false,
@@ -383,8 +383,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_001bd165-5685-48e9-9ac2-25270e20f5b6",
-   "layerId": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "el_20b8b28b-796a-40e7-9db1-4802f7813d5c",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "type": "hq",
    "label": "Honra Kartell",
    "color": "#c8393f",
@@ -397,8 +397,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_78c7ecb9-472b-48a6-b4ec-fab2e7177336",
-   "layerId": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "el_08e1f26c-77bd-45dd-9bbf-6d5916154a96",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "type": "hq",
    "label": "Task Force HQ",
    "color": "#2f6fc4",
@@ -411,8 +411,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_b940aa6d-af35-41f9-849a-9b78adac5bef",
-   "layerId": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "el_0a2161f2-a9cc-416e-88aa-a7f96f06f16c",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "type": "hq",
    "label": "Rebellen HQ",
    "color": "#2f9d5e",
@@ -425,8 +425,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_ccf413f7-d986-49d9-be2e-3ced6411bea1",
-   "layerId": "layer_72fc27f6-09d8-499a-a1a5-cae9ea140e9e",
+   "id": "el_dfd70013-3134-4898-b924-77bd7b316bdd",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
    "type": "hq",
    "label": "Esco Bar",
    "color": "#e8862d",
@@ -439,8 +439,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_9d7bcab4-83de-4eb6-9160-2688635ab4c8",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_b856cfe2-ee0f-4077-baa8-93a91055b1fa",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "204 Vorratslager",
    "locked": true,
@@ -452,8 +452,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_a68b153f-b0c3-4f6f-acc1-de6813018d91",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_c920a685-8609-4b80-b642-ed158b816430",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "217 Offiziersquartiere",
    "locked": true,
@@ -465,8 +465,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_04eb6bee-6bcc-481d-8c98-e19af9642f62",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_4c7d29d7-d313-4c6f-b2c7-ab95afcd658f",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "502 Alter Bahnhof",
    "locked": true,
@@ -478,8 +478,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_bc32ef46-67ff-421f-81db-7feadc6dfdcd",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_f5cd6a96-f8dd-41a2-8d55-8dc58575348e",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "506 Rampe",
    "locked": true,
@@ -491,8 +491,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_b2b6def9-2795-48d2-90d5-fbf9bc97a7e7",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_25c371d8-d4c3-4b48-bda4-a68d6da2004b",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "600 Roter Platz",
    "locked": true,
@@ -504,8 +504,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_187da5b0-bab9-47b2-84c0-64bc2b2341f7",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_69a86c0e-a311-420f-b7cb-04cfec166521",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "601 Garnison Süd",
    "locked": true,
@@ -517,8 +517,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_aca826bb-1028-4d24-9707-d16fdd1dae5e",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_f0b2f5dd-5376-4b07-bb6c-16fcdc6da31e",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "602 Garnison Nord",
    "locked": true,
@@ -530,8 +530,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_096d7b1d-f959-4521-afdc-682806949754",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_5a0c4787-5fa3-4314-9405-766cb222e499",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "606 Garage",
    "locked": true,
@@ -543,8 +543,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_aea060f9-a205-490c-a1fb-33d4dba3eee2",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_06cf2c39-4cb8-4b51-a616-f4e653f68da2",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "607 Dorf",
    "locked": true,
@@ -556,8 +556,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_ba762827-3f92-46e0-a919-395acbd4cd0b",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_a8345278-e866-4d4f-b33b-ff1f5004a4ee",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "608 Funkstation",
    "locked": true,
@@ -569,8 +569,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_9dcfc859-615b-420b-be45-bc7f4928b914",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_e42896f8-788b-49cb-8242-b3ca48b7d3af",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "610 Esco Bar",
    "locked": true,
@@ -582,8 +582,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_f31cba1c-9f4c-4c89-bb8f-b869a6068a5b",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_19970e14-d97b-414e-a933-3992b00c9946",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "611 Gefängnis",
    "locked": true,
@@ -595,8 +595,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_1d9ac7d4-63b4-4d44-b5c0-590e47028074",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_021fd1ef-7c95-4355-81a8-a446d9819bc2",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "613 Fahrzeughalle",
    "locked": true,
@@ -608,8 +608,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_37650c20-fb6b-4daf-9cdd-81142bdb1e1b",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_8a4b9907-9511-47c1-bb6a-6b2ec5f18a9a",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "616 Forschungskeller",
    "locked": true,
@@ -621,8 +621,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_17cf106d-95eb-41ca-9055-203ef44e8a2f",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_3000a03a-fe63-4f8e-83b0-205e1603f1af",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "617 Heizwerk",
    "locked": true,
@@ -634,8 +634,8 @@
   },
   {
    "kind": "marker",
-   "id": "el_e0150609-bfd8-42ef-8cba-86847a4dacab",
-   "layerId": "layer_ea38bd48-5cd4-474c-92ea-d38b8a4eb245",
+   "id": "el_a668572e-f6c3-4f18-8dc9-6bccb4c845d0",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
    "type": "poi",
    "label": "620 MP Station",
    "locked": true,
@@ -659,7 +659,20 @@
    "phaseIds": [
     "ph_1"
    ],
-   "rotation": 45
+   "rotation": 45,
+   "symbol": "recon",
+   "color": "#2f6fc4",
+   "locked": true,
+   "sourceId": "fm-poi-12",
+   "attachments": [
+    {
+     "id": "att_1",
+     "asset": "a4e35ca4ad8561560ce1805145497256cf113c3494367e67bba31e124b7481e7",
+     "name": "auftrag.pdf",
+     "mime": "application/pdf",
+     "addedAt": "2026-11-08T09:00:00.000Z"
+    }
+   ]
   },
   {
    "kind": "marker",
@@ -736,9 +749,15 @@
      ]
     ]
    },
-   "category": "safe",
+   "category": "objective",
    "fillOpacity": 0.18,
-   "pattern": "hatch"
+   "pattern": "cross",
+   "labelPos": [
+    11.8215,
+    52.3792
+   ],
+   "objectiveStatus": "secured",
+   "label": "Ziel B"
   },
   {
    "kind": "text",
@@ -749,7 +768,30 @@
     52.382
    ],
    "text": "Sammelpunkt",
-   "size": 16
+   "size": 16,
+   "color": "#14181b",
+   "label": "SP",
+   "notes": "Nach Abschnitt 2"
+  },
+  {
+   "kind": "route",
+   "id": "el_r2",
+   "layerId": "lay_plan",
+   "points": [
+    [
+     11.821,
+     52.38
+    ],
+    [
+     11.822,
+     52.381
+    ]
+   ],
+   "style": "alternative",
+   "arrow": false,
+   "phaseIds": [
+    "ph_2"
+   ]
   },
   {
    "kind": "bearing",
@@ -866,6 +908,40 @@
     "method": "similarity",
     "rmsM": 2.1,
     "maxM": 3.4
+   },
+   "locked": true,
+   "knownId": "probe-known"
+  },
+  {
+   "id": "img_inset",
+   "name": "Detail",
+   "asset": "fc7d41a4713ca314842897662b5ed312dbabfa7c83ca8a8e8379118013c0ba7d",
+   "mime": "image/png",
+   "width": 400,
+   "height": 300,
+   "corners": [
+    [
+     11.823010671763694,
+     52.38156979610912
+    ],
+    [
+     11.824189328236308,
+     52.38156979610912
+    ],
+    [
+     11.824189328236308,
+     52.38103020389089
+    ],
+    [
+     11.823010671763694,
+     52.38103020389089
+    ]
+   ],
+   "opacity": 1,
+   "visible": false,
+   "anchorImageId": "img_scan",
+   "fit": {
+    "method": "manual"
    }
   }
  ],
@@ -881,10 +957,19 @@
    "radioChannel": "3",
    "strength": 12,
    "leader": "Leiter A",
+   "unitNumber": "2-1",
+   "notes": "Funk prüfen",
    "planning": {
     "role": "Sturm",
     "mission": "Gebäude 4 nehmen",
-    "timing": "10:00–11:00"
+    "task": "Eingang sichern",
+    "objective": "Halle 4",
+    "startPoint": "Tor",
+    "rallyPoint": "Wald",
+    "timing": "10:00–11:00",
+    "actionsOnContact": "Deckung",
+    "contingency": "Rückzug",
+    "equipment": "Rauch"
    },
    "logoAsset": "96fd9c291c077985d68c63597abebe7529b71e0728c6d982de4062b6676609f5",
    "formationId": "frm_1",

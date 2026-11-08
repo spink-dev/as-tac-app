@@ -5,7 +5,7 @@ import { Library } from './features/library/Library';
 import { NewPlanDialog } from './features/library/NewPlanDialog';
 import { AreaDownloadDialog } from './features/areas/AreaDownloadDialog';
 import { ShortcutsDialog } from './features/workspace/ShortcutsDialog';
-import { ImportDialog } from './features/share/ImportDialog';
+import { ImportDialog, importErrorText } from './features/share/ImportDialog';
 import { JoinDialog } from './features/live/JoinDialog';
 import { CreditsDialog } from './features/library/CreditsDialog';
 import { showDialog } from './core/store/dialogs';
@@ -82,7 +82,7 @@ async function receiveLink() {
             showDialog('import', { result: { kind: 'project', project, source: 'link', unaligned: [], skipped: 0, missingAssets: 0 } });
         } catch (error) {
             console.warn('plan link rejected', error);
-            toast(t('import.errorInvalid'), { tone: 'danger' });
+            toast(importErrorText(error), { tone: 'danger' });
         }
     }
 }

@@ -17,14 +17,17 @@ const PresetTeamsSchema = z.array(TeamSchema).max(LIMITS.teams);
 
 /** Teams of a preset file in the current plan format; `newer` when it comes from a newer app. */
 export function presetTeams(data: unknown): { teams: z.infer<typeof PresetTeamsSchema> } | 'newer' | 'invalid' {
+    // The version first: a newer file may also have another shape.
+    if (isJson(data) && data.format === 'as-tac-teams'
+        && ((typeof data.formatVersion === 'number' && data.formatVersion > PRESET_FORMAT_VERSION)
+            || (typeof data.projectFormatVersion === 'number' && data.projectFormatVersion > FORMAT_VERSION))) {
+        return 'newer';
+    }
     const file = PresetFileSchema.safeParse(data);
     if (!file.success) {
         return 'invalid';
     }
     const from = file.data.projectFormatVersion ?? 1;
-    if (file.data.formatVersion > PRESET_FORMAT_VERSION || from > FORMAT_VERSION) {
-        return 'newer';
-    }
     try {
         const teams = PresetTeamsSchema.safeParse(file.data.teams.map((team) => (isJson(team) ? migrateEntity('teams', team, from) : team)));
         return teams.success ? { teams: teams.data } : 'invalid';

@@ -73,13 +73,19 @@ async function blocker(): Promise<string | null> {
     return null;
 }
 
-/** Register the service worker (production builds) and start looking for updates. */
+let registered = false;
+
+/** Register the service worker (production builds) and start looking for updates. Once per page. */
 export async function registerPwa() {
+    if (registered) {
+        return;
+    }
+    registered = true;
     announceUpdate();
     // Another tab opened the database with a newer schema (a newer app): Dexie closes and reopens
     // the connection on its own; this page's code is older and should reload.
     db.on('versionchange', (event: IDBVersionChangeEvent) => {
-        if (!applying && event.newVersion && event.newVersion / 10 > db.verno) {
+        if (!applying && event.newVersion && Math.floor(event.newVersion / 10) > db.verno) {
             usePwa.setState({ status: 'reload' });
         }
     });

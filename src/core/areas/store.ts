@@ -36,7 +36,7 @@ export async function verifyArea(input: unknown): Promise<AreaPackage> {
     if (!isJson(input) || input.format !== 'as-tac-map') {
         throw new Error('area-invalid');
     }
-    const value = migrateRecord(input, versionOf(input), AREA_FORMAT_VERSION, AREA_STEPS, 'area') as unknown as AreaPackage;
+    const value = migrateRecord(input, versionOf(input), AREA_FORMAT_VERSION, AREA_STEPS, 'area', 'formatVersion') as unknown as AreaPackage;
     if (value.formatVersion !== AREA_FORMAT_VERSION
         || typeof value.id !== 'string' || !/^[\w.-]{1,120}$/.test(value.id) || typeof value.name !== 'string' || value.name.length > 160
         || typeof value.sha256 !== 'string' || !value.data || value.data.type !== 'FeatureCollection' || !Array.isArray(value.data.features)) {
@@ -172,7 +172,7 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
     onProgress?.(null, 'save');
     return saveArea({
         format: 'as-tac-map',
-        formatVersion: 1,
+        formatVersion: AREA_FORMAT_VERSION,
         id,
         name: preset.name,
         bounds: preset.bounds,

@@ -21,15 +21,26 @@ export type EntityKind = SyncedCollection | 'tracks' | 'meta';
 export interface ProjectStep {
     /** Turns one entity of version n into version n+1. */
     entity?: Partial<Record<EntityKind, (entity: Json) => Json>>;
-    /** Plan-wide change after the entity steps, for fields that are not synced entity by entity. */
+    /**
+     * Plan-wide change after the entity steps, only for fields that are not synced entity by entity
+     * (e.g. `view`). It must not change the shape of entities or `meta`: live sessions migrate single
+     * entities with the `entity` steps alone, so anything done here would never reach them.
+     */
     project?: (project: Json) => Json;
 }
 
 /** `PROJECT_STEPS[n]` turns plan format n into n+1. Format 1 is the first 1.0 format: nothing to do yet. */
 export const PROJECT_STEPS: Readonly<Record<number, ProjectStep>> = {};
 
-/** Plan-level fields that live sessions send as the `meta` entity (see store/diff.ts `metaOf`). */
+/**
+ * Plan-level fields that live sessions send as the `meta` entity. Steps see them in exactly the shape
+ * of store/diff.ts `metaOf` (`event: null` when there is none), in a plan as in a live session.
+ */
 const META_FIELDS = ['name', 'areaId', 'event', 'settings'] as const;
+
+function metaRecord(project: Json): Json {
+    return { name: project.name, areaId: project.areaId ?? null, event: project.event ?? null, settings: project.settings };
+}
 const COLLECTIONS: readonly EntityKind[] = ['layers', 'teams', 'images', 'phases', 'elements', 'drawings', 'log', 'tracks'];
 
 export function isJson(value: unknown): value is Json {
@@ -46,7 +57,7 @@ export function versionOf(value: unknown, field = 'formatVersion'): number {
  * Bring any versioned record from `from` to `to` with `steps[n]` (n → n+1). Throws `<prefix>-newer`
  * for records from a newer app and `<prefix>-invalid` for unknown versions or a missing step.
  */
-export function migrateRecord<T>(value: T, from: number, to: number, steps: Readonly<Record<number, (value: T) => T>>, prefix: string): T {
+export function migrateRecord<T>(value: T, from: number, to: number, steps: Readonly<Record<number, (value: T) => T>>, prefix: string, versionField?: string): T {
     if (!Number.isInteger(from) || from < 1) {
         throw new Error(`${prefix}-invalid`);
     }
@@ -60,6 +71,10 @@ export function migrateRecord<T>(value: T, from: number, to: number, steps: Read
             throw new Error(`${prefix}-invalid`);
         }
         current = step(structuredClone(current));
+        if (versionField && isJson(current)) {
+            // The record states its new version itself; a step need not remember to.
+            (current as Json)[versionField] = version + 1;
+        }
     }
     return current;
 }
@@ -79,12 +94,13 @@ export function migrateProjectRecord(input: unknown, to: number = FORMAT_VERSION
         let next = project;
         for (const [kind, fn] of Object.entries(step.entity ?? {}) as [EntityKind, (entity: Json) => Json][]) {
             if (kind === 'meta') {
-                const meta = fn(Object.fromEntries(META_FIELDS.filter((field) => field in next).map((field) => [field, next[field]])));
+                const meta = fn(metaRecord(next));
                 for (const field of META_FIELDS) {
-                    if (field in meta) {
+                    if (field === 'event' && (meta.event === null || meta.event === undefined)) {
+                        // Plans store "no event" as an absent field.
+                        delete next.event;
+                    } else if (field in meta) {
                         next[field] = meta[field];
-                    } else {
-                        delete next[field];
                     }
                 }
             } else if (COLLECTIONS.includes(kind) && Array.isArray(next[kind])) {

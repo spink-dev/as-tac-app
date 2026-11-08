@@ -1,10 +1,13 @@
 import { create } from 'zustand';
-import { db, type ProjectIndexRow } from './db';
+import { db, type BackupRow, type KvRow, type LiveLinkRow, type OutboxRow, type ProjectIndexRow, type ProjectRow } from './db';
 import { FORMAT_VERSION, ProjectSchema, type Project } from '../model/schema';
 import { migrateProject, versionOf } from '../model/migrations';
 import { APP_VERSION } from '../../version';
 import { onProjectChange, useProject } from '../store/project';
-import { duplicateProject } from '../model/factory';
+import { duplicateProject, uid } from '../model/factory';
+import { MAX } from '../model/schema';
+import { toast } from '../store/ui';
+import { t } from '../../i18n';
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -23,9 +26,17 @@ function indexRow(project: Project, live = false): ProjectIndexRow {
     };
 }
 
+/**
+ * Store a plan. A stored record written by a newer app is never replaced: the save fails with
+ * 'newer' (autosave then keeps this tab's edits as a copy, see `write`).
+ */
 export async function saveProject(project: Project): Promise<void> {
     const live = Boolean(await db.liveLinks.get(project.id));
     await db.transaction('rw', db.projects, db.projectIndex, async () => {
+        const existing = await db.projects.get(project.id);
+        if (existing && versionOf(existing.data) > FORMAT_VERSION) {
+            throw new Error('newer');
+        }
         await db.projects.put({ id: project.id, data: project });
         await db.projectIndex.put(indexRow(project, live));
     });
@@ -40,42 +51,101 @@ export async function listProjects(): Promise<ProjectIndexRow[]> {
  * `backups`, the migrated plan is written back. A record from a newer app is refused ('newer')
  * and left untouched, so going back to that version loses nothing.
  */
-export function loadProject(id: string): Promise<Project> {
-    return loadStored(id, FORMAT_VERSION, migrateProject);
+/** How stored plans are read: current format, its migration and its validation (tests pass a future format). */
+export interface StoredFormat {
+    current: number;
+    migrate: (input: unknown) => Project;
+    parse: (input: unknown) => Project | null;
 }
 
-/** `loadProject` with the format and migration passed in (tests run the migration path with a future format). */
-export async function loadStored(id: string, current: number, migrate: (input: unknown) => Project): Promise<Project> {
+export const STORED_FORMAT: StoredFormat = {
+    current: FORMAT_VERSION,
+    migrate: migrateProject,
+    parse: (input) => {
+        const parsed = ProjectSchema.safeParse(input);
+        if (!parsed.success) {
+            console.warn('stored project failed validation', parsed.error.issues.slice(0, 5));
+            return null;
+        }
+        return parsed.data as Project;
+    },
+};
+
+export function loadProject(id: string): Promise<Project> {
+    return loadStored(id, STORED_FORMAT);
+}
+
+/**
+ * A stored plan in the current format. An older record is migrated: its original goes to
+ * `backups` (never overwritten), the migrated plan is written back — unless the record changed in
+ * the meantime or storage refuses, then the migrated plan opens unsaved and the original stays.
+ * A record from a newer app is refused ('newer') and left untouched.
+ */
+export async function loadStored(id: string, format: StoredFormat): Promise<Project> {
     const row = await db.projects.get(id);
     if (!row) {
         throw new Error('missing');
     }
     const version = versionOf(row.data);
-    if (version > current) {
+    if (version > format.current) {
         throw new Error('newer');
     }
-    if (version === current) {
-        const parsed = ProjectSchema.safeParse(row.data);
-        if (!parsed.success) {
-            console.warn('stored project failed validation', parsed.error.issues.slice(0, 5));
+    if (version === format.current) {
+        const project = format.parse(row.data);
+        if (!project) {
             throw new Error('invalid');
         }
-        return parsed.data as Project;
+        return project;
     }
     let project: Project;
     try {
-        project = migrate(row.data);
+        project = format.migrate(row.data);
     } catch (error) {
         console.warn('stored project could not be migrated', error);
         throw new Error('invalid');
     }
-    await db.transaction('rw', db.projects, db.projectIndex, db.backups, async () => {
-        await db.backups.put({ id: `${id}@${version}`, projectId: id, formatVersion: version, appVersion: APP_VERSION, createdAt: new Date().toISOString(), data: row.data });
-        await db.projects.put({ id, data: project });
-        const index = await db.projectIndex.get(id);
-        await db.projectIndex.put({ ...indexRow(project, Boolean(index?.live)), updatedAt: index?.updatedAt ?? project.updatedAt });
-    });
+    try {
+        await db.transaction('rw', db.projects, db.projectIndex, db.backups, async () => {
+            const current = await db.projects.get(id);
+            if (!current || versionOf(current.data) !== version) {
+                // Written by someone else since it was read: leave it to them.
+                return;
+            }
+            const key = `${id}@${version}`;
+            if (!(await db.backups.get(key))) {
+                await db.backups.put({ id: key, projectId: id, formatVersion: version, appVersion: APP_VERSION, createdAt: new Date().toISOString(), data: current.data });
+            }
+            await db.projects.put({ id, data: project });
+            const index = await db.projectIndex.get(id);
+            await db.projectIndex.put({ ...indexRow(project, Boolean(index?.live)), updatedAt: index?.updatedAt ?? project.updatedAt });
+        });
+    } catch (error) {
+        // E.g. storage full after an update: open the migrated plan anyway; the original stays as it was.
+        console.warn('migrated project could not be written back', error);
+    }
     return project;
+}
+
+/** Plans with a backup from before a format migration. */
+export async function plansWithBackup(): Promise<Set<string>> {
+    const keys = await db.backups.toCollection().primaryKeys();
+    return new Set(keys.map((key) => String(key).replace(/@\d+$/, '')));
+}
+
+/**
+ * The plan as it was before its last format migration, migrated again by this version and stored as
+ * a new plan (the current one stays). Useful when a migration got something wrong and a later version fixed it.
+ */
+export async function restoreBackup(projectId: string): Promise<Project> {
+    const rows = await db.backups.where('projectId').equals(projectId).toArray();
+    const latest = rows.sort((a, b) => b.formatVersion - a.formatVersion)[0];
+    if (!latest) {
+        throw new Error('missing');
+    }
+    const restored = migrateProject(latest.data);
+    const copy = duplicateProject(restored, t('library.backupName', { name: restored.name.slice(0, MAX.projectName - 20) }));
+    await saveProject(copy);
+    return copy;
 }
 
 /** Drop migration backups older than 60 days. */
@@ -84,14 +154,53 @@ export async function pruneBackups(now = Date.now()): Promise<void> {
     await db.backups.where('createdAt').below(cutoff).delete();
 }
 
-export async function deleteProject(id: string): Promise<void> {
-    await db.transaction('rw', [db.projects, db.projectIndex, db.liveLinks, db.liveOutbox, db.kv, db.backups], async () => {
+/** Everything removed with a plan, so the deletion can be undone exactly (also for plans this app can't open). */
+export interface DeletedPlan {
+    project?: ProjectRow;
+    index?: ProjectIndexRow;
+    link?: LiveLinkRow;
+    outbox: OutboxRow[];
+    versions?: KvRow;
+    backups: BackupRow[];
+}
+
+export async function deleteProject(id: string): Promise<DeletedPlan> {
+    return db.transaction('rw', [db.projects, db.projectIndex, db.liveLinks, db.liveOutbox, db.kv, db.backups], async () => {
+        const snapshot: DeletedPlan = {
+            project: await db.projects.get(id),
+            index: await db.projectIndex.get(id),
+            link: await db.liveLinks.get(id),
+            outbox: await db.liveOutbox.where('projectId').equals(id).toArray(),
+            versions: await db.kv.get(`live:v:${id}`),
+            backups: await db.backups.where('projectId').equals(id).toArray(),
+        };
         await db.projects.delete(id);
         await db.backups.where('projectId').equals(id).delete();
         await db.projectIndex.delete(id);
         await db.liveLinks.delete(id);
         await db.liveOutbox.where('projectId').equals(id).delete();
         await db.kv.delete(`live:v:${id}`);
+        return snapshot;
+    });
+}
+
+/** Undo `deleteProject`: the stored rows come back as they were. */
+export async function restoreDeleted(snapshot: DeletedPlan): Promise<void> {
+    await db.transaction('rw', [db.projects, db.projectIndex, db.liveLinks, db.liveOutbox, db.kv, db.backups], async () => {
+        if (snapshot.project) {
+            await db.projects.put(snapshot.project);
+        }
+        if (snapshot.index) {
+            await db.projectIndex.put(snapshot.index);
+        }
+        if (snapshot.link) {
+            await db.liveLinks.put(snapshot.link);
+        }
+        if (snapshot.versions) {
+            await db.kv.put(snapshot.versions);
+        }
+        await db.liveOutbox.bulkPut(snapshot.outbox);
+        await db.backups.bulkPut(snapshot.backups);
     });
 }
 
@@ -103,6 +212,13 @@ export async function duplicateStored(id: string, name: string): Promise<Project
 
 let timer = 0;
 let pending: Project | null = null;
+/** Plans whose stored record a newer app took over while open here: this window saves to a copy (id). */
+const copies = new Map<string, string>();
+
+function target(project: Project): Project {
+    const copy = copies.get(project.id);
+    return copy ? { ...project, id: copy, name: t('save.copyName', { name: project.name.slice(0, MAX.projectName - 20) }) } : project;
+}
 let inflight: Promise<boolean> | null = null;
 
 /** Serialise writes so a close waits for (and learns the result of) a write already running. */
@@ -136,10 +252,24 @@ async function write(): Promise<boolean> {
         return false;
     }
     try {
-        await saveProject(project);
+        await saveProject(target(project));
         useSaveState.setState({ state: pending ? 'saving' : 'saved', error: undefined });
         return true;
     } catch (error) {
+        if ((error as Error)?.message === 'newer' && !copies.has(project.id)) {
+            // A newer app changed this plan meanwhile (another window, a later version): its record
+            // stays as it is, and this window's edits go to a copy from now on — nothing is lost.
+            copies.set(project.id, uid());
+            try {
+                const copy = target(project);
+                await saveProject(copy);
+                toast(t('save.keptAsCopy', { name: copy.name }), { tone: 'warn' });
+                useSaveState.setState({ state: pending ? 'saving' : 'saved', error: undefined });
+                return true;
+            } catch (copyError) {
+                error = copyError;
+            }
+        }
         useSaveState.setState({ state: 'error', error: error instanceof Error ? error.message : String(error) });
         pending = pending ?? project;
         return false;

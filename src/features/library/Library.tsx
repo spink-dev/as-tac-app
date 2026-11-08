@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, Download, FileUp, HardDrive, Map as MapIcon, MoreHorizontal, Pencil, Plus, Radio, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { Check, Copy, Download, FileUp, HardDrive, Map as MapIcon, MoreHorizontal, Pencil, History, Plus, Radio, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { areaErrorText } from '../areas/areaErrors';
 import { t, useT, relativeTime, formatBytes } from '../../i18n';
 import { usePrefs } from '../../core/store/prefs';
 import { Button, ICON, IconButton, useSmoothScroll, useStaggerIn } from '../../ui/components';
 import { AppearanceToggle, BrandMark, LanguageToggle } from '../../ui/Brand';
 import { showDialog } from '../../core/store/dialogs';
-import { deleteProject, duplicateStored, listProjects, loadProject, saveProject } from '../../core/storage/projects';
+import { deleteProject, duplicateStored, listProjects, loadProject, plansWithBackup, restoreBackup, restoreDeleted, saveProject } from '../../core/storage/projects';
 import type { ProjectIndexRow } from '../../core/storage/db';
 import { requestPersistence, storageEstimate } from '../../core/storage/db';
 import { openProject } from '../../core/store/route';
@@ -47,6 +47,7 @@ export function Library() {
     const statusText = pwa.offlineReady ? t('library.offlineReady') : navigator.onLine ? t('common.online') : t('common.offline');
 
     const [storageProblem, setStorageProblem] = useState<'newer' | 'unavailable' | null>(null);
+    const [backups, setBackups] = useState<Set<string>>(new Set());
 
     const refresh = useCallback(async () => {
         try {
@@ -54,6 +55,7 @@ export function Library() {
             setProjects(p);
             setAreas(a);
             setStorage(s);
+            setBackups(await plansWithBackup().catch(() => new Set<string>()));
             setStorageProblem(null);
         } catch (error) {
             console.error('local storage unavailable', error);
@@ -76,15 +78,26 @@ export function Library() {
 
     async function remove(row: ProjectIndexRow) {
         setMenu(null);
-        const backup = await loadProject(row.id).catch(() => null);
-        await deleteProject(row.id);
+        // The stored rows themselves, so undo also works for plans this version can't open.
+        const removed = await deleteProject(row.id);
         await refresh();
-        toast(t('library.deleted'), backup ? {
+        toast(t('library.deleted'), {
             action: {
                 label: t('common.undo'),
-                run: () => void saveProject(backup).then(refresh),
+                run: () => void restoreDeleted(removed).then(refresh),
             },
-        } : undefined);
+        });
+    }
+
+    async function fromBackup(row: ProjectIndexRow) {
+        setMenu(null);
+        try {
+            const copy = await restoreBackup(row.id);
+            toast(t('library.restoredBackup', { name: copy.name }), { tone: 'ok' });
+        } catch (error) {
+            openFailed(error);
+        }
+        await refresh();
     }
 
     async function duplicate(row: ProjectIndexRow) {
@@ -112,7 +125,7 @@ export function Library() {
         }
         project.name = trimmed;
         project.updatedAt = new Date().toISOString();
-        await saveProject(project);
+        await saveProject(project).catch(openFailed);
         await refresh();
     }
 
@@ -248,6 +261,9 @@ export function Library() {
                                                         setRenaming(row.id);
                                                     }}><Pencil size={16} /> {t('common.rename')}</button>
                                                     <button role="menuitem" className="menu__item" onClick={() => void duplicate(row)}><Copy size={16} /> {t('common.duplicate')}</button>
+                                                    {backups.has(row.id) ? (
+                                                        <button role="menuitem" className="menu__item" onClick={() => void fromBackup(row)}><History size={16} /> {t('library.restoreBackup')}</button>
+                                                    ) : null}
                                                     <button role="menuitem" className="menu__item menu__item--danger" onClick={() => void remove(row)}><Trash2 size={16} /> {t('common.delete')}</button>
                                                 </div>
                                             ) : null}

@@ -6,8 +6,8 @@ make a broken migration pass.
 
 | File | Format | Written by |
 | --- | --- | --- |
-| `project-v1.json` | plan format 1 (all collections) | 1.0.0-alpha.2 |
-| `archive-v2.astac` | `.astac` container 2 with plan format 1 and two pictures | 1.0.0-alpha.2 |
+| `project-v1.json` | plan format 1 (all collections, attachments, an inset image, optional fields) | 1.0.0-alpha.2 |
+| `archive-v2.astac` | `.astac` container 2 with plan format 1, three pictures, a PDF attachment and its base map (area format 1) | 1.0.0-alpha.2 |
 | `link-v1.txt` | `#plan=` link, plan format 1 | 1.0.0-alpha.2 |
 | `teams-v1.json` | team preset 1 without `projectFormatVersion` (as 1.0.0-alpha.1 wrote it) | 1.0.0-alpha.2 |
 | `area-v1.astac-map.json` | area package 1 | 1.0.0-alpha.2 |
