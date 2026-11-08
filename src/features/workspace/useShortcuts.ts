@@ -37,6 +37,10 @@ export function useShortcuts() {
             const combo = eventCombo(event);
             const overrides = usePrefs.getState().keybinds;
             const ui = useUi.getState();
+            // While the palette is open it owns the keyboard (except its own toggle and Escape).
+            if (ui.palette && combo !== 'escape' && combo !== bindingFor('view.palette', overrides)) {
+                return;
+            }
 
             if (layer && /^[1-9]$/.test(event.key)) {
                 applySubtype(layer, Number(event.key));

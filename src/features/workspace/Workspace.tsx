@@ -7,6 +7,8 @@ import { ContextBar, DraftBar, HintBar, ToolRail } from './Tools';
 import { useShortcuts } from './useShortcuts';
 import { PanelHost } from '../panels/Panel';
 import { CommandPalette } from './CommandPalette';
+import { AlignBar } from '../maps/AlignBar';
+import '../maps/MapsPanel';
 
 export function Workspace() {
     const mode = useUi((state) => state.mode);
@@ -20,6 +22,7 @@ export function Workspace() {
             <MapHud />
             <ToolRail />
             <div className="ws-bottom">
+                <AlignBar />
                 <DraftBar />
                 <HintBar />
                 <ContextBar />

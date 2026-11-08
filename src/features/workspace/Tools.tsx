@@ -181,7 +181,8 @@ export function HintBar() {
     const markerType = useUi((state) => state.markerType);
     const zoneShape = useUi((state) => state.zoneShape);
     const readOnly = useProject((state) => state.readOnly);
-    if (mode !== 'plan' || readOnly) {
+    const aligning = useUi((state) => state.imageEditId);
+    if (mode !== 'plan' || readOnly || aligning) {
         return null;
     }
     const started = Boolean(draft && draft.points.length > 0);

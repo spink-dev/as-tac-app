@@ -372,7 +372,7 @@ export function installInteraction(map: MlMap): () => void {
     function startPress(event: MapMouseEvent | MapTouchEvent): boolean {
         const ui = useUi.getState();
         const project = useProject.getState().project;
-        if (!project || gesture) {
+        if (!project || gesture || ui.imageEditId) {
             return false;
         }
         const point = event.point;
@@ -559,7 +559,7 @@ export function installInteraction(map: MlMap): () => void {
         }
         const ui = useUi.getState();
         const project = useProject.getState().project;
-        if (!project) {
+        if (!project || ui.imageEditId) {
             return;
         }
         const shiftKey = (event.originalEvent as MouseEvent).shiftKey;

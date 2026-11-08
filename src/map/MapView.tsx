@@ -17,6 +17,7 @@ import { addPlanLayers, applyPlanPalette, setPlanData, setSourceData } from './p
 import { buildPlanCollections } from './planFeatures';
 import { syncImageOverlays } from './images';
 import { installInteraction } from './interaction';
+import { installAlign } from './align';
 import { renderDraft, renderEdit } from './overlays';
 
 export const mapRef: { current: MlMap | null } = { current: null };
@@ -197,7 +198,12 @@ export function MapView() {
             }
             addPlanLayers(map, palette);
             planReady = true;
-            stopInteraction = installInteraction(map);
+            const stopTools = installInteraction(map);
+            const stopAlign = installAlign(map);
+            stopInteraction = () => {
+                stopTools();
+                stopAlign();
+            };
             renderPlan();
             for (const fn of readyCallbacks) {
                 fn(map);
@@ -253,7 +259,7 @@ export function MapView() {
             if ((state.draft !== prev.draft || state.measure !== prev.measure || state.zoneShape !== prev.zoneShape) && planReady) {
                 renderDraft(map);
             }
-            if (state.tool !== prev.tool && planReady) {
+            if ((state.tool !== prev.tool || state.imageEditId !== prev.imageEditId) && planReady) {
                 renderEdit(map);
             }
             if (state.streamer !== prev.streamer && planReady) {

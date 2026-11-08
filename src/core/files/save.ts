@@ -30,13 +30,22 @@ export function saveFile(blob: Blob, filename: string): void {
     setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
+/** Open the system file picker. The input is attached while open: detached inputs are ignored by some browsers. */
 export function pickFile(accept: string): Promise<File | null> {
     return new Promise((resolve) => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = accept;
-        input.addEventListener('change', () => resolve(input.files?.[0] ?? null));
-        input.addEventListener('cancel', () => resolve(null));
+        input.style.position = 'fixed';
+        input.style.left = '-9999px';
+        input.setAttribute('aria-hidden', 'true');
+        const done = (file: File | null) => {
+            input.remove();
+            resolve(file);
+        };
+        input.addEventListener('change', () => done(input.files?.[0] ?? null), { once: true });
+        input.addEventListener('cancel', () => done(null), { once: true });
+        document.body.append(input);
         input.click();
     });
 }
