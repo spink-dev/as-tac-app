@@ -47,6 +47,14 @@ const HISTORY_LIMIT = 100;
 const listeners = new Set<ChangeListener>();
 const rejectListeners = new Set<(label: string, reason: string) => void>();
 
+/** Set once an update is being applied: the page is about to reload, local edits would be lost. */
+let frozen = false;
+
+/** Refuse every further local edit, undo and redo (remote changes still apply and are saved). */
+export function freezeLocalEdits() {
+    frozen = true;
+}
+
 /** Fires when a change was refused because it would break the schema (too long, too many). */
 export function onMutationRejected(listener: (label: string, reason: string) => void): () => void {
     rejectListeners.add(listener);
@@ -163,7 +171,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     },
     mutate(label, recipe, options = {}) {
         const { project, readOnly, past } = get();
-        if (!project || (readOnly && !options.remote)) {
+        if (!project || ((readOnly || frozen) && !options.remote)) {
             return false;
         }
         const changed = produce(project, recipe);
@@ -208,7 +216,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     undo() {
         const { project, past, future, readOnly } = get();
         const entry = past[past.length - 1];
-        if (!project || !entry || readOnly) {
+        if (!project || !entry || readOnly || frozen) {
             return null;
         }
         const ops = applicable(project, entry.inverse, entry.forward);
@@ -222,7 +230,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     redo() {
         const { project, past, future, readOnly } = get();
         const entry = future[0];
-        if (!project || !entry || readOnly) {
+        if (!project || !entry || readOnly || frozen) {
             return null;
         }
         const ops = applicable(project, entry.forward, entry.inverse);

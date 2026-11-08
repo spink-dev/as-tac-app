@@ -1,6 +1,6 @@
 import { ArrowUpCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { useT, formatDateTime, relativeTime, type StringKey } from '../../i18n';
-import { applyUpdate, checkForUpdate, usePwa, type UpdateStatus } from '../../core/pwa';
+import { applyUpdate, canDownload, checkForUpdate, usePwa, type UpdateStatus } from '../../core/pwa';
 import { usePrefs } from '../../core/store/prefs';
 import { useDialogs, showDialog } from '../../core/store/dialogs';
 import { mayAutoDownload } from '../../core/net';
@@ -21,8 +21,11 @@ function buildLabel(build: BuildInfo, locale: 'de' | 'en'): string {
     return `${build.version} · ${build.commit || (build.date ? formatDateTime(build.date, locale) : '')}`;
 }
 
-function statusText(t: T, status: UpdateStatus, available: BuildInfo | null, lastCheck: number | null, locale: 'de' | 'en'): string {
+function statusText(t: T, status: UpdateStatus, available: BuildInfo | null, lastCheck: number | null, locale: 'de' | 'en', older = false): string {
     const v = available ? buildLabel(available, locale) : null;
+    if (older && v && (status === 'available' || status === 'downloading' || status === 'ready')) {
+        return t('update.older', { v });
+    }
     switch (status) {
         case 'checking':
             return t('update.checking');
@@ -50,14 +53,17 @@ function statusText(t: T, status: UpdateStatus, available: BuildInfo | null, las
 function UpdateAction({ small }: { small?: boolean }) {
     const t = useT();
     const status = usePwa((state) => state.status);
+    const older = usePwa((state) => state.older);
     if (status === 'reload') {
         return <Button small={small} variant="primary" onClick={() => void applyUpdate()} data-testid="update-apply"><RefreshCw size={16} /> {t('update.reload')}</Button>;
     }
     if (OFFERS.includes(status)) {
         const working = status === 'downloading' || status === 'applying';
+        // Not downloaded yet: this tap only downloads; a second one applies (never a surprise reload).
+        const label = older ? t('update.switch') : status === 'available' && canDownload() ? t('update.download') : t('update.apply');
         return (
             <Button small={small} variant="primary" disabled={working} aria-busy={working} onClick={() => void applyUpdate()} data-testid="update-apply">
-                <ArrowUpCircle size={16} /> {t('update.apply')}
+                <ArrowUpCircle size={16} /> {working ? t(status === 'applying' ? 'update.applying' : 'update.downloadingGeneric') : label}
             </Button>
         );
     }
@@ -72,9 +78,9 @@ function UpdateAction({ small }: { small?: boolean }) {
 export function AppInfo() {
     const t = useT();
     const locale = usePrefs((state) => state.locale);
-    const { status, available, lastCheck } = usePwa();
-    const text = statusText(t, status, available, lastCheck, locale);
-    const saver = status === 'available' && !mayAutoDownload();
+    const { status, available, lastCheck, older } = usePwa();
+    const text = statusText(t, status, available, lastCheck, locale, older);
+    const saver = status === 'available' && !older && canDownload() && !mayAutoDownload();
     return (
         <div className="app-info stack">
             <div className="app-info__version">
@@ -98,32 +104,62 @@ export function AppInfo() {
 export function UpdateBanner() {
     const t = useT();
     const locale = usePrefs((state) => state.locale);
-    const { status, available, lastCheck } = usePwa();
+    const { status, available, lastCheck, older } = usePwa();
     if (!OFFERS.includes(status)) {
         return null;
     }
     return (
-        <div className={`notice ${status === 'reload' ? 'notice--warn' : 'notice--ok'} update-banner`} role="status" data-testid="update-banner">
+        <div className={`notice ${status === 'reload' || older ? 'notice--warn' : 'notice--ok'} update-banner`} role="status" data-testid="update-banner">
             <ArrowUpCircle size={18} aria-hidden="true" />
-            <span className="spacer">{statusText(t, status, available, lastCheck, locale)}</span>
+            <span className="spacer">{statusText(t, status, available, lastCheck, locale, older)}</span>
             <UpdateAction small />
         </div>
     );
 }
 
-/** Plan view: one quiet button while an update waits; one tap saves and switches. */
+/** Plan view: one quiet button while an update is there; it shows the download and the switch too. */
 export function UpdateButton() {
     const t = useT();
     const locale = usePrefs((state) => state.locale);
-    const { status, available, lastCheck } = usePwa();
-    if (status !== 'ready' && status !== 'reload' && status !== 'available') {
+    const { status, available, lastCheck, older } = usePwa();
+    if (!OFFERS.includes(status)) {
         return null;
     }
-    const label = `${statusText(t, status, available, lastCheck, locale)} ${status === 'reload' ? t('update.reload') : t('update.apply')}`;
+    const working = status === 'downloading' || status === 'applying';
+    const action = status === 'reload' ? t('update.reload') : older ? t('update.switch') : status === 'available' && canDownload() ? t('update.download') : t('update.apply');
+    const label = working ? statusText(t, status, available, lastCheck, locale, older) : `${statusText(t, status, available, lastCheck, locale, older)} ${action}`;
     return (
-        <IconButton label={label} tipPos="bottom" className="update-dot" onClick={() => void applyUpdate()} data-testid="update-topbar">
+        <IconButton label={label} tipPos="bottom" className={`update-dot ${working ? 'is-busy' : ''}`} disabled={working} aria-busy={working} onClick={() => void applyUpdate()} data-testid="update-topbar">
             <ArrowUpCircle {...ICON} />
         </IconButton>
+    );
+}
+
+/** While the page saves and reloads into the new version: nothing more can be changed. */
+export function UpdatingOverlay() {
+    const t = useT();
+    const applying = usePwa((state) => state.status === 'applying');
+    if (!applying) {
+        return null;
+    }
+    return (
+        <div className="updating" role="alertdialog" aria-modal="true" aria-busy="true" aria-label={t('update.applying')} data-testid="updating">
+            <div className="updating__card">
+                <ArrowUpCircle size={28} aria-hidden="true" />
+                <p>{t('update.applyingLong')}</p>
+            </div>
+        </div>
+    );
+}
+
+/** In place of the plan view when its files belong to a removed build. */
+export function StaleBuild() {
+    const t = useT();
+    return (
+        <div className="boot stale-build" role="alert">
+            <p>{t('update.stale')}</p>
+            <Button variant="primary" onClick={() => void applyUpdate()} data-testid="stale-reload"><RefreshCw size={16} /> {t('update.reload')}</Button>
+        </div>
     );
 }
 
@@ -146,7 +182,7 @@ export function WhatsNewDialog() {
                         </ul>
                     </section>
                 ))}
-                <p className="field__hint">{t('update.changelog')}</p>
+                <p><a href={`${import.meta.env.BASE_URL}licenses/CHANGELOG.md`} target="_blank" rel="noopener">{t('update.changelog')}</a></p>
             </div>
         </Dialog>
     );

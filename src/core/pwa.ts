@@ -1,19 +1,20 @@
 import { create } from 'zustand';
-import { APP_VERSION, BUILD, isBuildInfo, sameBuild, type BuildInfo } from '../version';
+import { APP_VERSION, BUILD, compareVersions, isBuildInfo, sameBuild, type BuildInfo } from '../version';
 import { flushNow } from './storage/projects';
 import { db } from './storage/db';
 import { mayAutoDownload } from './net';
 import { toast, useUi, type Mode } from './store/ui';
-import { useProject } from './store/project';
+import { freezeLocalEdits, useProject } from './store/project';
 import { showDialog } from './store/dialogs';
 import { t } from '../i18n';
 
 /**
  * - `idle`: not checked yet · `checking`: asking the server · `current`: the server has this build
- * - `available`: the server has another build, not downloaded yet (data saver, or no service worker)
+ * - `available`: the server has another build, not downloaded yet (data saver, a tap, or no service worker)
  * - `downloading`: the new version installs in the background · `ready`: installed, waiting for a tap
- * - `applying`: saving, then reloading · `reload`: another tab switched to a new version; this one must reload
- * - `offline` / `failed`: the last manual check could not reach the server
+ * - `applying`: saving, then reloading (edits are frozen) · `reload`: another tab switched to a new
+ *   version (or this page's files are gone); this page must reload
+ * - `offline` / `failed`: the last check could not reach the server
  */
 export type UpdateStatus = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'applying' | 'reload' | 'offline' | 'failed';
 
@@ -22,10 +23,12 @@ interface PwaState {
     status: UpdateStatus;
     /** The build on the server, when it differs from the running one. */
     available: BuildInfo | null;
+    /** The server's build is an older version (a rollback): never downloaded without a tap. */
+    older: boolean;
     lastCheck: number | null;
 }
 
-export const usePwa = create<PwaState>(() => ({ offlineReady: false, status: 'idle', available: null, lastCheck: null }));
+export const usePwa = create<PwaState>(() => ({ offlineReady: false, status: 'idle', available: null, older: false, lastCheck: null }));
 
 const CHECK_EVERY_MS = 60 * 60 * 1000;
 const RECHECK_AFTER_MS = 15 * 60 * 1000;
@@ -36,6 +39,8 @@ const RECOVER_KEY = 'as-tac.recovered';
 let registration: ServiceWorkerRegistration | null = null;
 let applying = false;
 let checking: Promise<void> | null = null;
+let applyRun: Promise<boolean> | null = null;
+let recovering: Promise<void> | null = null;
 
 type Guard = () => string | null | Promise<string | null>;
 const guards = new Set<Guard>();
@@ -43,12 +48,29 @@ const guards = new Set<Guard>();
 /**
  * Something that must happen (or block) before the app reloads into a new version: e.g. a running
  * path recording (in memory only) blocks, the live queue finishes writing. Return a message to block.
+ * Guards run again right before the reload, when their message is ignored (only their waiting counts).
  */
 export function onBeforeUpdate(guard: Guard): () => void {
     guards.add(guard);
     return () => {
         guards.delete(guard);
     };
+}
+
+// Work that exists only in this page and would vanish with a reload.
+onBeforeUpdate(() => {
+    const ui = useUi.getState();
+    return ui.draft || ui.briefingInk.length > 0 || ui.streamerInk.length > 0 ? t('update.blockedDraft') : null;
+});
+
+async function blocker(): Promise<string | null> {
+    for (const guard of guards) {
+        const reason = await guard();
+        if (reason) {
+            return reason;
+        }
+    }
+    return null;
 }
 
 /** Register the service worker (production builds) and start looking for updates. */
@@ -65,22 +87,26 @@ export async function registerPwa() {
     db.on('blocked', () => {
         toast(t('storage.blocked'), { tone: 'warn' });
     });
-    window.addEventListener('vite:preloadError', (event) => {
-        event.preventDefault();
+    // Files of this build are gone from the server (an update happened): reload once, saved.
+    // (Not prevented: the failed import then rejects and its caller shows a way out.)
+    window.addEventListener('vite:preloadError', () => {
         void recoverFromStaleBuild();
     });
     if (!import.meta.env.DEV && 'serviceWorker' in navigator) {
-        let controlled = Boolean(navigator.serviceWorker.controller);
+        // Only the very first install may take over this page silently; any later switch of the
+        // controlling worker means another tab applied an update (also for a hard-reloaded page).
+        const before = await navigator.serviceWorker.getRegistration().catch(() => undefined);
+        let firstInstall = !before?.active;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!controlled) {
-                // First install takes control of this page; nothing changed for it.
-                controlled = true;
+            if (applying) {
+                void finishReload();
                 return;
             }
-            if (!applying) {
-                // Another tab switched to a new version; this page still runs the old code.
-                usePwa.setState({ status: 'reload' });
+            if (firstInstall) {
+                firstInstall = false;
+                return;
             }
+            usePwa.setState({ status: 'reload' });
         });
         try {
             const { registerSW } = await import('virtual:pwa-register');
@@ -88,6 +114,13 @@ export async function registerPwa() {
                 immediate: true,
                 onNeedRefresh() {
                     markReady();
+                },
+                // Without this, the plugin reloads every tab the moment any tab applies the update —
+                // unsaved and unguarded. This page reloads itself only through applyUpdate().
+                onNeedReload() {
+                    if (!applying) {
+                        usePwa.setState({ status: 'reload' });
+                    }
                 },
                 onOfflineReady() {
                     usePwa.setState({ offlineReady: true });
@@ -130,7 +163,12 @@ function scheduleChecks() {
             void checkForUpdate();
         }
     };
-    window.addEventListener('online', again);
+    window.addEventListener('online', () => {
+        if (usePwa.getState().status === 'offline') {
+            usePwa.setState({ status: 'idle' });
+        }
+        again();
+    });
     document.addEventListener('visibilitychange', again);
 }
 
@@ -156,23 +194,33 @@ async function serverBuild(): Promise<BuildInfo | null> {
     }
 }
 
-/**
- * Ask the server for its build. Background checks stay quiet and only download a new version
- * where large downloads are allowed (data saver); a manual check always reports and downloads.
- */
-export function checkForUpdate(manual = false): Promise<void> {
-    if (manual && !checking && !busy()) {
-        usePwa.setState({ status: navigator.onLine ? 'checking' : 'offline' });
-    }
-    checking ??= runCheck(manual).finally(() => {
-        checking = null;
-    });
-    return checking;
+/** Whether a service worker can download the update in the background (else applying reloads from the server). */
+export function canDownload(): boolean {
+    return Boolean(registration);
 }
 
 function busy(): boolean {
     const status = usePwa.getState().status;
     return status === 'downloading' || status === 'ready' || status === 'applying' || status === 'reload';
+}
+
+/**
+ * Ask the server for its build. Background checks stay quiet and download a newer version only
+ * where large downloads are allowed (data saver); a manual check always reports and downloads.
+ * An older build on the server (rollback) is only reported.
+ */
+export function checkForUpdate(manual = false): Promise<void> {
+    if (checking) {
+        // A manual check during a background one: report on the next round, as a manual check.
+        return manual ? checking.then(() => checkForUpdate(true)) : checking;
+    }
+    if (manual && !busy()) {
+        usePwa.setState({ status: navigator.onLine ? 'checking' : 'offline' });
+    }
+    checking = runCheck(manual).finally(() => {
+        checking = null;
+    });
+    return checking;
 }
 
 async function runCheck(manual: boolean) {
@@ -186,22 +234,24 @@ async function runCheck(manual: boolean) {
     usePwa.setState({ lastCheck: Date.now() });
     if (busy()) {
         if (remote && !sameBuild(remote, BUILD)) {
-            usePwa.setState({ available: remote });
+            usePwa.setState({ available: remote, older: compareVersions(remote.version, APP_VERSION) < 0 });
         }
         return;
     }
     if (!remote) {
-        if (manual || usePwa.getState().status === 'checking') {
+        const status = usePwa.getState().status;
+        if (manual || status === 'checking' || status === 'offline' || status === 'failed') {
             usePwa.setState({ status: navigator.onLine ? 'failed' : 'offline' });
         }
         return;
     }
     if (sameBuild(remote, BUILD)) {
-        usePwa.setState({ status: 'current', available: null });
+        usePwa.setState({ status: 'current', available: null, older: false });
         return;
     }
-    usePwa.setState({ available: remote, status: 'available' });
-    if (registration && (manual || mayAutoDownload())) {
+    const older = compareVersions(remote.version, APP_VERSION) < 0;
+    usePwa.setState({ available: remote, older, status: 'available' });
+    if (registration && !older && (manual || mayAutoDownload())) {
         await download();
     }
 }
@@ -211,7 +261,7 @@ function markReady() {
     if (!usePwa.getState().available) {
         void serverBuild().then((remote) => {
             if (remote && !sameBuild(remote, BUILD)) {
-                usePwa.setState({ available: remote });
+                usePwa.setState({ available: remote, older: compareVersions(remote.version, APP_VERSION) < 0 });
             }
         });
     }
@@ -219,7 +269,7 @@ function markReady() {
 
 /** Resolves when a new worker is installed (true) or was thrown away (false). */
 function watchInstall(worker: ServiceWorker): Promise<boolean> {
-    if (usePwa.getState().status !== 'ready') {
+    if (!busy()) {
         usePwa.setState({ status: 'downloading' });
     }
     return new Promise((resolve) => {
@@ -266,92 +316,122 @@ async function download(): Promise<boolean> {
 }
 
 /**
- * Switch to the new version: blockers first (e.g. a running path recording), then every unsaved
- * edit is written, then the page reloads into the new version and reopens the plan it showed.
+ * The update button. Not downloaded yet: download only (a second tap applies, so the page never
+ * reloads minutes after a tap). Ready (or another tab already switched): blockers first (a running
+ * path recording, an unfinished drawing), then every edit is saved, edits freeze, and the page
+ * reloads into the new version and reopens the same plan in the same mode and privacy view.
  */
-export async function applyUpdate(): Promise<boolean> {
+export function applyUpdate(): Promise<boolean> {
+    applyRun ??= runApply().finally(() => {
+        applyRun = null;
+    });
+    return applyRun;
+}
+
+async function runApply(): Promise<boolean> {
     const status = usePwa.getState().status;
     if (applying || status === 'downloading' || status === 'applying') {
         return false;
     }
-    for (const guard of guards) {
-        const reason = await guard();
-        if (reason) {
-            toast(reason, { tone: 'warn' });
-            return false;
-        }
-    }
-    if (status !== 'reload' && registration && !registration.waiting) {
+    if (status === 'available' && registration) {
         if (!(await download())) {
             toast(t(navigator.onLine ? 'update.failed' : 'update.offline'), { tone: 'warn' });
-            return false;
         }
-        // Downloading took a while: check the blockers and save again before switching.
-        return applyUpdate();
+        return false;
+    }
+    const reason = await blocker();
+    if (reason) {
+        toast(reason, { tone: 'warn' });
+        return false;
     }
     if (!(await flushNow())) {
         toast(t('update.saveFailed'), { tone: 'danger' });
         return false;
     }
     applying = true;
+    freezeLocalEdits();
     usePwa.setState({ status: 'applying' });
     rememberResume();
     const waiting = status === 'reload' ? null : registration?.waiting;
     if (waiting) {
-        navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
         waiting.postMessage({ type: 'SKIP_WAITING' });
         // Should the switch not be reported (some browsers), reload anyway: the new worker is then active or still waiting.
-        window.setTimeout(() => window.location.reload(), 10000);
+        window.setTimeout(() => void finishReload(), 10000);
     } else {
-        window.location.reload();
+        void finishReload();
     }
     return true;
 }
 
+let reloading = false;
+
+/** Last writes (live queue, a remote change saved since), then the reload. Blocking messages no longer apply. */
+async function finishReload() {
+    if (reloading) {
+        return;
+    }
+    reloading = true;
+    for (const guard of guards) {
+        await Promise.resolve().then(guard).catch(() => null);
+    }
+    await flushNow().catch(() => false);
+    window.location.reload();
+}
+
 /**
  * This page runs an older build than the server (files of the old version are gone): save, then
- * reload once into the current version. A second failure within a minute is reported instead.
+ * reload once into the current version. A second failure within a minute, or a blocker (e.g. a
+ * running recording), leaves the choice to the user (status `reload`).
  */
-export async function recoverFromStaleBuild(): Promise<void> {
+export function recoverFromStaleBuild(): Promise<void> {
+    recovering ??= runRecover();
+    return recovering;
+}
+
+async function runRecover() {
     if (applying) {
         return;
     }
     let recent = false;
     try {
         recent = Date.now() - Number(sessionStorage.getItem(RECOVER_KEY) ?? 0) < 60000;
-        sessionStorage.setItem(RECOVER_KEY, String(Date.now()));
     } catch {
         recent = true;
     }
-    if (recent) {
-        usePwa.setState({ status: 'reload' });
-        toast(t('update.reloadNeeded'), { tone: 'warn', action: { label: t('update.reload'), run: () => void applyUpdate() } });
+    usePwa.setState({ status: 'reload' });
+    const reason = recent ? null : await blocker();
+    if (recent || reason || !(await flushNow())) {
+        toast(reason ?? t('update.reloadNeeded'), { tone: 'warn', action: { label: t('update.reload'), run: () => void applyUpdate() } });
+        recovering = null;
         return;
     }
-    if (!(await flushNow())) {
-        usePwa.setState({ status: 'reload' });
-        toast(t('update.saveFailed'), { tone: 'danger' });
-        return;
+    try {
+        sessionStorage.setItem(RECOVER_KEY, String(Date.now()));
+    } catch {
+        // Without storage a second failure is simply reported again.
     }
     applying = true;
+    freezeLocalEdits();
     rememberResume();
-    window.location.reload();
+    await finishReload();
 }
 
-type Resume = { projectId: string; mode: Mode };
+type Streamer = ReturnType<typeof useUi.getState>['streamer'];
+type Resume = { projectId: string; mode: Mode; streamer: Streamer };
 
 function rememberResume() {
     const project = useProject.getState().project;
+    const ui = useUi.getState();
     try {
         if (project) {
-            sessionStorage.setItem(RESUME_KEY, JSON.stringify({ projectId: project.id, mode: useUi.getState().mode, at: Date.now() }));
+            sessionStorage.setItem(RESUME_KEY, JSON.stringify({ projectId: project.id, mode: ui.mode, streamer: ui.streamer, at: Date.now() }));
         }
     } catch {
         // Without storage the app starts in the library after the update.
     }
 }
 
-/** The plan (and mode) that was open when the page reloaded into a new version, once. */
+/** The plan, mode and Streamer Safe profile that were open when the page reloaded into a new version, once. */
 export function takeResume(): Resume | null {
     try {
         const raw = sessionStorage.getItem(RESUME_KEY);
@@ -361,13 +441,14 @@ export function takeResume(): Resume | null {
             return null;
         }
         const mode: Mode = value.mode === 'field' || value.mode === 'briefing' ? value.mode : 'plan';
-        return { projectId: value.projectId, mode };
+        const streamer: Streamer = value.streamer === 'field' || value.streamer === 'public' ? value.streamer : 'off';
+        return { projectId: value.projectId, mode, streamer };
     } catch {
         return null;
     }
 }
 
-/** After an update: say so once, with a way to see what changed. */
+/** After an update (or a switch back to an older version): say so once, with a way to see what changed. */
 function announceUpdate() {
     let last: string | null = null;
     try {
@@ -377,6 +458,7 @@ function announceUpdate() {
         return;
     }
     if (last && last !== APP_VERSION) {
-        toast(t('update.done', { v: APP_VERSION }), { tone: 'ok', action: { label: t('update.whatsNew'), run: () => showDialog('whatsNew') } });
+        const older = compareVersions(APP_VERSION, last) < 0;
+        toast(t(older ? 'update.switched' : 'update.done', { v: APP_VERSION }), { tone: older ? 'warn' : 'ok', action: { label: t('update.whatsNew'), run: () => showDialog('whatsNew') } });
     }
 }

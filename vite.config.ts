@@ -43,17 +43,20 @@ const versionFile: Plugin = {
     },
 };
 
-/** Ship CREDITS.md with the app (offline credits dialog links to it); served in dev too. */
+/** Ship CREDITS.md and CHANGELOG.md with the app (offline dialogs link to them); served in dev too. */
 const shipCredits: Plugin = {
     name: 'as-tac-credits',
     configureServer(server) {
-        server.middlewares.use('/licenses/CREDITS.md', (_req, res) => {
-            res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-            res.end(readFileSync('CREDITS.md', 'utf8'));
-        });
+        for (const file of ['CREDITS.md', 'CHANGELOG.md']) {
+            server.middlewares.use(`/licenses/${file}`, (_req, res) => {
+                res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+                res.end(readFileSync(file, 'utf8'));
+            });
+        }
     },
     generateBundle() {
         this.emitFile({ type: 'asset', fileName: 'licenses/CREDITS.md', source: readFileSync('CREDITS.md', 'utf8') });
+        this.emitFile({ type: 'asset', fileName: 'licenses/CHANGELOG.md', source: readFileSync('CHANGELOG.md', 'utf8') });
     },
 };
 

@@ -140,6 +140,64 @@
     max-width: 65ch;
 }
 
+/* Saving and reloading into a new version: covers everything, nothing can change any more. */
+.updating {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-tooltip);
+    display: grid;
+    place-items: center;
+    padding: var(--sp-4);
+    background: color-mix(in oklch, var(--bg) 70%, transparent);
+}
+
+.updating__card {
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-3);
+    max-width: 34ch;
+    padding: var(--sp-6);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    color: var(--ink);
+    text-align: center;
+    box-shadow: var(--shadow-2);
+}
+
+.updating__card p {
+    margin: 0;
+}
+
+.stale-build {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    text-align: center;
+}
+
+.stale-build p {
+    max-width: 40ch;
+    margin: 0;
+}
+
+.icon-btn.update-dot.is-busy::after {
+    animation: update-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes update-pulse {
+    50% {
+        opacity: 0.25;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .icon-btn.update-dot.is-busy::after {
+        animation: none;
+    }
+}
+
 /* Waiting update in the plan view: the icon carries a dot in the accent colour. */
 .icon-btn.update-dot {
     position: relative;

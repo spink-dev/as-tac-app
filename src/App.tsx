@@ -12,16 +12,17 @@ import { showDialog } from './core/store/dialogs';
 import { decodePlanLink, JOIN_PREFIX, LINK_PREFIX } from './core/files/link';
 import { pruneBackups, startAutosave } from './core/storage/projects';
 import { recoverFromStaleBuild, registerPwa, takeResume } from './core/pwa';
-import { WhatsNewDialog } from './features/update/Update';
+import { StaleBuild, UpdatingOverlay, WhatsNewDialog } from './features/update/Update';
 import { onMutationRejected } from './core/store/project';
-import { toast, useUi } from './core/store/ui';
+import { toast } from './core/store/ui';
 import { t } from './i18n';
 
-// A page from an older build may find its files gone after an update: reload into the current one.
+// A page from an older build may find its files gone after an update: reload into the current one
+// (saved), or, if that already failed once, offer the reload instead of an endless loading screen.
 const Workspace = lazy(() => import('./features/workspace/Workspace').then((module) => ({ default: module.Workspace })).catch((error: unknown) => {
     console.warn('workspace chunk failed to load', error);
     void recoverFromStaleBuild();
-    return new Promise<never>(() => undefined);
+    return { default: StaleBuild };
 }));
 
 type LaunchParams = { files: { getFile: () => Promise<File> }[] };
@@ -86,19 +87,19 @@ async function receiveLink() {
     }
 }
 
-/** After reloading into a new version: reopen the plan that was open, in the same mode. */
+/** After reloading into a new version: reopen the plan that was open, in the same mode and privacy view. */
 function resumeAfterUpdate() {
     const resume = takeResume();
     if (!resume) {
         return;
     }
-    void openProject(resume.projectId).then(() => {
-        if (resume.mode === 'field') {
-            useUi.getState().set({ mode: 'field', tool: 'select', panel: null, sheet: 'closed' });
-        } else if (resume.mode === 'briefing') {
-            useUi.getState().set({ mode: 'briefing', tool: 'select', phaseIndex: 0, selection: [], panel: null, sheet: 'closed' });
-        }
-    }).catch((error: unknown) => console.warn('could not reopen the plan after the update', error));
+    const session = resume.mode === 'field'
+        ? { mode: 'field' as const, tool: 'select' as const, panel: null, sheet: 'closed' as const }
+        : resume.mode === 'briefing'
+            ? { mode: 'briefing' as const, tool: 'select' as const, phaseIndex: 0, selection: [], panel: null, sheet: 'closed' as const }
+            : {};
+    void openProject(resume.projectId, false, { ...session, streamer: resume.streamer })
+        .catch((error: unknown) => console.warn('could not reopen the plan after the update', error));
 }
 
 export function App() {
@@ -141,6 +142,7 @@ export function App() {
             <JoinDialog />
             <CreditsDialog />
             <WhatsNewDialog />
+            <UpdatingOverlay />
             <Toasts />
         </>
     );

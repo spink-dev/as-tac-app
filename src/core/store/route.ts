@@ -11,14 +11,21 @@ export type Route = { name: 'library' } | { name: 'workspace'; projectId: string
 
 export const useRoute = create<{ route: Route }>(() => ({ route: { name: 'library' } }));
 
-export async function openProject(id: string, readOnly: false | 'viewer' | 'copy' = false): Promise<void> {
+type SessionPatch = Partial<Pick<ReturnType<typeof useUi.getState>, 'mode' | 'tool' | 'panel' | 'sheet' | 'streamer' | 'phaseIndex' | 'selection'>>;
+
+/** `session`: UI state to start with (e.g. the mode and Streamer Safe profile kept across an update). */
+export async function openProject(id: string, readOnly: false | 'viewer' | 'copy' = false, session?: SessionPatch): Promise<void> {
     const project = await loadProject(id);
-    showProject(project, readOnly);
+    showProject(project, readOnly, session);
 }
 
-export function showProject(project: Project, readOnly: false | 'viewer' | 'copy' = false) {
+export function showProject(project: Project, readOnly: false | 'viewer' | 'copy' = false, session?: SessionPatch) {
     resetSaveState();
     useUi.getState().resetSession();
+    if (session) {
+        // Before the plan renders: a privacy view must never show the plan for even one frame.
+        useUi.getState().set(session);
+    }
     useProject.getState().load(project, readOnly);
     useRoute.setState({ route: { name: 'workspace', projectId: project.id } });
     void kvSet('lastProject', project.id);

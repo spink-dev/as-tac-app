@@ -4,7 +4,7 @@
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 const require = createRequire(import.meta.url);
@@ -36,8 +36,9 @@ function build(version, commit) {
     return dir;
 }
 const current = JSON.parse(readFileSync('package.json', 'utf8')).version;
-const distA = process.env.UPDATE_DIST_A ?? build(current, 'e2e-a');
-const distB = process.env.UPDATE_DIST_B ?? build(NEXT, 'e2e-b');
+const built = [];
+const distA = process.env.UPDATE_DIST_A ?? built[built.push(build(current, 'e2e-a')) - 1];
+const distB = process.env.UPDATE_DIST_B ?? built[built.push(build(NEXT, 'e2e-b')) - 1];
 
 // Static server like docker/nginx.conf: hashed assets immutable, everything else revalidated, SPA fallback.
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.md': 'text/markdown', '.pbf': 'application/x-protobuf', '.geojson': 'application/geo+json' };
@@ -97,6 +98,13 @@ await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.6);
 await page.waitForTimeout(300);
 const marked = (await page.evaluate(() => window.__asTacCounts())).elements;
 check('marker-added', marked === before + 1, `${before} → ${marked}`);
+// Streamer Safe on: a privacy view that must survive the update (the plan must never show on stream).
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })));
+await page.waitForFunction(() => document.activeElement?.closest('.palette'));
+await page.keyboard.type('Streamer');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+check('streamer-on-before', (await page.locator('.topbar .badge--warn').textContent().catch(() => ''))?.includes('Streamer'));
 await page.getByTestId('mode-field').click();
 
 // Tab 2: the start screen of version A.
@@ -106,6 +114,9 @@ await other.goto(base);
 await other.getByTestId('new-plan').waitFor();
 
 // The server now has version B.
+await other.evaluate(() => {
+    window.__notReloaded = true;
+});
 root = distB;
 // Field mode keeps panels closed: the check runs in the start-screen tab; the plan tab learns of the
 // installed version from the shared service worker registration.
@@ -123,6 +134,7 @@ await page.waitForSelector('.maplibregl-canvas', { timeout: 60000 });
 await page.waitForTimeout(1500);
 check('same-plan-reopened', (await page.evaluate(() => window.__asTacCounts())).elements === marked);
 check('field-mode-kept', (await page.getByTestId('mode-field').getAttribute('aria-pressed')) === 'true');
+check('streamer-kept', (await page.locator('.topbar .badge--warn').textContent().catch(() => ''))?.includes('Streamer') && (await page.locator('.topbar__name').textContent()) === 'AS-TAC');
 const toast = await page.getByText(`Aktualisiert auf Version ${NEXT}`).waitFor({ timeout: 10000 }).then(() => true, () => false);
 check('update-announced', toast);
 check('runs-b', (await page.evaluate(async () => (await (await fetch('/version.json', { cache: 'no-store' })).json()).commit)) === 'e2e-b');
@@ -132,6 +144,7 @@ check('b-version-shown', (await page.getByTestId('app-version').textContent())?.
 await page.screenshot({ path: `${out}/update-done.png` });
 
 // Tab 2 still runs version A: it must say so and reload on request.
+check('other-tab-not-force-reloaded', (await other.evaluate(() => window.__notReloaded === true)));
 const told = await other.getByTestId('update-banner').filter({ hasText: /anderen Fenster/ }).waitFor({ timeout: 20000 }).then(() => true, () => false);
 check('other-tab-told', told, await other.getByTestId('update-banner').textContent().catch(() => 'no banner'));
 await Promise.all([other.waitForEvent('load', { timeout: 30000 }), other.getByTestId('update-banner').getByTestId('update-apply').click()]);
@@ -140,6 +153,9 @@ check('other-tab-on-b', (await other.getByTestId('app-version').textContent())?.
 
 await browser.close();
 server.close();
+for (const dir of built) {
+    rmSync(dir, { recursive: true, force: true });
+}
 console.log(JSON.stringify(results, null, 1));
 console.log(errors.length ? errors.join('\n') : 'no page errors');
 process.exitCode = errors.length ? 1 : 0;
