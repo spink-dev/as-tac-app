@@ -4,6 +4,7 @@ import { useRoute } from './core/store/route';
 import { Library } from './features/library/Library';
 import { NewPlanDialog } from './features/library/NewPlanDialog';
 import { AreaDownloadDialog } from './features/areas/AreaDownloadDialog';
+import { ShortcutsDialog } from './features/workspace/ShortcutsDialog';
 import { startAutosave } from './core/storage/projects';
 import { registerPwa } from './core/pwa';
 
@@ -29,6 +30,7 @@ export function App() {
             )}
             <NewPlanDialog />
             <AreaDownloadDialog />
+            <ShortcutsDialog />
             <Toasts />
         </>
     );

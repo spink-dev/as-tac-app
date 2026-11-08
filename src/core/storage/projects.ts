@@ -62,9 +62,22 @@ export async function duplicateStored(id: string, name: string): Promise<Project
 
 let timer = 0;
 let pending: Project | null = null;
+let inflight: Promise<boolean> | null = null;
+
+/** Serialise writes so a close waits for (and learns the result of) a write already running. */
+function flush(): Promise<boolean> {
+    const run = (inflight ?? Promise.resolve(true)).then(() => write());
+    inflight = run.finally(() => {
+        if (inflight === tracked) {
+            inflight = null;
+        }
+    });
+    const tracked = inflight;
+    return run;
+}
 
 /** Returns false when the write failed; the unsaved project stays pending for a retry. */
-async function flush(): Promise<boolean> {
+async function write(): Promise<boolean> {
     const project = pending;
     pending = null;
     if (!project) {

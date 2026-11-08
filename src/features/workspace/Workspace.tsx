@@ -5,6 +5,8 @@ import { TopBar } from './TopBar';
 import { MapHud, Readout } from './MapHud';
 import { ContextBar, DraftBar, HintBar, ToolRail } from './Tools';
 import { useShortcuts } from './useShortcuts';
+import { PanelHost } from '../panels/Panel';
+import { CommandPalette } from './CommandPalette';
 
 export function Workspace() {
     const mode = useUi((state) => state.mode);
@@ -23,6 +25,8 @@ export function Workspace() {
                 <ContextBar />
             </div>
             {streamer === 'off' ? <Readout /> : null}
+            <PanelHost />
+            <CommandPalette />
             <div className="attribution">© OpenStreetMap</div>
         </div>
     );
