@@ -13,7 +13,8 @@ export function connectionInfo(): NetworkInformation | undefined {
 
 /**
  * Whether large pictures (image maps, logos) may be downloaded without asking. «Nur WLAN» needs
- * a device that reports its connection type; where it doesn't (iPhone), it acts like «Manuell».
+ * a device that reports its connection type (Android, ChromeOS); everywhere else (iPhone,
+ * desktop browsers) it acts like «Manuell».
  * In «Automatisch», the browser's data-saver signal is respected.
  */
 export function mayAutoDownload(): boolean {

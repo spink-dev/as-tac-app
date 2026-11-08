@@ -62,6 +62,12 @@ export function SettingsPanel() {
                     <Segmented block value={prefs.coordFormat} onChange={(coordFormat) => prefs.set({ coordFormat })} options={[{ value: 'mgrs', label: 'MGRS' }, { value: 'latlng', label: 'WGS84' }]} />
                 </Field>
                 <Switch checked={prefs.redMapFilter} onChange={(redMapFilter) => prefs.set({ redMapFilter })}>{t('settings.redFilter')}</Switch>
+                <Field label={t('settings.media')}>
+                    <Segmented block value={prefs.mediaDownload} onChange={(mediaDownload) => prefs.set({ mediaDownload })} options={[
+                        { value: 'auto', label: t('settings.mediaAuto') }, { value: 'wifi', label: t('settings.mediaWifi') }, { value: 'manual', label: t('settings.mediaManual') },
+                    ]} />
+                    <span className="field__hint">{t('settings.mediaHint')}</span>
+                </Field>
                 <Field label={t('live.displayName')}>
                     <input className="input" value={prefs.displayName} maxLength={40} onChange={(event) => prefs.set({ displayName: event.target.value })} />
                 </Field>

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Copy, LogIn, Radio, Send, Unplug, UserPlus } from 'lucide-react';
-import { useT } from '../../i18n';
+import { Copy, Download, LogIn, Radio, Send, Unplug, UserPlus } from 'lucide-react';
+import { formatBytes, useT } from '../../i18n';
 import { useLive } from '../../core/live/state';
 import { usePrefs } from '../../core/store/prefs';
 import { useProject } from '../../core/store/project';
 import { toast, useUi } from '../../core/store/ui';
 import { Button, Empty, Field, Segmented } from '../../ui/components';
-import { createInvite, goLive, myClientId, resolveConflict, sendChat, unlinkLive } from '../../core/live/session';
+import { createInvite, goLive, loadPictures, myClientId, resolveConflict, sendChat, unlinkLive } from '../../core/live/session';
 import { currentUser, sendMagicLink, signInDevice, supabaseConfigured } from '../../core/live/supabase';
 import { registerPanel } from '../panels/registry';
 import { QrSvg, appBaseUrl } from '../share/SharePanel';
@@ -161,6 +161,31 @@ function Chat() {
     );
 }
 
+/** Pictures waiting (data saver, or still on their way) and pictures moving right now. */
+function Pictures() {
+    const t = useT();
+    const missing = useLive((state) => state.missing);
+    const transfers = useLive((state) => state.transfers);
+    const moving = Object.values(transfers);
+    if (missing.length === 0 && moving.length === 0) {
+        return null;
+    }
+    const percent = (done: number, total: number | null) => (total ? `${Math.round((done / total) * 100)} %` : formatBytes(done));
+    return (
+        <section className="section" data-testid="live-pictures">
+            {moving.map((transfer, i) => (
+                <p key={i} className="field__hint num">{transfer.dir === 'up' ? t('live.uploading', { p: percent(transfer.done, transfer.total) }) : t('live.downloading', { p: percent(transfer.done, transfer.total) })}</p>
+            ))}
+            {missing.length > 0 ? (
+                <div className="notice">
+                    <p>{t('live.picturesMissing', { n: missing.length })}</p>
+                    <Button small onClick={() => loadPictures()} disabled={moving.some((transfer) => transfer.dir === 'down')} data-testid="load-pictures"><Download size={16} /> {t('live.loadPictures')}</Button>
+                </div>
+            ) : null}
+        </section>
+    );
+}
+
 export function LivePanel() {
     const t = useT();
     const status = useLive((state) => state.status);
@@ -234,6 +259,7 @@ export function LivePanel() {
                     ))}
                 </ul>
             </section>
+            <Pictures />
             {admin ? <Invite /> : <p className="notice">{t('live.viewerLock')}</p>}
             {admin ? <Chat /> : null}
             <p className="field__hint">{t('live.gpsNever')}</p>

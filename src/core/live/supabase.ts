@@ -11,8 +11,30 @@ import { rangeDownload, TUS_PIECE, tusUpload } from './transfer';
 const URL_ = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
+/** A legacy JWT key names its role inside the token: never use a service_role key in a browser. */
+function secretKey(key: string): boolean {
+    if (/service_role|sb_secret/i.test(key)) {
+        return true;
+    }
+    const parts = key.split('.');
+    if (parts.length === 3) {
+        try {
+            const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { role?: unknown };
+            return payload.role === 'service_role';
+        } catch {
+            return false;
+        }
+    }
+    return false;
+}
+
 export function supabaseConfigured(): boolean {
-    return Boolean(URL_ && KEY && !/service_role|sb_secret/i.test(KEY));
+    return Boolean(URL_ && KEY && !secretKey(KEY));
+}
+
+/** Storage says "no such object" (as opposed to: could not ask). */
+function missingObject(error: { message?: string; statusCode?: string | number } | null): boolean {
+    return Boolean(error && (/not.?found|does not exist/i.test(error.message ?? '') || ['400', '404', 400, 404].includes(error.statusCode ?? '')));
 }
 
 let client: Promise<SupabaseClient> | null = null;
@@ -368,21 +390,38 @@ class SupabaseTransport implements LiveTransport {
         }
     }
 
+    async hasAsset(hash: string): Promise<boolean> {
+        const sb = await supabaseClient();
+        // A signed URL is only issued for an existing object: a few hundred bytes instead of an upload.
+        const { data, error } = await sb.storage.from('live-assets').createSignedUrl(`${this.planId}/${hash}`, 60);
+        if (error && !missingObject(error as { message?: string; statusCode?: string })) {
+            throw error;
+        }
+        return !error && Boolean(data?.signedUrl);
+    }
+
     async uploadAsset(hash: string, blob: Blob, options: TransferOptions = {}): Promise<void> {
         const sb = await supabaseClient();
         const path = `${this.planId}/${hash}`;
         if (blob.size > TUS_PIECE) {
             // Large pictures go up resumably: a dropped connection continues at the last 6 MB.
-            const token = (await sb.auth.getSession()).data.session?.access_token;
             await tusUpload({
-                endpoint: `${URL_}/storage/v1/upload/resumable`,
-                headers: { authorization: `Bearer ${token ?? KEY}`, apikey: KEY ?? '', 'x-upsert': 'false' },
+                endpoint: `${URL_!.replace(/\/+$/, '')}/storage/v1/upload/resumable`,
+                // Asked per attempt: a long upload outlives the access token.
+                headers: async () => {
+                    const token = (await sb.auth.getSession()).data.session?.access_token;
+                    if (!token) {
+                        throw new Error('unauthenticated');
+                    }
+                    return { authorization: `Bearer ${token}`, apikey: KEY ?? '', 'x-upsert': 'false' };
+                },
                 bucket: 'live-assets',
                 object: path,
                 contentType: blob.type || 'application/octet-stream',
-            }, blob, options);
+            }, blob, { ...options, fetcher: stallFetch });
             return;
         }
+        options.onProgress?.({ done: 0, total: blob.size });
         const { error } = await sb.storage.from('live-assets').upload(path, blob, { contentType: blob.type, upsert: false });
         if (error && !/exist|duplicate/i.test(error.message)) {
             throw error;
@@ -392,15 +431,20 @@ class SupabaseTransport implements LiveTransport {
 
     async downloadAsset(hash: string, options: TransferOptions = {}): Promise<Blob | null> {
         const sb = await supabaseClient();
-        const { data, error } = await sb.storage.from('live-assets').createSignedUrl(`${this.planId}/${hash}`, 3600);
-        if (error || !data?.signedUrl) {
-            // Not uploaded (yet): try again later.
-            return null;
-        }
+        const path = `${this.planId}/${hash}`;
+        // Asked again when the server refuses an old link (it expired during a slow download).
+        const link = async () => {
+            const { data, error } = await sb.storage.from('live-assets').createSignedUrl(path, 3600);
+            if (error || !data?.signedUrl) {
+                throw missingObject(error as { message?: string; statusCode?: string } | null) ? Object.assign(new Error('missing'), { permanent: true }) : (error ?? new Error('link'));
+            }
+            return data.signedUrl;
+        };
         try {
-            return new Blob([await rangeDownload(data.signedUrl, hash, options)]);
+            return new Blob([await rangeDownload(link, hash, { ...options, fetcher: stallFetch })]);
         } catch (failure) {
-            if ((failure as { permanent?: boolean }).permanent) {
+            if ((failure as { permanent?: boolean }).permanent && /missing|HTTP 40[04]|HTTP 410/.test((failure as Error).message)) {
+                // Not uploaded (yet): try again later.
                 return null;
             }
             throw failure;

@@ -13,6 +13,8 @@ import { pickFile } from '../../core/files/save';
 import { mapRef } from '../../map/MapView';
 import { assetState, assetUrl, onAssetStored } from '../../core/storage/assets';
 import { registerPanel } from '../panels/registry';
+import { useLive } from '../../core/live/state';
+import { loadPictures } from '../../core/live/session';
 import { LIMITS, type ImageOverlay } from '../../core/model/schema';
 import { t as translate } from '../../i18n';
 
@@ -23,6 +25,8 @@ function imageError(error: unknown): string {
 
 function Thumb({ image }: { image: ImageOverlay }) {
     const t = useT();
+    const live = useLive((state) => state.status !== 'off');
+    const transfer = useLive((state) => state.transfers[image.asset]);
     const [state, setState] = useState<{ url: string | null; status: 'loading' | 'ok' | 'missing' | 'unusable' }>({ url: null, status: 'loading' });
     useEffect(() => {
         let alive = true;
@@ -46,6 +50,16 @@ function Thumb({ image }: { image: ImageOverlay }) {
     }
     if (state.url) {
         return <img className="thumb" src={state.url} alt="" />;
+    }
+    if (state.status === 'missing' && live) {
+        // A live partner's picture held back (data saver) or still on its way: load on tap.
+        const percent = transfer?.total ? Math.round((transfer.done / transfer.total) * 100) : null;
+        return (
+            <button type="button" className="thumb thumb--off thumb--load" onClick={() => loadPictures([image.asset])} disabled={Boolean(transfer)}
+                aria-label={transfer ? t('maps.loadingImage', { p: percent ?? '…' }) : t('maps.loadImage')} title={transfer ? undefined : t('maps.loadImage')} data-testid="load-image">
+                {transfer ? <span className="num">{percent !== null ? `${percent} %` : '…'}</span> : <Download size={18} aria-hidden />}
+            </button>
+        );
     }
     const label = state.status === 'missing' ? t('maps.imageMissing') : t('maps.imageUnusable');
     return <span className="thumb thumb--off" role="img" aria-label={label} title={label}><ImageOff size={18} aria-hidden /></span>;

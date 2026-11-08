@@ -88,6 +88,8 @@ export interface LiveTransport {
     sendChat(body: string): Promise<void>;
     /** Resumable where the backend allows; retries over weak links. */
     uploadAsset(hash: string, blob: Blob, options?: TransferOptions): Promise<void>;
+    /** Whether the server already holds this picture (cheap check before an upload). */
+    hasAsset(hash: string, signal?: AbortSignal): Promise<boolean>;
     /** `null` when the server doesn't have it (yet); throws on network trouble. */
     downloadAsset(hash: string, options?: TransferOptions): Promise<Blob | null>;
     close(): void;

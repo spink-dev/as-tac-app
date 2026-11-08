@@ -1,5 +1,6 @@
 import { db, kvGet, kvSet, type LiveLinkRow, type OutboxRow } from '../storage/db';
-import { getAsset, putVerifiedAsset, safeMime, sha256Hex } from '../storage/assets';
+import { getAsset, isRenderableImage, putVerifiedAsset, safeMime, sha256Hex } from '../storage/assets';
+import { mayAutoDownload } from '../net';
 import { flushNow, saveProject } from '../storage/projects';
 import { mutate, onProjectChange, useProject } from '../store/project';
 import { applyOps, diffProjects, entityOf, metaOf, ORDER_ID, type DiffCollection, type EntityOp } from '../store/diff';
@@ -230,7 +231,7 @@ export async function pullAll(transport: LiveTransport, onProgress?: (count: num
             // Smaller pages, and assume bigger rows (long routes, drawings) next time.
             limit = Math.max(1, Math.floor(limit / 2));
             if (message === 'timeout') {
-                bytesPerRow = Math.min(ROW_MAX, bytesPerRow * 2);
+                bytesPerRow = Math.min(ROW_MAX, bytesPerRow * 4);
             }
             await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** failures));
             continue;
@@ -288,6 +289,11 @@ class Session {
     /** Pictures being downloaded, and when a failed one may be tried again. */
     private assetJobs = new Map<string, Promise<void>>();
     private assetRetry = new Map<string, { at: number; wait: number }>();
+    /** Pictures to put on the server, sent one at a time in the background. */
+    private uploadQueue = new Set<string>();
+    private uploading = false;
+    private progressAt = 0;
+    private ownPicturesQueued = false;
     /** The first realtime connect attempt has finished (until then: «connecting»). */
     private connectSettled = false;
     private isolate = false;
@@ -381,11 +387,21 @@ class Session {
         // Back from the background (phone locked, app switched): the link may have died meanwhile.
         const onVisible = () => {
             if (!document.hidden) {
-                this.kick();
+                void this.catchUp();
             }
         };
         document.addEventListener('visibilitychange', onVisible);
         this.stop.push(() => document.removeEventListener('visibilitychange', onVisible));
+        // Switching to automatic downloads, or onto Wi-Fi, fetches what was held back.
+        this.stop.push(usePrefs.subscribe((state, prev) => {
+            if (state.mediaDownload !== prev.mediaDownload) {
+                void this.ensureAssets();
+            }
+        }));
+        const connection = (navigator as Navigator & { connection?: EventTarget }).connection;
+        const onConnection = () => void this.ensureAssets();
+        connection?.addEventListener?.('change', onConnection);
+        this.stop.push(() => connection?.removeEventListener?.('change', onConnection));
         // HTTP does not wait for realtime: a blocked or slow websocket must not delay the data.
         void this.catchUp();
         void this.connect();
@@ -425,7 +441,7 @@ class Session {
                         this.connectSettled = true;
                         this.showStatus();
                         // Back online: fetch what was missed. Dropped: keep fetching over HTTP.
-                        this.kick();
+                        void this.catchUp();
                     },
                 }, { exclude: this.clientId }),
                 new Promise((_, reject) => window.setTimeout(() => reject(new Error('timeout')), 30000)),
@@ -439,7 +455,7 @@ class Session {
                 this.connectRetry = Math.min(this.connectRetry + 1, 6);
                 this.later(() => void this.connect(), 1000 * 2 ** this.connectRetry);
                 // Realtime may be blocked (proxy, flaky websocket) while plain HTTP works.
-                this.kick();
+                void this.catchUp();
             }
             return;
         }
@@ -577,8 +593,9 @@ class Session {
                             continue;
                         }
                         if (error instanceof Error && error.message === 'timeout') {
-                            // Rows are bigger than assumed (long routes, drawings): smaller pages.
-                            this.rowBytes = Math.min(ROW_MAX, this.rowBytes * 2);
+                            // Rows are bigger than assumed (long routes, drawings): smaller pages with
+                            // a longer deadline each (rows ×4, page ÷2: twice the time per request).
+                            this.rowBytes = Math.min(ROW_MAX, this.rowBytes * 4);
                             this.pageSize = Math.max(1, Math.floor(this.pageSize / 2));
                         }
                         throw error;
@@ -624,6 +641,10 @@ class Session {
                 this.retry = 0;
             }
             void this.ensureAssets();
+            if (!this.ownPicturesQueued) {
+                this.ownPicturesQueued = true;
+                this.queueOwnPictures();
+            }
             this.pollTimer = this.later(() => void this.catchUp(), this.realtime ? SAFETY_POLL_MS : POLL_MS);
         } catch (error) {
             console.warn('live: catch-up failed', error);
@@ -638,7 +659,11 @@ class Session {
         }
     }
 
-    /** Something changed (network back, realtime resumed, app visible): fetch now. */
+    /**
+     * The device got a new network connection: a request on the old one is dead, so it is
+     * restarted at once. Everything else (realtime flapping, app back in front) only asks for
+     * another pass — a slow pull that is still receiving data must never be thrown away.
+     */
     private kick() {
         if (this.pullRestart) {
             this.pullRestart.abort();
@@ -748,7 +773,8 @@ class Session {
         try {
             while (this.pending.size > 0 && !this.closed) {
                 batch = this.nextBatch();
-                await this.uploadAssets(batch);
+                // Pictures go up in the background: plan edits never wait behind a large upload.
+                this.queueUploads(batch);
                 const sent = new Map(batch.map((row) => [keyOf(row.collection, row.entityId), row]));
                 sent.forEach((row, key) => this.inflight.set(key, row));
                 const ops = batch.map((row) => ({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: row.data, base: row.base }));
@@ -921,39 +947,149 @@ class Session {
         toast(t('live.conflict', { name: item.label }), { tone: 'warn', action: { label: t('live.conflictOpen'), run: () => useUi.getState().set({ panel: 'live', sheet: 'half' }) } });
     }
 
-    private async uploadAssets(rows: OutboxRow[]) {
-        if (this.transport.kind !== 'supabase') {
+    /** Pictures referenced by these rows (image maps, team logos) go into the upload queue. */
+    private queueUploads(rows: OutboxRow[]) {
+        if (this.role === 'viewer') {
             return;
         }
         for (const row of rows) {
             const data = row.data as { asset?: string; logoAsset?: string } | null;
             const hash = row.collection === 'images' ? data?.asset : row.collection === 'teams' ? data?.logoAsset : undefined;
             if (hash && !this.uploaded.has(hash)) {
-                const asset = await getAsset(hash);
-                // Only real images go to the shared bucket (passive types only).
-                if (asset && asset.mime.startsWith('image/')) {
-                    await this.transport.uploadAsset(hash, asset.blob);
-                }
-                this.uploaded.add(hash);
+                this.uploadQueue.add(hash);
             }
+        }
+        void this.runUploads();
+    }
+
+    /** Make sure the server has every picture this device holds for the plan (e.g. after a reload). */
+    private queueOwnPictures() {
+        const project = useProject.getState().project;
+        if (!project || project.id !== this.link.projectId || this.role === 'viewer') {
+            return;
+        }
+        for (const hash of [...project.images.map((image) => image.asset), ...project.teams.map((team) => team.logoAsset)]) {
+            if (hash && !this.uploaded.has(hash)) {
+                this.uploadQueue.add(hash);
+            }
+        }
+        void this.runUploads();
+    }
+
+    /** One upload at a time (a weak uplink is shared), resumable, retried later on failure. */
+    private async runUploads() {
+        if (this.uploading || this.closed) {
+            return;
+        }
+        this.uploading = true;
+        try {
+            for (const hash of [...this.uploadQueue]) {
+                if (this.closed) {
+                    return;
+                }
+                this.uploadQueue.delete(hash);
+                const asset = await getAsset(hash);
+                // Only real images go to the shared bucket (passive types only); a missing one can't.
+                if (!asset || !isRenderableImage(asset)) {
+                    continue;
+                }
+                try {
+                    if (!(await this.transport.hasAsset(hash, this.life.signal))) {
+                        this.showTransfer(hash, 'up', { done: 0, total: asset.blob.size });
+                        await this.transport.uploadAsset(hash, asset.blob, { signal: this.life.signal, onProgress: (p) => this.showTransfer(hash, 'up', p) });
+                    }
+                    this.uploaded.add(hash);
+                } catch (error) {
+                    if (this.closed) {
+                        return;
+                    }
+                    console.warn('live: picture upload failed, retrying later', error);
+                    const retry = this.assetRetry.get(`up:${hash}`);
+                    const wait = Math.min((retry?.wait ?? 15000) * 2, 15 * 60 * 1000);
+                    this.assetRetry.set(`up:${hash}`, { at: Date.now() + wait, wait });
+                    this.later(() => {
+                        this.uploadQueue.add(hash);
+                        void this.runUploads();
+                    }, wait);
+                } finally {
+                    this.showTransfer(hash, 'up', null);
+                }
+            }
+        } finally {
+            this.uploading = false;
+        }
+        if (this.uploadQueue.size > 0) {
+            void this.runUploads();
         }
     }
 
-    /** Fetch image maps and logos this device doesn't have yet (join, reconnect, new images). */
-    private async ensureAssets() {
-        const project = useProject.getState().project;
-        if (!project || project.id !== this.link.projectId) {
+    /** Transfer progress for the UI (at most four updates a second). */
+    private showTransfer(hash: string, dir: 'up' | 'down', progress: { done: number; total: number | null } | null) {
+        const transfers = { ...useLive.getState().transfers };
+        if (!progress) {
+            delete transfers[hash];
+            useLive.setState({ transfers });
             return;
         }
+        const now = Date.now();
+        if (now - this.progressAt < 250 && transfers[hash] && progress.done !== progress.total) {
+            return;
+        }
+        this.progressAt = now;
+        transfers[hash] = { dir, done: progress.done, total: progress.total };
+        useLive.setState({ transfers });
+    }
+
+    /** Pictures of the open plan that this device doesn't have. */
+    private async missingPictures(): Promise<{ hash: string; mime: string | undefined }[]> {
+        const project = useProject.getState().project;
+        if (!project || project.id !== this.link.projectId) {
+            return [];
+        }
         const wanted = [
-            ...project.images.map((image) => ({ hash: image.asset, mime: image.mime })),
+            ...project.images.map((image) => ({ hash: image.asset, mime: image.mime as string | undefined })),
             ...project.teams.filter((team) => team.logoAsset).map((team) => ({ hash: team.logoAsset!, mime: undefined })),
         ];
-        for (const { hash, mime } of wanted) {
+        const missing: { hash: string; mime: string | undefined }[] = [];
+        for (const item of wanted) {
+            if (!missing.some((m) => m.hash === item.hash) && !(await getAsset(item.hash))) {
+                missing.push(item);
+            }
+        }
+        return missing;
+    }
+
+    /**
+     * Fetch image maps and logos this device doesn't have yet — automatically only when the
+     * «Bildkarten laden» setting and the connection allow it; otherwise they wait for a tap.
+     */
+    private async ensureAssets(force = false) {
+        const missing = await this.missingPictures();
+        if (this.closed) {
+            return;
+        }
+        useLive.setState({ missing: missing.map((m) => m.hash) });
+        if (!force && !mayAutoDownload()) {
+            return;
+        }
+        for (const { hash, mime } of missing) {
             if (this.closed) {
                 return;
             }
-            await this.ensureAsset(hash, mime);
+            await this.ensureAsset(hash, mime, force);
+        }
+    }
+
+    /** Download pictures now, regardless of the data-saver setting (the user asked for them). */
+    loadPictures(hashes?: string[]) {
+        if (!hashes) {
+            void this.ensureAssets(true);
+            return;
+        }
+        for (const hash of hashes) {
+            const project = useProject.getState().project;
+            const mime = project?.images.find((image) => image.asset === hash)?.mime;
+            void this.ensureAsset(hash, mime, true);
         }
     }
 
@@ -961,7 +1097,7 @@ class Session {
      * Fetch one picture. Never twice at the same time (polls would otherwise start parallel
      * copies that share — and starve — a weak link), and a failed one waits before the next try.
      */
-    private ensureAsset(hash: string | undefined, mime: string | undefined): Promise<void> {
+    private ensureAsset(hash: string | undefined, mime: string | undefined, force = false): Promise<void> {
         if (!hash) {
             return Promise.resolve();
         }
@@ -970,7 +1106,7 @@ class Session {
             return running;
         }
         const retry = this.assetRetry.get(hash);
-        if (retry && retry.at > Date.now()) {
+        if (!force && retry && retry.at > Date.now()) {
             return Promise.resolve();
         }
         const job = (async () => {
@@ -978,10 +1114,14 @@ class Session {
                 return;
             }
             let blob: Blob | null = null;
+            // Visible from the start: the first piece can take a while on a weak link.
+            this.showTransfer(hash, 'down', { done: 0, total: null });
             try {
-                blob = await this.transport.downloadAsset(hash, { signal: this.life.signal });
+                blob = await this.transport.downloadAsset(hash, { signal: this.life.signal, onProgress: (p) => this.showTransfer(hash, 'down', p) });
             } catch {
                 blob = null;
+            } finally {
+                this.showTransfer(hash, 'down', null);
             }
             if (this.closed) {
                 return;
@@ -991,11 +1131,17 @@ class Session {
             if (bytes && (await sha256Hex(bytes)) === hash) {
                 this.assetRetry.delete(hash);
                 await putVerifiedAsset(hash, bytes, safeMime(mime ?? blob?.type));
+                useLive.setState({ missing: useLive.getState().missing.filter((m) => m !== hash) });
                 renderPlan();
                 return;
             }
+            if (bytes || (blob && blob.size > 40 * 1024 * 1024)) {
+                // It arrived but is not this picture (or too large): no point fetching it again this session.
+                this.assetRetry.set(hash, { at: Number.POSITIVE_INFINITY, wait: 0 });
+                return;
+            }
             // Not there yet (uploader still on its way) or the link broke: try later, less often.
-            const wait = Math.min((retry?.wait ?? 15000) * 2, 15 * 60 * 1000);
+            const wait = retry ? Math.min(retry.wait * 2, 15 * 60 * 1000) : 15000;
             this.assetRetry.set(hash, { at: Date.now() + wait, wait });
         })().finally(() => this.assetJobs.delete(hash));
         this.assetJobs.set(hash, job);
@@ -1095,11 +1241,9 @@ class Session {
         }
         this.versions.set(key, entity.version);
         this.saveVersions();
-        const data = entity.data as { asset?: string; logoAsset?: string; mime?: string } | null;
-        if (entity.collection === 'images') {
-            void this.ensureAsset(data?.asset, data?.mime);
-        } else if (entity.collection === 'teams') {
-            void this.ensureAsset(data?.logoAsset, undefined);
+        if (entity.collection === 'images' || entity.collection === 'teams') {
+            // A new picture: fetch it (if allowed) or list it as waiting for a tap.
+            void this.ensureAssets();
         }
     }
 
@@ -1367,6 +1511,11 @@ export function setLeading(on: boolean) {
 
 export function setFollowing(on: boolean) {
     useLive.setState({ following: on });
+}
+
+/** Load pictures held back by the data saver (all missing ones, or the given ones). */
+export function loadPictures(hashes?: string[]) {
+    session?.loadPictures(hashes);
 }
 
 export function myClientId(): string | null {

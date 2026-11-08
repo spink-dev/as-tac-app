@@ -99,7 +99,7 @@ describe('resumable uploads', () => {
             stored += (init.body as Blob).size;
             return new Response(null, { status: 204, headers: { 'upload-offset': String(stored) } });
         }) as unknown as typeof fetch;
-        const target = { endpoint: 'https://x.supabase.co/storage/v1/upload/resumable', headers: {}, bucket: 'live-assets', object: 'p/h', contentType: 'image/png' };
+        const target = { endpoint: 'https://x.supabase.co/storage/v1/upload/resumable', headers: async () => ({}), bucket: 'live-assets', object: 'p/h', contentType: 'image/png' };
         const done = tusUpload(target, blob, { fetcher });
         await vi.runAllTimersAsync();
         expect(await done).toBe('done');
@@ -110,7 +110,130 @@ describe('resumable uploads', () => {
 
     it('reports an object that already exists', async () => {
         const fetcher = (async () => new Response(null, { status: 409 })) as unknown as typeof fetch;
-        const target = { endpoint: 'https://x/storage/v1/upload/resumable', headers: {}, bucket: 'b', object: 'o', contentType: 'image/png' };
+        const target = { endpoint: 'https://x/storage/v1/upload/resumable', headers: async () => ({}), bucket: 'b', object: 'o', contentType: 'image/png' };
         expect(await tusUpload(target, new Blob([file(10)]), { fetcher })).toBe('exists');
+    });
+});
+
+describe('transfers on dead and odd links (review findings)', () => {
+    it('cuts a request that never gets an answer and tries again', async () => {
+        vi.useFakeTimers();
+        const bytes = file(1000);
+        let calls = 0;
+        const fetcher = (async (_url: string, init: RequestInit) => {
+            calls += 1;
+            if (calls === 1) {
+                // Dead connection: no headers ever (until aborted).
+                return new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }));
+            }
+            return new Response(bytes.slice(), { status: 206, headers: { 'content-range': `bytes 0-999/1000` } });
+        }) as unknown as typeof fetch;
+        const done = rangeDownload('u', 'dead', { fetcher });
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        expect(await done).toEqual(bytes);
+        expect(calls).toBe(2);
+    });
+
+    it('renews an expired link and keeps the pieces it already has', async () => {
+        vi.useFakeTimers();
+        const bytes = file(PIECE * 2 + 5);
+        const served = rangeServer(bytes, new Set());
+        let links = 0;
+        let refused = false;
+        const fetcher = (async (url: string, init: RequestInit) => {
+            if (url === 'old' && (init.headers as Record<string, string>).Range !== `bytes=0-${PIECE - 1}` && !refused) {
+                refused = true;
+                return new Response('expired', { status: 400 });
+            }
+            return served.fetcher(url, init);
+        }) as unknown as typeof fetch;
+        const done = rangeDownload(async () => (links++ === 0 ? 'old' : 'new'), 'renew', { fetcher });
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(await done).toEqual(bytes);
+        expect(links).toBe(2);
+        // The first piece was not fetched again after the renewal.
+        expect(served.requests.filter((r) => r === `bytes=0-${PIECE - 1}`)).toHaveLength(1);
+    });
+
+    it('shares one download between two callers of the same file', async () => {
+        const bytes = file(PIECE + 10);
+        const server = rangeServer(bytes, new Set());
+        const [a, b] = await Promise.all([rangeDownload('u', 'twice', { fetcher: server.fetcher }), rangeDownload('u', 'twice', { fetcher: server.fetcher })]);
+        expect(a).toEqual(bytes);
+        expect(b).toEqual(bytes);
+        expect(server.requests).toHaveLength(2);
+    });
+
+    it('ends cleanly on a file that is an exact multiple of a piece, and without a readable Content-Range', async () => {
+        const exact = file(PIECE * 2);
+        const server = rangeServer(exact, new Set());
+        const fetcher = (async (url: string, init: RequestInit) => {
+            const range = (init.headers as Record<string, string>).Range;
+            if (range.startsWith(`bytes=${PIECE * 2}-`)) {
+                return new Response('', { status: 416 });
+            }
+            const response = await server.fetcher(url, init);
+            // CORS hides Content-Range from the page.
+            return new Response(await response.arrayBuffer(), { status: 206 });
+        }) as unknown as typeof fetch;
+        expect(await rangeDownload('u', 'exact', { fetcher })).toEqual(exact);
+    });
+
+    it('treats a duplicate upload of the same object as already there', async () => {
+        vi.useFakeTimers();
+        const blob = new Blob([file(TUS_PIECE + 10)]);
+        let posts = 0;
+        const fetcher = (async (_url: string, init: RequestInit) => {
+            if (init.method === 'POST') {
+                posts += 1;
+                return posts === 1 ? new Response(null, { status: 201, headers: { location: 'https://x.supabase.co/upload/1' } }) : new Response(null, { status: 409 });
+            }
+            if (init.method === 'HEAD') {
+                return new Response(null, { status: 200, headers: { 'upload-offset': '0' } });
+            }
+            // Another device finished the same object first.
+            return new Response(null, { status: 409 });
+        }) as unknown as typeof fetch;
+        const target = { endpoint: 'https://x.supabase.co/storage/v1/upload/resumable', headers: async () => ({}), bucket: 'b', object: 'dup', contentType: 'image/png' };
+        const done = tusUpload(target, blob, { fetcher });
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(await done).toBe('exists');
+    });
+
+    it('keeps an upload when the server is only busy (423), and refuses a nonsense offset', async () => {
+        vi.useFakeTimers();
+        const blob = new Blob([file(TUS_PIECE * 2)]);
+        let stored = 0;
+        let heads = 0;
+        const offsets: number[] = [];
+        const fetcher = (async (_url: string, init: RequestInit) => {
+            if (init.method === 'POST') {
+                return new Response(null, { status: 201, headers: { location: '/upload/2' } });
+            }
+            if (init.method === 'HEAD') {
+                heads += 1;
+                return heads === 1 ? new Response(null, { status: 423 }) : new Response(null, { status: 200, headers: { 'upload-offset': String(stored) } });
+            }
+            const offset = Number((init.headers as Record<string, string>)['Upload-Offset']);
+            offsets.push(offset);
+            if (offsets.length === 2) {
+                throw new TypeError('Failed to fetch');
+            }
+            stored = offset + (init.body as Blob).size;
+            return new Response(null, { status: 204, headers: { 'upload-offset': String(stored) } });
+        }) as unknown as typeof fetch;
+        const target = { endpoint: 'https://x.supabase.co/storage/v1/upload/resumable', headers: async () => ({}), bucket: 'b', object: 'busy', contentType: 'image/png' };
+        const done = tusUpload(target, blob, { fetcher });
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        expect(await done).toBe('done');
+        // Never back to 0 after the first piece was stored.
+        expect(offsets).toEqual([0, TUS_PIECE, TUS_PIECE]);
+
+        const garbage = (async (_url: string, init: RequestInit) => init.method === 'POST'
+            ? new Response(null, { status: 201, headers: { location: '/upload/3' } })
+            : new Response(null, { status: 204, headers: { 'upload-offset': 'abc' } })) as unknown as typeof fetch;
+        const bad = tusUpload({ ...target, object: 'bad' }, new Blob([file(10)]), { fetcher: garbage }).catch((error: Error) => error);
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        expect(await bad).toBeInstanceOf(Error);
     });
 });

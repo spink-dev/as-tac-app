@@ -1482,6 +1482,27 @@ input.layer-row__name:focus {
     display: block;
 }
 
+.thumb--load {
+    cursor: pointer;
+    border-style: dashed;
+    border-color: var(--line-strong);
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--fs-xs);
+    font-weight: 650;
+}
+
+.thumb--load:disabled {
+    cursor: progress;
+    color: var(--ink-2);
+}
+
+@media (pointer: coarse) {
+    .thumb--load {
+        height: 48px;
+    }
+}
+
 .thumb--off {
     display: grid;
     place-items: center;

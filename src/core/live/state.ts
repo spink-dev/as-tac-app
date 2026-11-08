@@ -31,6 +31,10 @@ interface LiveState {
     queued: number;
     /** Objects received so far in a running catch-up, `null` when none runs. */
     receiving: number | null;
+    /** Pictures moving right now (image maps, logos), by hash. */
+    transfers: Record<string, { dir: 'up' | 'down'; done: number; total: number | null }>;
+    /** Pictures of this plan not on this device (yet). */
+    missing: string[];
     presence: Presence[];
     chat: ChatMessage[];
     unread: number;
@@ -53,11 +57,13 @@ export const useLive = create<LiveState>(() => ({
     leaderId: null,
     leaderName: null,
     receiving: null,
+    transfers: {},
+    missing: [],
     following: false,
     error: null,
     conflicts: [],
 }));
 
 export function resetLive() {
-    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, receiving: null, presence: [], chat: [], unread: 0, leaderId: null, leaderName: null, following: false, error: null, conflicts: [] });
+    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, receiving: null, transfers: {}, missing: [], presence: [], chat: [], unread: 0, leaderId: null, leaderName: null, following: false, error: null, conflicts: [] });
 }

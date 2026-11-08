@@ -432,6 +432,12 @@ class LoopbackTransport implements LiveTransport {
         return `https://loopback.invalid/${this.planId}/${hash}`;
     }
 
+    async hasAsset(hash: string): Promise<boolean> {
+        await travel(200);
+        const cache = await this.assetCache();
+        return Boolean(cache && await cache.match(this.assetUrl(hash)));
+    }
+
     async uploadAsset(hash: string, blob: Blob, options: TransferOptions = {}): Promise<void> {
         const cache = await this.assetCache();
         if (!cache || await cache.match(this.assetUrl(hash))) {
@@ -474,6 +480,8 @@ class LoopbackTransport implements LiveTransport {
                 if (options.signal?.aborted || failures >= 5) {
                     throw error;
                 }
+                // Like the real transfer: a pause before the piece is tried again.
+                await new Promise((resolve) => window.setTimeout(resolve, 500 * failures));
             }
         }
     }
