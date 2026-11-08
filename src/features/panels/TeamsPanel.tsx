@@ -58,7 +58,7 @@ async function importPreset(t: ReturnType<typeof useT>) {
             }
             next.formationId = formations.get(team.formationId);
         }
-        if (team.logoAsset && !(await getAsset(team.logoAsset))) {
+        if (team.logoAsset && !isRenderableImage(await getAsset(team.logoAsset))) {
             missingLogos += 1;
             delete next.logoAsset;
             next.displayMode = 'icon';

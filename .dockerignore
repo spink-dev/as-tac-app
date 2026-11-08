@@ -2,7 +2,8 @@ node_modules
 dist
 dev-dist
 .git
-.env
+.env*
+!.env.example
 test-results
 playwright-report
 tests/e2e/screenshots

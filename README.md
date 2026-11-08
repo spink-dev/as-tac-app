@@ -31,7 +31,7 @@ npm run preview      # http://localhost:4000, Produktionsbuild mit Service Worke
 Browser-Prüfungen gegen die laufende Vorschau (Chromium via Playwright):
 
 ```sh
-npx playwright install chromium   # einmalig
+npx playwright install chromium   # einmalig (Playwright ist Entwicklungsabhängigkeit)
 npm run e2e                       # alle Szenarien, Screenshots unter tests/e2e/screenshots
 ```
 
@@ -39,8 +39,8 @@ npm run e2e                       # alle Szenarien, Screenshots unter tests/e2e/
 
 Ohne Konfiguration bietet die App einen **lokalen Testmodus** zwischen Tabs desselben Browsers an (jeder Tab ist eine eigene Person). Für echte Geräte wird ein Supabase-Projekt gebraucht:
 
-1. Migration `supabase/migrations/20261108000001_live.sql` auf ein **neues** Projekt anwenden (SQL-Editor oder `supabase db push`).
-2. In Supabase Auth «Anonymous sign-ins» aktivieren (Geräte-Anmeldung) und optional E-Mail-Magic-Links.
+1. Migration `supabase/migrations/20261108000001_live.sql` auf ein **neues** Projekt anwenden (Inhalt im SQL-Editor des Projekts ausführen).
+2. In Supabase Auth «Anonymous sign-ins» aktivieren (Geräte-Anmeldung) und optional E-Mail-Magic-Links. Weil anonyme Konten beliebig neu entstehen können, Captcha-Schutz (Auth → Attack Protection) und die Auth-Ratenlimits einschalten.
 3. Realtime: private Kanäle verwenden (Realtime-Einstellungen: öffentlichen Zugriff deaktivieren); die Migration legt die Richtlinien für `realtime.messages` und den privaten Bucket `live-assets` an.
 4. `.env.example` nach `.env` kopieren, **nur** Projekt-URL und Publishable Key eintragen, neu bauen.
 
@@ -78,8 +78,8 @@ Die beiden Werte werden beim Build eingebunden; ohne sie läuft die App rein lok
 
 ## Was geprüft ist – und was nicht
 
-- Geprüft: Typprüfung, Unit-Tests (Geometrie, MGRS, Speicher, Undo mit Partnern, Dateiformate, ZIP-Grenzen, TacMap-Umwandlung, Live-Migration und RLS unter PGlite, gleiche Regeln im lokalen Testmodus), Browser-Szenarien in Chromium (Werkzeuge, Panels, Bildkarten, Feld mit simuliertem GPS/Kompass, Teilen/Import, Live im lokalen Testmodus mit drei Tabs).
-- **Nicht** geprüft: echte Geräte (iPhone, Android) und echte Sensoren, Safari/WebKit, ein echtes Supabase-Projekt (Realtime, Storage, Auth), Offline-Betrieb auf einem installierten Telefon, Docker-Build.
+- Geprüft: Typprüfung, Unit-Tests (Geometrie, MGRS, Speicher, Undo mit Partnern, Dateiformate, ZIP-Grenzen, TacMap-Umwandlung, Live-Migration und RLS unter PGlite, gleiche Regeln im lokalen Testmodus), Browser-Szenarien in Chromium (Werkzeuge, Panels, Bildkarten mit erzeugtem Bild und Ablehnung ungültiger Bilder, Feld mit simuliertem GPS/Kompass, Teilen/Import, Live im lokalen Testmodus mit drei Tabs), auch gegen die nginx-Konfiguration aus `docker/`.
+- **Nicht** geprüft: echte Geräte (iPhone, Android) und echte Sensoren, Safari/WebKit, ein echtes Supabase-Projekt (Realtime, Storage, Auth), Offline-Betrieb auf einem installierten Telefon, der Docker-Build selbst, die Erkennung bekannter Eventkarten (braucht die eigene Bilddatei: `node tests/e2e/images.mjs <ordner> <eventkarte>`).
 
 ## Lizenzen
 

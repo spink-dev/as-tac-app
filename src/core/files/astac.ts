@@ -1,5 +1,5 @@
 import { db } from '../storage/db';
-import { getAsset, imageDimensions, putVerifiedAsset, safeMime, sha256Hex } from '../storage/assets';
+import { getAsset, isRenderableImage, putVerifiedAsset, sha256Hex } from '../storage/assets';
 import { saveProject } from '../storage/projects';
 import { ProjectSchema, FORMAT_VERSION, type Project } from '../model/schema';
 import { duplicateProject } from '../model/factory';
@@ -130,25 +130,17 @@ async function verifyEntry(files: Map<string, Uint8Array>, entry: unknown): Prom
 }
 
 const MAX_ASSET = 40 * 1024 * 1024;
-const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 /**
- * Store an archive asset under its verified hash. Images must really be images within the
- * decode limits; anything else (or a mismatch) is kept inert as application/octet-stream.
+ * Store an archive asset under its verified hash. The asset store keeps images only when the bytes
+ * really are an image within the decode limits; anything else is kept inert.
  */
 async function storeAsset(hash: string, bytes: Uint8Array, declaredMime: unknown): Promise<string> {
     if (bytes.length > MAX_ASSET) {
         throw new Error('archive-too-large');
     }
-    let mime = safeMime(typeof declaredMime === 'string' ? declaredMime : undefined);
-    if (IMAGE_TYPES.has(mime)) {
-        const size = imageDimensions(bytes);
-        if (!size || size.width > 16384 || size.height > 16384 || size.width * size.height > 50_000_000) {
-            mime = 'application/octet-stream';
-        }
-    }
-    await putVerifiedAsset(hash, bytes, mime);
-    return mime;
+    await putVerifiedAsset(hash, bytes, typeof declaredMime === 'string' ? declaredMime : '');
+    return (await getAsset(hash))?.mime ?? 'application/octet-stream';
 }
 
 const decode = (bytes: Uint8Array) => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown;
@@ -311,7 +303,48 @@ async function readTacMap(files: Map<string, Uint8Array>, manifest: Record<strin
  * `.astac-map.json` offline area. Nothing is stored until it is fully verified, except
  * content-addressed assets and areas (harmless duplicates at worst).
  */
+/**
+ * What of a plan's pictures this device can't show: image maps and logos that are missing or were
+ * stored inert (not a real image, too large to decode), and missing attachments. Logos that can't
+ * be shown fall back to the team symbol instead of an empty marker.
+ */
+export async function checkPlanAssets(project: Project): Promise<{ project: Project; unusable: number }> {
+    let unusable = 0;
+    for (const image of project.images) {
+        if (!isRenderableImage(await getAsset(image.asset))) {
+            unusable += 1;
+        }
+    }
+    const teams = [];
+    for (const team of project.teams) {
+        if (team.logoAsset && !isRenderableImage(await getAsset(team.logoAsset))) {
+            unusable += 1;
+            const copy = { ...team, displayMode: team.displayMode === 'logo' ? 'icon' as const : team.displayMode };
+            delete copy.logoAsset;
+            teams.push(copy);
+        } else {
+            teams.push(team);
+        }
+    }
+    const attachments = new Set(project.elements.flatMap((element) => element.attachments?.map((a) => a.asset) ?? []));
+    for (const hash of attachments) {
+        if (!(await getAsset(hash))) {
+            unusable += 1;
+        }
+    }
+    return { project: { ...project, teams }, unusable };
+}
+
 export async function readImportFile(file: Blob, place: PlacementResolver, signal?: AbortSignal): Promise<ImportResult> {
+    const result = await readAnyFile(file, place, signal);
+    if (result.kind !== 'project') {
+        return result;
+    }
+    const checked = await checkPlanAssets(result.project);
+    return { ...result, project: checked.project, missingAssets: checked.unusable };
+}
+
+async function readAnyFile(file: Blob, place: PlacementResolver, signal?: AbortSignal): Promise<ImportResult> {
     if (file.size > MAX_FILE) {
         throw new Error('archive-too-large');
     }

@@ -14,9 +14,9 @@ const nowhere = async () => {
 };
 
 function png(): Uint8Array {
-    // Valid header is enough for the asset store (no decode in these paths).
+    // A valid header (100×80) is enough for the asset store (no decode in these paths).
     const bytes = new Uint8Array(64);
-    bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 100, 0, 0, 0, 80]);
     return bytes;
 }
 
@@ -175,5 +175,47 @@ describe('asset store', () => {
         expect(isRenderableImage(await getAsset(hash))).toBe(false);
         const real = await putAsset(new Blob([new Uint8Array(png())], { type: 'image/png' }), 'real.png');
         expect(isRenderableImage(real)).toBe(true);
+    });
+
+    it('stores real images under their actual format and refuses decode bombs', async () => {
+        // A JPEG declared as the non-standard image/jpg (or with no type at all) is still a JPEG.
+        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 60, 0, 80, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]);
+        expect((await putAsset(new Blob([jpeg], { type: 'image/jpg' }))).mime).toBe('image/jpeg');
+        const gif = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 40, 0, 30, 0, 0, 0, 0, 0x2c, 0, 0, 0, 0, 40, 0, 30, 0, 0]);
+        expect((await putAsset(new Blob([gif]))).mime).toBe('image/gif');
+        const webp = new Uint8Array(30);
+        webp.set([0x52, 0x49, 0x46, 0x46, 22, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x58, 10, 0, 0, 0, 0, 0, 0, 0, 99, 0, 0, 49, 0, 0]);
+        expect((await putAsset(new Blob([webp], { type: 'image/webp' }))).mime).toBe('image/webp');
+        // A PNG whose header claims 30000×30000 would decode into gigabytes: kept inert.
+        const bomb = png();
+        bomb.set([0, 0, 0x75, 0x30, 0, 0, 0x75, 0x30], 16);
+        const stored = await putAsset(new Blob([new Uint8Array(bomb)], { type: 'image/png' }));
+        expect(stored.mime).toBe('application/octet-stream');
+        expect(isRenderableImage(stored)).toBe(false);
+    });
+
+    it('reports unusable images on import and falls back to the team symbol for logos', async () => {
+        const bomb = png();
+        bomb.set([0, 0, 0x75, 0x30, 0, 0, 0x75, 0x31], 16);
+        const hash = await sha256Hex(bomb);
+        const project = createProject({ name: 'Logos', areaId: null });
+        project.teams.push({ id: 't1', name: 'Rot', side: 'friendly', color: '#c0392b', displayMode: 'logo', logoAsset: hash } as Project['teams'][number]);
+        const files: Record<string, Uint8Array> = {
+            'project.json': strToU8(JSON.stringify(project)),
+            [`assets/${hash}.png`]: bomb,
+        };
+        const manifest = {
+            format: 'as-tac', formatVersion: 2, appVersion: 'test',
+            project: { path: 'project.json', sha256: await sha256Hex(files['project.json']), bytes: files['project.json'].length },
+            assets: [{ hash, path: `assets/${hash}.png`, sha256: hash, mime: 'image/png', bytes: bomb.length }],
+        };
+        const zip = zipSync({ ...files, 'manifest.json': strToU8(JSON.stringify(manifest)) });
+        const result = await readImportFile(new Blob([new Uint8Array(zip)]), nowhere);
+        if (result.kind !== 'project') {
+            throw new Error('expected a project');
+        }
+        expect(result.missingAssets).toBe(1);
+        expect(result.project.teams[0].logoAsset).toBeUndefined();
+        expect(result.project.teams[0].displayMode).toBe('icon');
     });
 });

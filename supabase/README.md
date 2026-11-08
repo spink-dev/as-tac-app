@@ -11,14 +11,14 @@ Optionaler Server für die Live-Zusammenarbeit. Ohne ihn funktioniert AS-TAC vol
 - Client: Jede noch nicht bestätigte Änderung liegt pro Objekt in IndexedDB (`liveOutbox`) und übersteht Neuladen und Funklöcher. Ein Konflikt wird nur gemeldet, wenn beide Seiten wirklich Verschiedenes wollen; eine verlorene Bestätigung oder eine unveränderte Gegenseite wird still aufgelöst.
 - Grenzen: 500 Operationen pro Aufruf, 1 MB pro Objekt, 60 000 Objekte pro Plan (inkl. Grabsteine), IDs 1–80 Zeichen, 50 Pläne pro Konto, 20 offene Einladungen pro Plan, Codes 24 Stunden gültig, Chat 30 Nachrichten pro Minute und Person, die letzten 1000 pro Plan bleiben.
 - Realtime: private Kanäle `plan:<id>`. Mitglieder empfangen und senden Anwesenheit (Schlüssel = Konto-ID; die angezeigte Rolle kommt aus `live_members`, nicht aus der Anwesenheit); nur Admins dürfen Broadcasts senden. Wer eine Präsentation leitet, ergibt sich allein aus diesen Broadcasts (mit Herzschlag alle 5 s), nie aus der Anwesenheit, deren Inhalt Clients selbst bestimmen.
-- Einladungslinks tragen nur den Code und nur im Fragment (`…/#join=CODE`), er erreicht also keinen Server und wird nach dem Öffnen aus Adresszeile und Verlauf entfernt.
+- Einladungslinks tragen nur den Code und nur im Fragment (`…/#join=CODE`), er erreicht also keinen Server und wird nach dem Öffnen aus der Adresszeile entfernt. Der Browserverlauf kann den geöffneten Link trotzdem enthalten; Codes laufen nach 24 Stunden ab und lassen sich widerrufen.
 - Speicher: privater Bucket `live-assets`, Pfad `<plan-id>/<sha256>`, nur Bildtypen, 40 MB. Clients prüfen den SHA-256 jedes heruntergeladenen Bilds. Übertragen werden Bildkarten und Teamlogos; Dateianhänge an Objekten bleiben auf dem Gerät, auf dem sie angehängt wurden (Weitergabe per `.astac`).
 - Keine Spalte und keine Nachricht enthält GPS-Positionen oder eigene Pfade.
 
 ## Einrichten
 
 1. Neues Supabase-Projekt (nicht eine bestehende Datenbank) und Migration `migrations/20261108000001_live.sql` anwenden.
-2. Auth: «Anonymous sign-ins» aktivieren (Gerät-Anmeldung). Optional E-Mail mit Magic Link; als Redirect-URL die Adresse der App eintragen.
+2. Auth: «Anonymous sign-ins» aktivieren (Geräte-Anmeldung). Optional E-Mail mit Magic Link; als Redirect-URL die Adresse der App eintragen. Captcha-Schutz und Auth-Ratenlimits einschalten: anonyme Konten entstehen beliebig neu, die Grenzen pro Konto (z. B. 50 Pläne) liessen sich sonst vervielfachen.
 3. Realtime: in den Realtime-Einstellungen nur private Kanäle zulassen.
 4. Im App-Ordner `.env` anlegen:
    ```

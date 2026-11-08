@@ -1477,6 +1477,13 @@ input.layer-row__name:focus {
     display: block;
 }
 
+.thumb--off {
+    display: grid;
+    place-items: center;
+    color: var(--ink-3);
+    background: var(--surface-2);
+}
+
 .image-row__opacity {
     height: 24px;
 }

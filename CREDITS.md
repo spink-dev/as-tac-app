@@ -30,7 +30,7 @@ Bei Aufnahme der Karten-/PWA-Abhängigkeiten ihre tatsächlichen Lizenzhinweise 
 - Die beiden frischen OSM-Auszüge liegen unter `public/maps/`. Zugehörige JSON-Manifeste nennen Quelle, Datenzeit, SHA-256 und Bytezahl. OSM-Daten bleiben ODbL 1.0; lokale Lizenz unter `public/licenses/ODbL-1.0.txt`.
 - React (MIT), MapLibre GL JS (BSD-3-Clause), Astro (MIT), Astro React (MIT) und osmtogeojson (MIT): Hinweise unter `public/licenses/dependencies.txt`. MapLibre enthält zusätzliche Fremdcodehinweise in seinem Lizenztext.
 - App-Icon, einfache Gebietssymbole und Kartenstil sind eigene Arbeit. Labels nutzen die installierte Systemschrift. Keine heruntergeladenen Fonts, Sprites, fremden Logos oder Kartenbilder.
-- `CREDITS.md` wird beim Produktionsbuild nach `/licenses/CREDITS.md` kopiert und ebenfalls offline gespeichert.
+- `CREDITS.md` wird beim Produktionsbuild nach `/licenses/CREDITS.md` kopiert und ebenfalls offline gespeichert. (Seit 1.0 über das Vite-Plugin `shipCredits` in `vite.config.ts`; Schriftlizenz in `public/licenses/OFL-1.1.txt`.)
 
 ## AST-004
 
@@ -79,7 +79,7 @@ Neuentwicklung; Code eigens geschrieben. Übernommen bzw. neu verwendet:
 | FieldMaps `2998bb6d7413a3e036412fa37443e8eead1238f3` (Daten aus 0.6, `src/data/mahlwinkel-fieldmaps.json`) | Eventvorlagen `src/core/templates/mahlwinkel.ts`; POIs, Spielfelder, Zonen, HQs, Linien. `[lat,lng]` → `[lng,lat]` | Erlaubnis des Autors (siehe oben) |
 | as-tac r2 Dark-Emergency-Korrektur (`src/data/dark-emergency-correction.json`) | Vorlage «Dark Emergency»; Safe-Zone-Ecken als Passpunkte | eigenes Projekt |
 | TacMap 0.12 (`spink-dev/tacmap`, `77474d8`) | Funktionsumfang, Tastenkürzel-Hierarchie, `.tacmap`-Format für den Import. Kein Code kopiert. | eigenes Projekt |
-| Noto Sans (GoNotoKurrent) Glyphen aus `smp-noto-glyphs` 2.0.0 → `public/glyphs/Noto Sans Regular/` | Offline-Kartenbeschriftung | SIL OFL 1.1 (Schrift), MIT (Paket) |
+| Noto Sans (GoNotoKurrent) Glyphen aus `smp-noto-glyphs` 2.0.0 → `public/glyphs/Noto Sans Regular/` | Offline-Kartenbeschriftung | SIL OFL 1.1 (Schrift, Text in `public/licenses/OFL-1.1.txt`), MIT (Paket) |
 | MapLibre GL JS 6 | Kartendarstellung | BSD-3-Clause |
 | React, Zustand, Immer, Dexie, Zod, fflate, osmtogeojson, lucide-react, uqr | App-Grundlage | MIT / Apache-2.0 / ISC |
 | GSAP 3.15 | Sheet- und Zustandsanimationen | GreenSock Standard «no charge» Lizenz |

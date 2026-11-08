@@ -1,5 +1,5 @@
 import type { Map as MlMap } from 'maplibre-gl';
-import { getAsset, isRenderableImage } from '../core/storage/assets';
+import { getAsset, isRenderableImage, onAssetStored } from '../core/storage/assets';
 
 const RATIO = 2;
 
@@ -377,14 +377,34 @@ function drawArrow(color: string, head: boolean) {
     return toImage(c);
 }
 
+/** Stand-in while a logo is missing (live download pending) or can't be shown: never an empty marker. */
+function drawLogoPlaceholder(scale: number) {
+    const size = Math.round(40 * scale);
+    const { c, ctx } = canvas(size);
+    const r = size * 0.36;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeStyle = '#3b4250';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#3b4250';
+    ctx.font = `600 ${Math.round(r * 1.1)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', size / 2, size / 2 + 1);
+    return toImage(c);
+}
+
 async function drawLogo(hash: string, scale: number) {
     const asset = await getAsset(hash);
     if (!isRenderableImage(asset)) {
-        return null;
+        return drawLogoPlaceholder(scale);
     }
     const bitmap = await createImageBitmap(asset!.blob).catch(() => null);
     if (!bitmap) {
-        return null;
+        return drawLogoPlaceholder(scale);
     }
     const size = Math.round(40 * scale);
     const { c, ctx } = canvas(size);
@@ -401,6 +421,15 @@ async function drawLogo(hash: string, scale: number) {
  * the resolver (also for async team logos), so no placeholder or second tile pass is needed.
  */
 export function installIconFactory(map: MlMap) {
+    // A logo that arrives later (live partner, import) replaces its stand-in.
+    const stop = onAssetStored((hash) => {
+        const stale = map.listImages().filter((id) => id.startsWith(`logo|${hash}|`));
+        stale.forEach((id) => map.removeImage(id));
+        if (stale.length > 0) {
+            void import('./MapView').then(({ renderPlan }) => renderPlan());
+        }
+    });
+    map.once('remove', stop);
     map.setMissingStyleImageResolver(async (id) => {
         if (map.hasImage(id)) {
             return;

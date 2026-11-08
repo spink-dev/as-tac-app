@@ -1,7 +1,9 @@
 // Image map run against `vite preview` on :4000.
 // Usage: node tests/e2e/images.mjs <outdir> <known-event-image?> <any-image>
 import { createRequire } from 'node:module';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 let playwright;
 try {
@@ -9,7 +11,42 @@ try {
 } catch {
     playwright = require('/opt/npm-tools/node_modules/playwright');
 }
-const [out = 'tests/e2e/screenshots', known, sketch] = process.argv.slice(2);
+const [out = 'tests/e2e/screenshots', known, given] = process.argv.slice(2);
+
+/** A checkerboard PNG, so the scenario always has an image to place and align. */
+function makePng(size) {
+    const { deflateSync, crc32 } = require('node:zlib');
+    const chunk = (type, data) => {
+        const length = Buffer.alloc(4);
+        length.writeUInt32BE(data.length);
+        const body = Buffer.concat([Buffer.from(type), data]);
+        const crc = Buffer.alloc(4);
+        crc.writeUInt32BE(crc32(body) >>> 0);
+        return Buffer.concat([length, body, crc]);
+    };
+    const header = Buffer.alloc(13);
+    header.writeUInt32BE(size, 0);
+    header.writeUInt32BE(size, 4);
+    header[8] = 8;
+    header[9] = 2;
+    const rows = [];
+    for (let y = 0; y < size; y++) {
+        const row = Buffer.alloc(1 + size * 3);
+        for (let x = 0; x < size; x++) {
+            const on = ((x >> 4) + (y >> 4)) % 2 === 0;
+            row.set(on ? [200, 120, 40] : [240, 240, 230], 1 + x * 3);
+        }
+        rows.push(row);
+    }
+    return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.concat(rows))), chunk('IEND', Buffer.alloc(0))]);
+}
+const scratch = mkdtempSync(join(tmpdir(), 'astac-images-'));
+const sketch = given ?? join(scratch, 'skizze.png');
+if (!given) {
+    writeFileSync(sketch, makePng(256));
+}
+const fake = join(scratch, 'kein-bild.png');
+writeFileSync(fake, '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
 const base = process.env.BASE_URL ?? 'http://localhost:4000';
 const browser = await playwright.chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'de-CH' });
@@ -38,6 +75,10 @@ const addImage = async (file) => {
     await (await chooser).setFiles(file);
     await page.waitForTimeout(1500);
 };
+if (!known) {
+    // Third-party event maps are never bundled: recognition is only checked with your own copy.
+    console.log('skipped: known event image (pass its path as the second argument)');
+}
 if (known && existsSync(known)) {
     await addImage(known);
     const toastText = await page.locator('.toast').first().textContent().catch(() => '');
@@ -67,6 +108,21 @@ if (sketch && existsSync(sketch)) {
     }
     await page.screenshot({ path: `${out}/images-align.png` });
     await page.getByTestId('align-done').click();
+    await page.waitForTimeout(500);
+    const thumbs = await page.locator('.image-row img.thumb').count();
+    console.log('thumbnails shown:', thumbs);
+    if (thumbs < 1) {
+        fail('image map thumbnail not shown');
+    }
+}
+// Something that only claims to be a PNG is refused with an explanation, never stored as a map.
+const before = await page.locator('.image-row').count();
+await page.locator('.toast').evaluateAll((nodes) => nodes.forEach((node) => node.remove()));
+await addImage(fake);
+const refused = await page.locator('.toast', { hasText: /kann nicht gelesen|can’t be read/ }).count();
+console.log('fake image refused:', refused > 0);
+if (!refused || (await page.locator('.image-row').count()) !== before) {
+    fail('fake image was not refused clearly');
 }
 console.log(errors.length ? `errors:\n${errors.join('\n')}` : 'no page errors');
 await browser.close();

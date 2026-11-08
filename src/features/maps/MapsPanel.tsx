@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Crosshair, Download, Eye, EyeOff, ImagePlus, Lock, LockOpen, Trash2 } from 'lucide-react';
+import { Crosshair, Download, Eye, EyeOff, ImageOff, ImagePlus, Lock, LockOpen, Trash2 } from 'lucide-react';
 import { useT, formatBytes } from '../../i18n';
 import { useProject, mutate } from '../../core/store/project';
 import { useUi, toast } from '../../core/store/ui';
@@ -11,7 +11,7 @@ import { canEdit, toastUndoable } from '../../core/actions';
 import { addImageMap, boundCount, removeImage } from '../../core/images';
 import { pickFile } from '../../core/files/save';
 import { mapRef } from '../../map/MapView';
-import { assetUrl } from '../../core/storage/assets';
+import { assetState, assetUrl, onAssetStored } from '../../core/storage/assets';
 import { registerPanel } from '../panels/registry';
 import { LIMITS, type ImageOverlay } from '../../core/model/schema';
 import { t as translate } from '../../i18n';
@@ -22,11 +22,33 @@ function imageError(error: unknown): string {
 }
 
 function Thumb({ image }: { image: ImageOverlay }) {
-    const [url, setUrl] = useState<string | null>(null);
+    const t = useT();
+    const [state, setState] = useState<{ url: string | null; status: 'loading' | 'ok' | 'missing' | 'unusable' }>({ url: null, status: 'loading' });
     useEffect(() => {
-        void assetUrl(image.asset).then(setUrl);
+        let alive = true;
+        const check = async () => {
+            const status = await assetState(image.asset);
+            const url = status === 'ok' ? await assetUrl(image.asset) : null;
+            if (alive) {
+                setState({ url, status });
+            }
+        };
+        void check();
+        // A missing picture can still arrive (live partner, later import).
+        const stop = onAssetStored((hash) => hash === image.asset && void check());
+        return () => {
+            alive = false;
+            stop();
+        };
     }, [image.asset]);
-    return url ? <img className="thumb" src={url} alt="" /> : <span className="thumb skeleton" />;
+    if (state.status === 'loading') {
+        return <span className="thumb skeleton" />;
+    }
+    if (state.url) {
+        return <img className="thumb" src={state.url} alt="" />;
+    }
+    const label = state.status === 'missing' ? t('maps.imageMissing') : t('maps.imageUnusable');
+    return <span className="thumb thumb--off" role="img" aria-label={label} title={label}><ImageOff size={18} aria-hidden /></span>;
 }
 
 export async function pickAndAddImage() {

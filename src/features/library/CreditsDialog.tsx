@@ -17,11 +17,13 @@ export function CreditsDialog() {
                     <div className="section__title">{t('credits.maps')}</div>
                     <p>{t('credits.osm')}</p>
                     <p><a href={`${base}licenses/ODbL-1.0.txt`} target="_blank" rel="noopener">Open Database License 1.0</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright</a></p>
+                    <p>{t('credits.font')} <a href={`${base}licenses/OFL-1.1.txt`} target="_blank" rel="noopener">SIL Open Font License 1.1</a></p>
                 </section>
                 <section className="section">
                     <div className="section__title">{t('credits.events')}</div>
                     <p>{t('credits.fieldmaps')}</p>
                     <p className="field__hint data">{FIELDMAPS_CREDIT}</p>
+                    <p><a href={`${base}licenses/CREDITS.md`} target="_blank" rel="noopener">CREDITS.md</a></p>
                     <p className="field__hint">{t('credits.noThirdParty')}</p>
                 </section>
                 <section className="section">

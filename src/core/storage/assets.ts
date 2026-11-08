@@ -19,17 +19,37 @@ export function safeMime(mime: string | undefined): string {
 const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_DECODE_PIXELS = 50_000_000;
 
+/** The image format the bytes really are (by signature), or `null`. */
+export function imageType(b: Uint8Array): string | null {
+    if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+        return 'image/png';
+    }
+    if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) {
+        return 'image/jpeg';
+    }
+    if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) {
+        return 'image/gif';
+    }
+    if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) {
+        return 'image/webp';
+    }
+    return null;
+}
+
 /**
- * The content type an asset is stored under: an image type only when the bytes really are an
- * image within the decode limits, otherwise inert. Applies to every way into the store.
+ * The content type an asset is stored under. Real images within the decode limits are stored as
+ * the format their bytes have (a declared `image/jpg` or a wrong extension doesn't matter);
+ * anything claiming to be an image that isn't one (or is too large to decode) is kept inert.
+ * Applies to every way into the store.
  */
 function storedMime(bytes: Uint8Array, declared: string | undefined): string {
-    const mime = safeMime(declared);
-    if (!IMAGE_MIME.has(mime)) {
-        return mime;
+    const type = imageType(bytes);
+    const size = type ? imageDimensions(bytes) : null;
+    if (type && size && size.width > 0 && size.height > 0 && size.width <= 16384 && size.height <= 16384 && size.width * size.height <= MAX_DECODE_PIXELS) {
+        return type;
     }
-    const size = imageDimensions(bytes);
-    return size && size.width <= 16384 && size.height <= 16384 && size.width * size.height <= MAX_DECODE_PIXELS ? mime : 'application/octet-stream';
+    const mime = safeMime(declared);
+    return IMAGE_MIME.has(mime) || (declared ?? '').toLowerCase().startsWith('image/') ? 'application/octet-stream' : mime;
 }
 
 /** Only assets stored as a checked image type are ever decoded or shown. */
@@ -38,7 +58,7 @@ export function isRenderableImage(row: Pick<AssetRow, 'mime'> | undefined | null
 }
 const MAX_ASSET_BYTES = 40 * 1024 * 1024;
 
-export async function putAsset(blob: Blob, name?: string, extra: Partial<AssetRow> = {}): Promise<AssetRow> {
+export async function putAsset(blob: Blob, name?: string, extra: Pick<AssetRow, 'width' | 'height'> = {}): Promise<AssetRow> {
     if (blob.size > MAX_ASSET_BYTES) {
         throw new Error('asset-too-large');
     }
@@ -50,15 +70,17 @@ export async function putAsset(blob: Blob, name?: string, extra: Partial<AssetRo
     }
     const mime = storedMime(bytes, blob.type);
     const row: AssetRow = {
+        width: extra.width,
+        height: extra.height,
         hash,
         blob: new Blob([bytes], { type: mime }),
         mime,
         size: bytes.byteLength,
         name,
         createdAt: new Date().toISOString(),
-        ...extra,
     };
     await db.assets.put(row);
+    announce(hash);
     return row;
 }
 
@@ -75,10 +97,29 @@ export async function putVerifiedAsset(hash: string, bytes: Uint8Array, mime: st
     copy.set(bytes);
     const type = storedMime(bytes, mime);
     await db.assets.put({ hash, blob: new Blob([copy], { type }), mime: type, size: bytes.byteLength, name, createdAt: new Date().toISOString() });
+    announce(hash);
 }
 
 export async function getAsset(hash: string): Promise<AssetRow | undefined> {
     return db.assets.get(hash);
+}
+
+const storedListeners = new Set<(hash: string) => void>();
+
+/** Called whenever an asset lands in the store (import, upload, live download). */
+export function onAssetStored(fn: (hash: string) => void): () => void {
+    storedListeners.add(fn);
+    return () => storedListeners.delete(fn);
+}
+
+function announce(hash: string) {
+    storedListeners.forEach((fn) => fn(hash));
+}
+
+/** What the asset store can do with a hash: show it, nothing (missing), or nothing (not an image). */
+export async function assetState(hash: string): Promise<'ok' | 'missing' | 'unusable'> {
+    const row = await db.assets.get(hash);
+    return !row ? 'missing' : isRenderableImage(row) ? 'ok' : 'unusable';
 }
 
 const urlCache = new Map<string, string>();

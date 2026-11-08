@@ -1,10 +1,20 @@
-import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Large bundled OSM areas are installed into IndexedDB on demand instead of being precached.
 // Their manifests too: a precached manifest from an older deploy would not match fresh data.
 const ON_DEMAND = ['maps/zurich.geojson', 'maps/benglen.geojson', 'maps/zurich.json', 'maps/benglen.json'];
+
+/** Ship CREDITS.md with the app (offline credits dialog links to it). */
+const shipCredits: Plugin = {
+    name: 'as-tac-credits',
+    apply: 'build',
+    generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'licenses/CREDITS.md', source: readFileSync('CREDITS.md', 'utf8') });
+    },
+};
 
 export default defineConfig({
     server: { port: 9000, host: true },
@@ -31,6 +41,7 @@ export default defineConfig({
     },
     plugins: [
         react(),
+        shipCredits,
         VitePWA({
             registerType: 'prompt',
             injectRegister: false,
@@ -73,7 +84,7 @@ export default defineConfig({
                 navigateFallback: '/index.html',
                 navigateFallbackDenylist: [/^\/maps\//, /^\/glyphs\//],
                 maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-                globPatterns: ['**/*.{js,css,html,svg,png,pbf,txt,webmanifest}', 'maps/*.json', 'maps/mahlwinkel.geojson'],
+                globPatterns: ['**/*.{js,css,html,svg,png,pbf,txt,webmanifest}', 'licenses/*.md', 'maps/*.json', 'maps/mahlwinkel.geojson'],
                 globIgnores: ON_DEMAND,
             },
             devOptions: { enabled: false },
