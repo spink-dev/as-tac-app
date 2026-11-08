@@ -78,13 +78,13 @@ describe('live database', () => {
     it('returns a conflict instead of overwriting a newer version', async () => {
         const { plan } = await newPlan();
         await as(owner);
-        await push(plan, [{ collection: 'teams', entityId: 'team_a', data: { name: 'A' }, base: 0 }]);
-        const ok = await push(plan, [{ collection: 'teams', entityId: 'team_a', data: { name: 'A1' }, base: 1 }]);
+        await push(plan, [{ collection: 'teams', entityId: 'team_a', data: { id: 'team_a', name: 'A' }, base: 0 }]);
+        const ok = await push(plan, [{ collection: 'teams', entityId: 'team_a', data: { id: 'team_a', name: 'A1' }, base: 1 }]);
         expect(ok.applied[0].version).toBe(2);
         await as(admin);
-        const stale = await push(plan, [{ collection: 'teams', entityId: 'team_a', data: { name: 'Admin edit' }, base: 1 }]);
+        const stale = await push(plan, [{ collection: 'teams', entityId: 'team_a', data: { id: 'team_a', name: 'Admin edit' }, base: 1 }]);
         expect(stale.applied).toHaveLength(0);
-        expect(stale.conflicts[0]).toMatchObject({ entityId: 'team_a', version: 2, data: { name: 'A1' } });
+        expect(stale.conflicts[0]).toMatchObject({ entityId: 'team_a', version: 2, data: { id: 'team_a', name: 'A1' } });
         // Deletes leave a tombstone peers can see by sequence.
         const del = await push(plan, [{ collection: 'teams', entityId: 'team_a', data: null, base: 2 }]);
         expect(del.applied[0].version).toBe(3);
@@ -113,11 +113,38 @@ describe('live database', () => {
         const { plan } = await newPlan();
         await as(owner);
         await expect(push(plan, [{ collection: 'secrets', entityId: 'x', data: {}, base: 0 }])).rejects.toThrow();
-        await expect(push(plan, [{ collection: 'elements', entityId: '../../x', data: {}, base: 0 }])).rejects.toThrow();
+        await expect(push(plan, [{ collection: 'elements', entityId: 'x'.repeat(81), data: {}, base: 0 }])).rejects.toThrow();
+        // An entity must travel under its own id.
+        await expect(push(plan, [{ collection: 'elements', entityId: 'el_a', data: { id: 'el_b' }, base: 0 }])).rejects.toThrow('mismatch');
         await expect(push(plan, [{ collection: 'elements', entityId: 'x', data: 'string', base: 0 }])).rejects.toThrow();
         await as(outsider);
         await expect(db.query("select public.live_redeem_invite('ZZZZZZZZ', 'x')")).rejects.toThrow('invite');
         expect((await db.query<{ t: string | null }>("select public.live_topic_role('plan:not-a-uuid') as t")).rows[0].t).toBeNull();
         expect((await db.query<{ t: string | null }>('select public.live_topic_role($1) as t', [`plan:${plan}`])).rows[0].t).toBeNull();
+    });
+});
+
+describe('live invites and removal', () => {
+    it('lets only the owner hand out admin rights and voids invites of demoted or removed members', async () => {
+        const { plan } = await newPlan();
+        await as(admin);
+        await expect(db.query("select public.live_create_invite($1, 'admin')", [plan])).rejects.toThrow('forbidden');
+        const stash = (await db.query<{ c: string }>("select public.live_create_invite($1, 'viewer') as c", [plan])).rows[0].c;
+        await as(owner);
+        await db.query("select public.live_set_role($1, $2, 'viewer')", [plan, admin]);
+        // The demoted admin's own earlier invite no longer works.
+        await as(outsider);
+        await expect(db.query("select public.live_redeem_invite($1, 'x')", [stash])).rejects.toThrow('invite');
+        // A removed member can't rejoin with any code.
+        await as(owner);
+        const viewerCode = (await db.query<{ c: string }>("select public.live_create_invite($1, 'viewer') as c", [plan])).rows[0].c;
+        await db.query('select public.live_remove_member($1, $2)', [plan, viewer]);
+        await as(viewer);
+        await expect(db.query("select public.live_redeem_invite($1, 'x')", [viewerCode])).rejects.toThrow('invite');
+        // The owner can revoke a code.
+        await as(owner);
+        await db.query('select public.live_revoke_invite($1, $2)', [plan, viewerCode]);
+        await as(outsider);
+        await expect(db.query("select public.live_redeem_invite($1, 'x')", [viewerCode])).rejects.toThrow('invite');
     });
 });

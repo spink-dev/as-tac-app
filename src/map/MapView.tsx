@@ -240,7 +240,12 @@ export function MapView() {
             const current = useProject.getState().project;
             window.clearTimeout(saveTimer);
             if (current && (viewSaveGuard?.() ?? true)) {
-                saveTimer = window.setTimeout(() => void kvSet(`view:${current.id}`, currentCamera(map)), 400);
+                saveTimer = window.setTimeout(() => {
+                    // Checked again when it runs: a follow may have started in the meantime.
+                    if (viewSaveGuard?.() ?? true) {
+                        void kvSet(`view:${current.id}`, currentCamera(map));
+                    }
+                }, 400);
             }
         });
         map.on('mousemove', (event: MapMouseEvent) => {

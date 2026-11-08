@@ -54,7 +54,7 @@ check('codes', /^[A-Z2-9]{8}$/.test(viewerCode) && /^[A-Z2-9]{8}$/.test(adminCod
 async function join(name, code) {
     const page = await context.newPage();
     watch(page, name);
-    await page.goto(`${base}/?join=${code}`);
+    await page.goto(`${base}/#join=${code}`);
     await page.getByTestId('join-code').waitFor();
     await page.getByTestId('join-submit').click();
     await page.waitForSelector('.maplibregl-canvas');

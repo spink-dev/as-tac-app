@@ -11,6 +11,8 @@ export interface Presence {
     color: string;
     selection?: string[];
     leading?: boolean;
+    /** Account behind this device, filled in from the membership list (not self-reported). */
+    userId?: string;
 }
 
 export interface ChatMessage {

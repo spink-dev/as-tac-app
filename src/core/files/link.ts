@@ -8,6 +8,8 @@ import { inflateCapped } from './zip';
  * The fragment never reaches a server. Image maps and logos can't fit and are left out.
  */
 export const LINK_PREFIX = '#plan=';
+/** Live invite links: `#join=CODE`. Only the code, and only in the fragment. */
+export const JOIN_PREFIX = '#join=';
 /** Larger QR codes get hard to scan from a phone screen. */
 export const MAX_LINK_PAYLOAD = 1800;
 const MAX_INFLATED = 2 * 1024 * 1024;

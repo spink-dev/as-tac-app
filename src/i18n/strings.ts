@@ -457,6 +457,8 @@ export const S = {
     'live.gpsNever': ['Deine GPS-Position wird nie übertragen.', 'Your GPS position is never transmitted.'],
     'live.anonymous': ['Unbenannt', 'Unnamed'],
     'live.inviteStreamer': ['Im Streamer-Modus werden keine Einladungscodes angezeigt.', 'Invite codes are not shown in streamer mode.'],
+    'live.rejected': ['«{name}» konnte nicht synchronisiert werden und bleibt nur auf diesem Gerät.', '“{name}” could not be synced and stays on this device only.'],
+    'live.stopConfirm': ['{n} Änderungen sind noch nicht gesendet. Trotzdem trennen?', '{n} changes are not sent yet. Disconnect anyway?'],
     'live.otherAccount': ['Dieser Plan ist mit einem anderen Konto (oder im Testmodus mit einem anderen Tab) live verbunden und wird hier nicht synchronisiert.', 'This plan is live-linked to another account (or, in test mode, another tab) and is not synced here.'],
     'live.failed': ['Das hat nicht geklappt. Verbindung prüfen und erneut versuchen.', 'That didn’t work. Check the connection and try again.'],
     'live.signedInAs': ['Angemeldet als {email}', 'Signed in as {email}'],

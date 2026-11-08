@@ -46,11 +46,12 @@ export async function loadProject(id: string): Promise<Project> {
 }
 
 export async function deleteProject(id: string): Promise<void> {
-    await db.transaction('rw', [db.projects, db.projectIndex, db.liveLinks, db.outbox], async () => {
+    await db.transaction('rw', [db.projects, db.projectIndex, db.liveLinks, db.liveOutbox, db.kv], async () => {
         await db.projects.delete(id);
         await db.projectIndex.delete(id);
         await db.liveLinks.delete(id);
-        await db.outbox.where('projectId').equals(id).delete();
+        await db.liveOutbox.where('projectId').equals(id).delete();
+        await db.kv.delete(`live:v:${id}`);
     });
 }
 

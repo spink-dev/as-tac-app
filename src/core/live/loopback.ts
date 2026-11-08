@@ -20,6 +20,13 @@ interface PlanState {
 
 const PREFIX = 'as-tac-loopback';
 const INVITES = `${PREFIX}:invites`;
+/* Same limits as the SQL functions (supabase/migrations). */
+const MAX_OPS = 500;
+const MAX_ENTITY_BYTES = 1024 * 1024;
+const MAX_ENTITIES = 60000;
+const ENTITY_ID = /^.{1,80}$/s;
+
+type InviteRow = { planId: string; role: 'admin' | 'viewer'; expires: number; createdBy?: string };
 
 export interface KeyValue {
     get(key: string): string | null;
@@ -80,14 +87,16 @@ export class LoopbackBackend implements LiveBackend {
     }
 
     async redeem(input: string, displayName: string): Promise<JoinInfo> {
-        const invites = JSON.parse(this.store.get(INVITES) ?? '{}') as Record<string, { planId: string; role: 'admin' | 'viewer'; expires: number }>;
+        const invites = JSON.parse(this.store.get(INVITES) ?? '{}') as Record<string, InviteRow>;
         const invite = invites[input.trim().toUpperCase()];
         if (!invite || invite.expires < Date.now()) {
             throw new Error('invite');
         }
         return locked(invite.planId, () => {
             const state = this.read(invite.planId);
-            if (!state) {
+            // The invite is only as good as its creator's current role (owner, or admin for viewers).
+            const creator = invite.createdBy ? state?.members[invite.createdBy]?.role : undefined;
+            if (!state || !creator || !(creator === 'owner' || (invite.role === 'viewer' && creator === 'admin'))) {
                 throw new Error('invite');
             }
             const current = state.members[this.user]?.role;
@@ -120,6 +129,22 @@ export class LoopbackBackend implements LiveBackend {
             if (!state || (role !== 'owner' && role !== 'admin')) {
                 throw new Error('forbidden');
             }
+            if (!Array.isArray(ops) || ops.length > MAX_OPS) {
+                throw new Error('batch');
+            }
+            // Validate the whole batch first: the server rolls back on any bad change.
+            for (const op of ops) {
+                const data = op.data as { id?: unknown } | null;
+                if (typeof op.entityId !== 'string' || !ENTITY_ID.test(op.entityId)) {
+                    throw new Error('22023 invalid entity id');
+                }
+                if (data !== null && (typeof data !== 'object' || new TextEncoder().encode(JSON.stringify(data)).length > MAX_ENTITY_BYTES)) {
+                    throw new Error('23514 violates check constraint');
+                }
+                if (op.collection !== 'meta' && op.collection !== 'order' && data && !Array.isArray(data) && data.id !== op.entityId) {
+                    throw new Error('22023 entity id mismatch');
+                }
+            }
             const result: PushResult = { applied: [], conflicts: [] };
             const changed: RemoteEntity[] = [];
             for (const op of ops) {
@@ -140,6 +165,9 @@ export class LoopbackBackend implements LiveBackend {
                 changed.push(entity);
                 result.applied.push({ collection: op.collection, entityId: op.entityId, version: entity.version, seq: entity.seq });
             }
+            if (Object.keys(state.entities).length > MAX_ENTITIES) {
+                throw new Error('limit');
+            }
             this.write(planId, state);
             return { result, changed };
         });
@@ -147,12 +175,13 @@ export class LoopbackBackend implements LiveBackend {
 
     invite(planId: string, user: string, role: 'admin' | 'viewer'): string {
         const r = this.role(planId, user);
-        if (r !== 'owner' && r !== 'admin') {
+        // Admin invites are owner-only; admins may invite viewers.
+        if (r !== 'owner' && !(r === 'admin' && role === 'viewer')) {
             throw new Error('forbidden');
         }
-        const invites = JSON.parse(this.store.get(INVITES) ?? '{}') as Record<string, { planId: string; role: string; expires: number }>;
+        const invites = JSON.parse(this.store.get(INVITES) ?? '{}') as Record<string, InviteRow>;
         const c = code();
-        invites[c] = { planId, role, expires: Date.now() + 24 * 3600 * 1000 };
+        invites[c] = { planId, role, expires: Date.now() + 24 * 3600 * 1000, createdBy: user };
         this.store.set(INVITES, JSON.stringify(invites));
         return c;
     }
@@ -261,10 +290,17 @@ class LoopbackTransport implements LiveTransport {
             case 'entity':
                 this.handlers.entity(message.entity);
                 break;
-            case 'presence':
-                this.people.set(message.person.clientId, { person: message.person, seen: Date.now() });
+            case 'presence': {
+                // Roles come from the membership list, never from what a peer claims.
+                const senderRole = this.server.role(this.planId, message.user);
+                if (!senderRole) {
+                    break;
+                }
+                const person: Presence = { ...message.person, role: senderRole, userId: message.user, leading: Boolean(message.person.leading) && senderRole !== 'viewer' };
+                this.people.set(person.clientId, { person, seen: Date.now() });
                 this.emitPresence();
                 break;
+            }
             case 'leave':
                 this.people.delete(message.clientId);
                 this.emitPresence();

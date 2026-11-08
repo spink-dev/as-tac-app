@@ -8,7 +8,7 @@ import { ShortcutsDialog } from './features/workspace/ShortcutsDialog';
 import { ImportDialog } from './features/share/ImportDialog';
 import { JoinDialog } from './features/live/JoinDialog';
 import { showDialog } from './core/store/dialogs';
-import { decodePlanLink, LINK_PREFIX } from './core/files/link';
+import { decodePlanLink, JOIN_PREFIX, LINK_PREFIX } from './core/files/link';
 import { startAutosave } from './core/storage/projects';
 import { registerPwa } from './core/pwa';
 import { onMutationRejected } from './core/store/project';
@@ -42,19 +42,29 @@ async function receiveLaunch() {
         }
     });
     window.addEventListener('hashchange', () => void receiveLink());
+    // Older invite links used `?join=`; they still open the dialog but leave no trace either.
     const params = new URLSearchParams(location.search);
-    const join = params.get('join');
-    if (join) {
-        // Invite links carry only the code; it goes into the join dialog, never into history.
+    const legacyJoin = params.get('join');
+    if (legacyJoin) {
         params.delete('join');
         const rest = params.toString();
         history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
-        showDialog('join', { code: join.slice(0, 16) });
+        showDialog('join', { code: legacyJoin.slice(0, 16) });
     }
     await receiveLink();
 }
 
 async function receiveLink() {
+    if (location.hash.startsWith(JOIN_PREFIX)) {
+        // Invite links carry only the code in the fragment (never sent to a server or logged);
+        // it goes into the join dialog and is removed from the address bar and history.
+        const code = location.hash.slice(JOIN_PREFIX.length).slice(0, 16);
+        history.replaceState(null, '', location.pathname + location.search);
+        if (/^[A-Za-z0-9]{4,16}$/.test(code)) {
+            showDialog('join', { code });
+        }
+        return;
+    }
     if (location.hash.startsWith(LINK_PREFIX)) {
         const hash = location.hash;
         // Drop the plan from the address bar and history right away.

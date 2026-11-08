@@ -10,6 +10,7 @@ import { createInvite, goLive, myClientId, resolveConflict, sendChat, unlinkLive
 import { currentUser, sendMagicLink, signInDevice, supabaseConfigured } from '../../core/live/supabase';
 import { registerPanel } from '../panels/registry';
 import { QrSvg, appBaseUrl } from '../share/SharePanel';
+import { JOIN_PREFIX } from '../../core/files/link';
 
 function NotLive() {
     const t = useT();
@@ -84,7 +85,7 @@ function Invite() {
     const [role, setRole] = useState<'viewer' | 'admin'>('viewer');
     const [code, setCode] = useState<string | null>(null);
     const streamer = useUi((state) => state.streamer);
-    const link = code ? `${appBaseUrl()}?join=${code}` : null;
+    const link = code ? `${appBaseUrl()}${JOIN_PREFIX}${code}` : null;
     if (streamer !== 'off') {
         // An invite code on a stream would let any viewer join the plan.
         return (
@@ -165,6 +166,7 @@ export function LivePanel() {
     const queued = useLive((state) => state.queued);
     const conflicts = useLive((state) => state.conflicts);
     const project = useProject((state) => state.project);
+    const [confirmStop, setConfirmStop] = useState(false);
     if (!project) {
         return null;
     }
@@ -172,6 +174,18 @@ export function LivePanel() {
         return <NotLive />;
     }
     const me = myClientId();
+    const stop = () => {
+        // Unsent changes would be lost with the link: ask once more first.
+        if (queued > 0 && !confirmStop) {
+            setConfirmStop(true);
+            return;
+        }
+        setConfirmStop(false);
+        void unlinkLive(project.id).then(() => {
+            toast(t('live.left'));
+            useUi.getState().openPanel(null);
+        });
+    };
     const admin = role === 'owner' || role === 'admin';
     return (
         <div className="stack" data-testid="live-panel">
@@ -215,12 +229,17 @@ export function LivePanel() {
             {admin ? <Invite /> : <p className="notice">{t('live.viewerLock')}</p>}
             {admin ? <Chat /> : null}
             <p className="field__hint">{t('live.gpsNever')}</p>
-            <Button variant="ghost" onClick={() => {
-                void unlinkLive(project.id).then(() => {
-                    toast(t('live.left'));
-                    useUi.getState().openPanel(null);
-                });
-            }}><Unplug size={18} /> {t('live.stop')}</Button>
+            {confirmStop && queued > 0 ? (
+                <div className="notice notice--warn" role="alert">
+                    <p>{t('live.stopConfirm', { n: queued })}</p>
+                    <span className="row-gap">
+                        <Button small variant="ghost" onClick={() => setConfirmStop(false)}>{t('common.cancel')}</Button>
+                        <Button small variant="danger" onClick={stop} data-testid="live-stop-confirm">{t('live.stop')}</Button>
+                    </span>
+                </div>
+            ) : (
+                <Button variant="ghost" onClick={stop} data-testid="live-stop"><Unplug size={18} /> {t('live.stop')}</Button>
+            )}
         </div>
     );
 }

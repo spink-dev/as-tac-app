@@ -37,6 +37,31 @@ export async function currentUser(): Promise<{ id: string; email: string | null;
     return user ? { id: user.id, email: user.email ?? null, anonymous: Boolean(user.is_anonymous) } : null;
 }
 
+/**
+ * The account stored on this device, even when its token expired and can't be refreshed
+ * (offline). Used to decide whose copy a plan is — not to authorise anything.
+ */
+export async function storedUserId(): Promise<string | null> {
+    const live = await currentUser().catch(() => null);
+    if (live) {
+        return live.id;
+    }
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && /^sb-.*-auth-token$/.test(key)) {
+                const stored = JSON.parse(localStorage.getItem(key) ?? 'null') as { user?: { id?: unknown } } | null;
+                if (typeof stored?.user?.id === 'string') {
+                    return stored.user.id;
+                }
+            }
+        }
+    } catch {
+        // Storage unavailable: no stored account.
+    }
+    return null;
+}
+
 /** Quick start: an anonymous account bound to this device (can be upgraded with an email later). */
 export async function signInDevice(): Promise<void> {
     const sb = await supabaseClient();
@@ -59,17 +84,22 @@ export async function signOut(): Promise<void> {
     await sb.auth.signOut();
 }
 
-function rpcError(error: { message?: string } | null): Error {
+function rpcError(error: { message?: string; code?: string } | null): Error {
     const message = error?.message ?? 'error';
-    for (const known of ['forbidden', 'unauthenticated', 'invite', 'limit', 'batch', 'role']) {
+    for (const known of ['forbidden', 'unauthenticated', 'invite']) {
         if (message.includes(known)) {
             return new Error(known);
         }
     }
-    return new Error(message);
+    // Keep the SQLSTATE so the engine can tell a permanent rejection from network trouble.
+    return new Error(error?.code ? `${error.code} ${message}` : message);
 }
 
-function toEntity(row: Record<string, unknown>): RemoteEntity {
+function toEntity(row: Record<string, unknown>): RemoteEntity | null {
+    // A row without a data field (partial realtime payload) is not a deletion: ignore it.
+    if (!('data' in row) || typeof row.collection !== 'string') {
+        return null;
+    }
     return {
         collection: row.collection as RemoteCollection,
         entityId: String(row.entity_id),
@@ -84,7 +114,7 @@ export class SupabaseBackend implements LiveBackend {
     readonly kind = 'supabase' as const;
 
     async userId(): Promise<string | null> {
-        return (await currentUser())?.id ?? null;
+        return storedUserId();
     }
 
     async createPlan(name: string, areaId: string | null, displayName: string): Promise<string> {
@@ -114,6 +144,9 @@ export class SupabaseBackend implements LiveBackend {
 class SupabaseTransport implements LiveTransport {
     readonly kind = 'supabase' as const;
     private channel: RealtimeChannel | null = null;
+    private closed = false;
+    /** Roles by account, from the membership table (presence claims are not trusted). */
+    private roles = new Map<string, LiveRole>();
 
     constructor(readonly planId: string) {}
 
@@ -128,12 +161,12 @@ class SupabaseTransport implements LiveTransport {
             if (error) {
                 throw rpcError(error);
             }
-            const rows = (data ?? []).map((row) => toEntity(row as Record<string, unknown>));
+            const rows = (data ?? []).map((row) => toEntity(row as Record<string, unknown>)).filter((row): row is RemoteEntity => row !== null);
             out.push(...rows);
-            if (rows.length < 1000) {
+            if ((data ?? []).length < 1000) {
                 return out;
             }
-            cursor = rows[rows.length - 1].seq;
+            cursor = Number((data ?? [])[(data ?? []).length - 1].seq);
         }
     }
 
@@ -146,15 +179,45 @@ class SupabaseTransport implements LiveTransport {
         return data as PushResult;
     }
 
+    private async loadRoles() {
+        const sb = await supabaseClient();
+        const { data } = await sb.from('live_members').select('user_id, role').eq('plan_id', this.planId);
+        this.roles = new Map((data ?? []).map((row) => [String(row.user_id), row.role as LiveRole]));
+    }
+
     async subscribe(handlers: TransportHandlers): Promise<void> {
         const sb = await supabaseClient();
+        const me = await storedUserId();
+        await this.loadRoles();
         await sb.realtime.setAuth();
-        const channel = sb.channel(`plan:${this.planId}`, { config: { private: true, broadcast: { self: false } } });
+        const topic = `plan:${this.planId}`;
+        // A channel left over from an earlier session would swallow this subscribe: remove it first.
+        for (const stale of sb.getChannels().filter((channel) => channel.topic === `realtime:${topic}`)) {
+            await sb.removeChannel(stale);
+        }
+        if (this.closed) {
+            return;
+        }
+        const channel = sb.channel(topic, { config: { private: true, broadcast: { self: false }, presence: { key: me ?? undefined } } });
+        const emitPresence = () => {
+            const state = channel.presenceState<Presence>();
+            const people: Presence[] = [];
+            for (const [userId, entries] of Object.entries(state)) {
+                const role = this.roles.get(userId);
+                if (!role) {
+                    continue;
+                }
+                for (const p of entries) {
+                    people.push({ clientId: String(p.clientId), name: String(p.name ?? '').slice(0, 40), role, userId, color: String(p.color ?? '#888888'), leading: Boolean(p.leading) && role !== 'viewer' });
+                }
+            }
+            handlers.presence(people);
+        };
         channel
             .on('postgres_changes', { event: '*', schema: 'public', table: 'live_entities', filter: `plan_id=eq.${this.planId}` }, (payload) => {
-                const row = payload.new as Record<string, unknown> | undefined;
-                if (row && row.collection) {
-                    handlers.entity(toEntity(row));
+                const entity = toEntity((payload.new ?? {}) as Record<string, unknown>);
+                if (entity) {
+                    handlers.entity(entity);
                 }
             })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_chat', filter: `plan_id=eq.${this.planId}` }, (payload) => {
@@ -162,22 +225,29 @@ class SupabaseTransport implements LiveTransport {
                 handlers.chat({ id: String(row.id), author: String(row.user_id), authorName: String(row.display_name ?? ''), body: String(row.body ?? ''), createdAt: String(row.created_at) });
             })
             .on('presence', { event: 'sync' }, () => {
-                const state = channel.presenceState<Presence>();
-                handlers.presence(Object.values(state).flat().map((p) => ({ clientId: p.clientId, name: p.name, role: p.role, color: p.color, leading: p.leading })));
+                const unknown = Object.keys(channel.presenceState()).some((userId) => !this.roles.has(userId));
+                if (unknown) {
+                    void this.loadRoles().then(emitPresence);
+                } else {
+                    emitPresence();
+                }
             })
             .on('broadcast', { event: 'briefing' }, ({ payload }) => handlers.briefing(payload as BriefingMessage));
-        await new Promise<void>((resolve) => {
+        this.channel = channel;
+        await new Promise<void>((resolve, reject) => {
             channel.subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     handlers.status(true);
                     resolve();
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
                     handlers.status(false);
-                    resolve();
+                    reject(new Error(status));
                 }
             });
         });
-        this.channel = channel;
+        if (this.closed) {
+            this.close();
+        }
     }
 
     track(me: Presence): void {
@@ -226,10 +296,12 @@ class SupabaseTransport implements LiveTransport {
     }
 
     close(): void {
-        if (this.channel) {
-            void this.channel.untrack();
-            void supabaseClient().then((sb) => sb.removeChannel(this.channel!));
-        }
+        this.closed = true;
+        const channel = this.channel;
         this.channel = null;
+        if (channel) {
+            void channel.untrack().catch(() => undefined);
+            void supabaseClient().then((sb) => sb.removeChannel(channel)).catch(() => undefined);
+        }
     }
 }

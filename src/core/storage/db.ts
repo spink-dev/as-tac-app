@@ -50,14 +50,19 @@ export interface LiveLinkRow {
     userId: string;
 }
 
+/** One pending live change per entity (`id` = projectId|collection:entityId), replaced in place on every edit. */
 export interface OutboxRow {
-    seq?: number;
+    id: string;
     projectId: string;
     collection: string;
     entityId: string;
     data: unknown | null;
+    /** The entity as it was before the first unsent edit (lets a stale base be told from a real clash). */
+    prev: unknown | null;
     /** Server version this change was based on (0 = new); sent for the conflict check. */
     base: number;
+    /** Send order. */
+    order: number;
     clientId: string;
     createdAt: string;
 }
@@ -75,7 +80,7 @@ export class AsTacDatabase extends Dexie {
     /** Metadata only, so listing areas never loads multi-megabyte GeoJSON. */
     areaMeta!: Table<AreaMetaRow, string>;
     liveLinks!: Table<LiveLinkRow, string>;
-    outbox!: Table<OutboxRow, number>;
+    liveOutbox!: Table<OutboxRow, string>;
     kv!: Table<KvRow, string>;
 
     constructor(name = 'as-tac-v2') {
@@ -92,6 +97,8 @@ export class AsTacDatabase extends Dexie {
         this.version(2).stores({ areaMeta: 'id' }).upgrade(async (tx) => {
             await tx.table('areas').each((row: AreaRow) => tx.table('areaMeta').put({ id: row.id, meta: row.meta }));
         });
+        // v3: one outbox row per entity, replaced in place (no leftovers from interleaved edits).
+        this.version(3).stores({ outbox: null, liveOutbox: 'id, projectId' });
     }
 }
 
