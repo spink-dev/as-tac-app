@@ -93,7 +93,8 @@ export async function prepareImage(file: Blob): Promise<PreparedImage> {
     const bitmap = await createImageBitmap(file);
     const { width, height } = bitmap;
     const longEdge = Math.max(width, height);
-    if (longEdge <= MAX_IMAGE_EDGE && file.size <= 16 * 1024 * 1024) {
+    const keepable = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type);
+    if (keepable && longEdge <= MAX_IMAGE_EDGE && file.size <= 16 * 1024 * 1024) {
         bitmap.close();
         return { blob: file, width, height, originalHash, downscaled: false };
     }
@@ -109,5 +110,5 @@ export async function prepareImage(file: Blob): Promise<PreparedImage> {
     context.drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
     const blob = await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
-    return { blob, width: w, height: h, originalHash, downscaled: true };
+    return { blob, width: w, height: h, originalHash, downscaled: scale < 1 };
 }

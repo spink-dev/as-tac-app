@@ -650,7 +650,7 @@ button.list-row:hover,
 }
 
 [data-appearance='dark'] .toast .btn {
-    --btn-ink: oklch(0.55 0.15 40);
+    --btn-ink: oklch(0.47 0.14 40);
 }
 
 /* Tooltip on fine pointers */

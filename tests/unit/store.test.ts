@@ -153,3 +153,56 @@ describe('review regressions (P0-fix)', () => {
         expect(ProjectSchema.safeParse(orphan).success).toBe(true);
     });
 });
+
+describe('review regressions (P0-fix2)', () => {
+    beforeEach(() => {
+        useProject.getState().load(createProject({ name: 'R2', areaId: null }));
+        useProject.getState().mutate('seed', (draft) => {
+            draft.layers.push({ id: 'L2', name: 'Two', visible: true, opacity: 1, locked: false });
+            draft.elements.push(marker('a'), marker('b'), marker('c'), { ...marker('x'), layerId: 'L2' });
+        });
+    });
+
+    it('undo and redo survive a peer deleting the layer of a restored entity', () => {
+        const store = useProject.getState();
+        store.mutate('delete x', (draft) => {
+            draft.elements.splice(3, 1);
+        });
+        store.mutate('peer deletes L2', (draft) => {
+            draft.layers.splice(1, 1);
+        }, { remote: true });
+        expect(() => useProject.getState().undo()).not.toThrow();
+        const x = useProject.getState().project!.elements.find((e) => e.id === 'x');
+        expect(x?.layerId).toBe(useProject.getState().project!.layers[0].id);
+        expect(() => useProject.getState().redo()).not.toThrow();
+    });
+
+    it('does not coalesce across a peer change', () => {
+        const store = useProject.getState();
+        store.mutate('label', (draft) => {
+            draft.elements[0].label = 'A1';
+        }, { key: 'label:a' });
+        store.mutate('peer move', (draft) => {
+            draft.elements[0] = { ...draft.elements[0], pos: [11.9, 52.4] } as never;
+        }, { remote: true });
+        store.mutate('label', (draft) => {
+            draft.elements[0].label = 'A12';
+        }, { key: 'label:a' });
+        useProject.getState().undo();
+        const a = useProject.getState().project!.elements[0] as Marker;
+        expect(a.pos).toEqual([11.9, 52.4]);
+        expect(a.label).toBe('A1');
+    });
+
+    it('does not override a peer reorder when undoing a middle delete', () => {
+        const store = useProject.getState();
+        store.mutate('delete b', (draft) => {
+            draft.elements.splice(1, 1);
+        });
+        store.mutate('peer reorder', (draft) => {
+            draft.elements.reverse();
+        }, { remote: true });
+        useProject.getState().undo();
+        expect(useProject.getState().project!.elements.map((e) => e.id)).toEqual(['x', 'c', 'a', 'b']);
+    });
+});

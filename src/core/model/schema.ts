@@ -233,7 +233,8 @@ export const SettingsSchema = z.object({
 });
 
 /** Collections that are synchronised entity-by-entity in live sessions. */
-export const SYNCED_COLLECTIONS = ['elements', 'drawings', 'images', 'teams', 'phases', 'layers', 'log'] as const;
+/** Containers first, so a receiver applying ops in order never sees an entity before its layer/team. */
+export const SYNCED_COLLECTIONS = ['layers', 'teams', 'images', 'phases', 'elements', 'drawings', 'log'] as const;
 export type SyncedCollection = typeof SYNCED_COLLECTIONS[number];
 
 export const ProjectSchema = z.object({

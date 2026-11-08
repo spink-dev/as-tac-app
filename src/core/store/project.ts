@@ -2,7 +2,7 @@ import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
 import type { Project } from '../model/schema';
 import { nowIso } from '../model/factory';
-import { applyOps, diffProjects, entityOf, HISTORY_COLLECTIONS, type EntityOp } from './diff';
+import { applyOps, diffProjects, entityOf, HISTORY_COLLECTIONS, ORDER_ID, type EntityOp } from './diff';
 
 /**
  * Undo history is stored as entity operations, not array-index patches. That keeps it
@@ -60,8 +60,34 @@ function emit(prev: Project | null, next: Project | null, source: ChangeSource) 
     }
 }
 
+function stable(value: unknown): string {
+    return JSON.stringify(value, (_key, v) => (v && typeof v === 'object' && !Array.isArray(v)
+        ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+        : v));
+}
+
 function equal(a: unknown, b: unknown): boolean {
-    return a === b || JSON.stringify(a) === JSON.stringify(b);
+    return a === b || stable(a) === stable(b);
+}
+
+/**
+ * Make sure every collection whose order one direction restores is also order-checked in the
+ * other direction, so undo never overrides a peer's reorder it did not cause.
+ */
+function pairOrderOps(forward: EntityOp[], inverse: EntityOp[], before: Project, after: Project) {
+    const orderOf = (ops: EntityOp[]) => new Set(ops.filter((op) => op.entityId === ORDER_ID).map((op) => op.collection));
+    const f = orderOf(forward);
+    const i = orderOf(inverse);
+    for (const collection of i) {
+        if (!f.has(collection) && collection !== 'meta') {
+            forward.push({ collection, entityId: ORDER_ID, data: (after[collection] as { id: string }[]).map((item) => item.id) });
+        }
+    }
+    for (const collection of f) {
+        if (!i.has(collection) && collection !== 'meta') {
+            inverse.push({ collection, entityId: ORDER_ID, data: (before[collection] as { id: string }[]).map((item) => item.id) });
+        }
+    }
 }
 
 function lastOpFor(ops: EntityOp[], op: EntityOp): EntityOp | undefined {
@@ -123,7 +149,10 @@ export const useProject = create<ProjectState>((set, get) => ({
             return false;
         }
         if (options.remote) {
-            set({ project: changed, revision: get().revision + 1 });
+            // A peer change ends any coalescing window: merging across it would let undo revert the peer.
+            const top = past[past.length - 1];
+            const barrier = top?.key ? [...past.slice(0, -1), { ...top, key: undefined }] : past;
+            set({ project: changed, past: barrier, revision: get().revision + 1 });
             emit(project, changed, 'remote');
             return true;
         }
@@ -131,6 +160,7 @@ export const useProject = create<ProjectState>((set, get) => ({
             draft.updatedAt = nowIso();
         });
         const inverse = diffProjects(changed, project, HISTORY_COLLECTIONS);
+        pairOrderOps(forward, inverse, project, changed);
         const now = Date.now();
         const last = past[past.length - 1];
         let nextPast = past;

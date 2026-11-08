@@ -112,16 +112,17 @@ export function repairReferences(project: Project): void {
     }
     const layers = new Set(project.layers.map((layer) => layer.id));
     const fallback = project.layers[0].id;
-    for (const element of project.elements) {
+    // Entities may be frozen history objects: replace, never mutate.
+    project.elements.forEach((element, i) => {
         if (element.layerId && !layers.has(element.layerId)) {
-            element.layerId = fallback;
+            project.elements[i] = { ...element, layerId: fallback };
         }
-    }
-    for (const stroke of project.drawings) {
+    });
+    project.drawings.forEach((stroke, i) => {
         if (stroke.layerId && !layers.has(stroke.layerId)) {
-            stroke.layerId = fallback;
+            project.drawings[i] = { ...stroke, layerId: fallback };
         }
-    }
+    });
     // Team and image references may legitimately arrive before their target in a live
     // session; they are resolved at render time instead of being stripped here.
 }
