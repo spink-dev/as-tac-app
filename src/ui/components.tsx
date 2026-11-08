@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import gsap from 'gsap';
 import Lenis from 'lenis';
@@ -30,7 +30,7 @@ export function IconButton({ label, pressed, small, tipPos, className = '', chil
     );
 }
 
-export function Segmented<T extends string>({ value, options, onChange, block, label }: { value: T; options: { value: T; label: ReactNode; title?: string }[]; onChange: (value: T) => void; block?: boolean; label?: string }) {
+export function Segmented<T extends string>({ value, options, onChange, block, label, disabled }: { value: T; options: { value: T; label: ReactNode; title?: string }[]; onChange: (value: T) => void; block?: boolean; label?: string; disabled?: boolean }) {
     return (
         <div className={`seg ${block ? 'seg--block' : ''}`} role="group" aria-label={label}>
             {options.map((option) => (
@@ -40,6 +40,7 @@ export function Segmented<T extends string>({ value, options, onChange, block, l
                     className="seg__item"
                     aria-pressed={option.value === value}
                     title={option.title}
+                    disabled={disabled}
                     onClick={() => onChange(option.value)}
                 >
                     {option.label}
@@ -189,10 +190,19 @@ export function prefersReducedMotion(): boolean {
  * Lenis smooth scrolling for wheel/trackpad on long lists. Touch keeps native scrolling
  * (momentum and overscroll behave as users expect on phones) and reduced motion disables it.
  */
+/**
+ * Lenis smooth scrolling on fine pointers. A callback ref, so it attaches whenever the
+ * scroller mounts (also after a conditional render) and is torn down when it unmounts.
+ */
 export function useSmoothScroll<T extends HTMLElement>() {
-    const ref = useRef<T>(null);
-    useEffect(() => {
-        const wrapper = ref.current;
+    const cleanup = useRef<(() => void) | null>(null);
+    useEffect(() => () => {
+        cleanup.current?.();
+        cleanup.current = null;
+    }, []);
+    return useCallback((wrapper: T | null) => {
+        cleanup.current?.();
+        cleanup.current = null;
         const content = wrapper?.firstElementChild as HTMLElement | null;
         if (!wrapper || !content || prefersReducedMotion() || !window.matchMedia('(pointer: fine)').matches) {
             return;
@@ -202,12 +212,11 @@ export function useSmoothScroll<T extends HTMLElement>() {
             lenis.raf(time * 1000);
         };
         gsap.ticker.add(tick);
-        return () => {
+        cleanup.current = () => {
             gsap.ticker.remove(tick);
             lenis.destroy();
         };
     }, []);
-    return ref;
 }
 
 /** Animated tabular number (React Bits "CountUp" pattern, GSAP-driven). */

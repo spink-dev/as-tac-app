@@ -4,12 +4,15 @@ import { useProject, mutate } from '../../core/store/project';
 import { useUi, toast } from '../../core/store/ui';
 import { Button, ICON, IconButton, Segmented, Switch } from '../../ui/components';
 import { createLayer } from '../../core/model/factory';
-import { activeLayerId, canEdit } from '../../core/actions';
+import { activeLayerId, canEdit, toastUndoable } from '../../core/actions';
+import { LIMITS, MAX } from '../../core/model/schema';
 
 export function LayersPanel() {
     const t = useT();
     const project = useProject((state) => state.project);
-    const readOnly = useProject((state) => state.readOnly);
+    // Subscriptions so permission changes (mode, live role) re-render the controls.
+    useProject((state) => state.readOnly);
+    useUi((state) => state.mode);
     useUi((state) => state.activeLayerId);
     if (!project) {
         return null;
@@ -45,7 +48,7 @@ export function LayersPanel() {
                     {t('panel.layers')}
                     <span className="spacer" />
                     {editable ? (
-                        <Button small variant="ghost" onClick={() => {
+                        <Button small variant="ghost" disabled={project.layers.length >= LIMITS.layers} title={project.layers.length >= LIMITS.layers ? t('layers.limit', { n: LIMITS.layers }) : undefined} onClick={() => {
                             const layer = createLayer(`${t('layers.newName')} ${project.layers.length + 1}`);
                             mutate(t('layers.add'), (draft) => {
                                 draft.layers.push(layer);
@@ -58,11 +61,11 @@ export function LayersPanel() {
                     {ordered.map(({ layer, index }) => (
                         <li key={layer.id} className={`layer-row ${layer.id === active ? 'is-active' : ''}`}>
                             <div className="layer-row__top">
-                                <IconButton small label={layer.visible ? t('common.visible') : t('common.hidden')} pressed={!layer.visible} onClick={() => patchLayer(layer.id, { visible: !layer.visible }, t('common.visible'))} disabled={Boolean(readOnly)}>
+                                <IconButton small label={layer.visible ? t('common.visible') : t('common.hidden')} pressed={!layer.visible} onClick={() => patchLayer(layer.id, { visible: !layer.visible }, t('common.visible'))} disabled={!editable}>
                                     {layer.visible ? <Eye size={18} /> : <EyeOff size={18} />}
                                 </IconButton>
                                 {editable ? (
-                                    <input className="layer-row__name input" aria-label={t('common.name')} value={layer.name} onChange={(event) => patchLayer(layer.id, { name: event.target.value || '–' }, t('common.rename'), `layer-name:${layer.id}`)} />
+                                    <input className="layer-row__name input" aria-label={t('common.name')} maxLength={MAX.name} value={layer.name} onChange={(event) => patchLayer(layer.id, { name: event.target.value || '–' }, t('common.rename'), `layer-name:${layer.id}`)} />
                                 ) : <span className="layer-row__name">{layer.name}</span>}
                                 <span className="badge num">{counts.get(layer.id) ?? 0}</span>
                                 {editable ? (
@@ -77,16 +80,25 @@ export function LayersPanel() {
                                                 toast(t('layers.deleteBlocked'), { tone: 'warn' });
                                                 return;
                                             }
-                                            const fallback = project.layers.find((l) => l.id !== layer.id)?.id;
-                                            mutate(t('common.delete'), (draft) => {
+                                            if (layer.locked) {
+                                                // Moving locked content into an unlocked layer would silently unlock it.
+                                                toast(t('layers.deleteLocked'), { tone: 'warn' });
+                                                return;
+                                            }
+                                            const first = project.layers[0].id;
+                                            const fallback = project.layers.find((l) => l.id !== layer.id && !l.locked)?.id ?? project.layers.find((l) => l.id !== layer.id)?.id;
+                                            const ok = mutate(t('common.delete'), (draft) => {
                                                 draft.layers = draft.layers.filter((l) => l.id !== layer.id);
-                                                for (const element of draft.elements) {
-                                                    if ((element.layerId ?? project.layers[0].id) === layer.id) {
-                                                        element.layerId = fallback;
+                                                // Elements and drawings follow the same rule, so peers' repairReferences agrees.
+                                                for (const item of [...draft.elements, ...draft.drawings]) {
+                                                    if ((item.layerId ?? first) === layer.id) {
+                                                        item.layerId = fallback;
                                                     }
                                                 }
                                             });
-                                            toast(t('inspector.deleted', { name: layer.name }), { action: { label: t('common.undo'), run: () => useProject.getState().undo() } });
+                                            if (ok) {
+                                                toastUndoable(t('inspector.deleted', { name: layer.name }));
+                                            }
                                         }}><Trash2 size={16} /></IconButton>
                                     </>
                                 ) : null}
@@ -98,7 +110,7 @@ export function LayersPanel() {
                                         {t('layers.active')}
                                     </label>
                                 ) : <span />}
-                                <input type="range" className="range layer-row__opacity" aria-label={t('common.opacity')} min={10} max={100} value={Math.round(layer.opacity * 100)} disabled={Boolean(readOnly)} onChange={(event) => patchLayer(layer.id, { opacity: Number(event.target.value) / 100 }, t('common.opacity'), `layer-op:${layer.id}`)} />
+                                <input type="range" className="range layer-row__opacity" aria-label={t('common.opacity')} min={10} max={100} value={Math.round(layer.opacity * 100)} disabled={!editable} onChange={(event) => patchLayer(layer.id, { opacity: Number(event.target.value) / 100 }, t('common.opacity'), `layer-op:${layer.id}`)} />
                             </div>
                         </li>
                     ))}
@@ -106,12 +118,12 @@ export function LayersPanel() {
             </section>
             <section className="section">
                 <div className="section__title">{t('layers.basemap')}</div>
-                <Switch checked={project.settings.basemapLabels} disabled={Boolean(readOnly)} onChange={(value) => mutate(t('layers.basemapLabels'), (draft) => {
+                <Switch checked={project.settings.basemapLabels} disabled={!editable} onChange={(value) => mutate(t('layers.basemapLabels'), (draft) => {
                     draft.settings.basemapLabels = value;
                 })}>{t('layers.basemapLabels')}</Switch>
                 <div className="field">
                     <span className="field__label">{t('layers.grid')}</span>
-                    <Segmented block value={project.settings.grid} onChange={(grid) => mutate(t('layers.grid'), (draft) => {
+                    <Segmented block disabled={!editable} value={project.settings.grid} onChange={(grid) => mutate(t('layers.grid'), (draft) => {
                         draft.settings.grid = grid;
                     })} options={[{ value: 'off', label: t('streamer.off') }, { value: '1km', label: '1 km' }, { value: '100m', label: '100 m' }]} />
                 </div>

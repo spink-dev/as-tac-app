@@ -5,8 +5,8 @@ import { useProject, mutate } from '../../core/store/project';
 import { useUi } from '../../core/store/ui';
 import { usePrefs } from '../../core/store/prefs';
 import { Button, Empty, Field, ICON, Segmented, Swatches, Switch } from '../../ui/components';
-import { canEdit, deleteSelection, duplicateSelection, patchElement, toggleLockSelection, typeLabel, MARKER_TYPES, ROUTE_STYLES, ZONE_CATEGORIES } from '../../core/actions';
-import type { Element, LngLat, ObjectiveStatus, Project, ZonePattern } from '../../core/model/schema';
+import { canEdit, deleteSelection, duplicateSelection, elementLocked, patchElement, toggleLockSelection, typeLabel, MARKER_TYPES, ROUTE_STYLES, ZONE_CATEGORIES } from '../../core/actions';
+import { MAX, type Element, type LngLat, type ObjectiveStatus, type Project, type ZonePattern } from '../../core/model/schema';
 import { elementAnchor, elementColor, teamMap, zoneRing } from '../../map/planFeatures';
 import { bearingDeg, distanceM, formatArea, formatBearing, formatDistance, formatLngLat, formatMils, pathLengthM, polygonAreaM2 } from '../../core/geo/geo';
 import { toMgrs } from '../../core/geo/mgrs';
@@ -70,6 +70,7 @@ export function Inspector() {
     const project = useProject((state) => state.project);
     const selection = useUi((state) => state.selection);
     const mode = useUi((state) => state.mode);
+    useProject((state) => state.readOnly);
     const bearingUnit = usePrefs((state) => state.bearingUnit);
     const labelId = useId();
     const notesId = useId();
@@ -83,10 +84,12 @@ export function Inspector() {
     const elements = project.elements.filter((e) => selection.includes(e.id));
     const stroke = project.drawings.find((s) => s.id === selection[0]);
     if (elements.length === 0 && stroke && selection.length === 1) {
+        const strokeLocked = Boolean(project.layers.find((l) => l.id === (stroke.layerId ?? project.layers[0]?.id))?.locked);
         return (
             <div className="stack">
                 <h3 className="inspector__title">{t('tool.draw')}</h3>
-                <fieldset className="plain" disabled={!editable}>
+                {strokeLocked ? <span className="badge"><Lock size={12} /> {t('common.locked')}</span> : null}
+                <fieldset className="plain" disabled={!editable || strokeLocked}>
                     <Field label={t('common.color')}>
                         <Swatches value={stroke.color} colors={PALETTE} onChange={(color) => mutate(t('common.color'), (draft) => {
                             const target = draft.drawings.find((s) => s.id === stroke.id);
@@ -96,23 +99,31 @@ export function Inspector() {
                         })} />
                     </Field>
                 </fieldset>
-                {editable ? <Button variant="danger" onClick={() => deleteSelection()}><Trash2 {...ICON} /> {t('common.delete')}</Button> : null}
+                {editable && !strokeLocked ? <Button variant="danger" onClick={() => deleteSelection()}><Trash2 {...ICON} /> {t('common.delete')}</Button> : null}
             </div>
         );
     }
     if (elements.length > 1) {
         const allLocked = elements.every((e) => e.locked);
+        // Bulk edits only touch what is not locked (element lock or locked layer).
+        const unlocked = new Set(elements.filter((e) => !elementLocked(project, e)).map((e) => e.id));
+        const skipped = elements.length - unlocked.size;
         return (
             <div className="stack">
                 <h3 className="inspector__title">{t('inspector.multi', { n: elements.length })}</h3>
-                <fieldset className="plain stack" disabled={!editable}>
+                {skipped > 0 ? <p className="field__hint"><Lock size={12} /> {t('common.locked')}: {skipped}</p> : null}
+                <fieldset className="plain stack" disabled={!editable || unlocked.size === 0}>
                     <Field label={t('common.team')}>
                         <select className="select" value="" onChange={(event) => {
                             const teamId = event.target.value === '__none' ? undefined : event.target.value;
                             mutate(t('common.team'), (draft) => {
                                 for (const element of draft.elements) {
-                                    if (selection.includes(element.id)) {
-                                        element.teamId = teamId;
+                                    if (unlocked.has(element.id)) {
+                                        if (teamId) {
+                                            element.teamId = teamId;
+                                        } else {
+                                            delete element.teamId;
+                                        }
                                     }
                                 }
                             });
@@ -125,7 +136,7 @@ export function Inspector() {
                     <Field label={t('common.layer')}>
                         <select className="select" value="" onChange={(event) => mutate(t('common.layer'), (draft) => {
                             for (const element of draft.elements) {
-                                if (selection.includes(element.id)) {
+                                if (unlocked.has(element.id)) {
                                     element.layerId = event.target.value;
                                 }
                             }
@@ -169,7 +180,7 @@ export function Inspector() {
                 {element.kind === 'text' ? (
                     <>
                         <Field label={t('inspector.text')} htmlFor={labelId}>
-                            <textarea id={labelId} className="textarea" rows={2} value={element.text} autoFocus={element.text === t('tool.text')} onFocus={(event) => element.text === t('tool.text') && event.target.select()} onChange={(event) => set({ text: event.target.value }, 'text')} />
+                            <textarea id={labelId} className="textarea" rows={2} maxLength={MAX.text} value={element.text} autoFocus={element.text === t('tool.text')} onFocus={(event) => element.text === t('tool.text') && event.target.select()} onChange={(event) => set({ text: event.target.value }, 'text')} />
                         </Field>
                         <Field label={`${t('inspector.size')} · ${element.size ?? 14}`}>
                             <input type="range" className="range" min={9} max={40} value={element.size ?? 14} onChange={(event) => set({ size: Number(event.target.value) }, 'size')} />
@@ -177,7 +188,7 @@ export function Inspector() {
                     </>
                 ) : (
                     <Field label={t('common.label')} htmlFor={labelId}>
-                        <input id={labelId} className="input" value={element.label ?? ''} onChange={(event) => set({ label: event.target.value || undefined }, 'label')} />
+                        <input id={labelId} className="input" maxLength={MAX.shortText} value={element.label ?? ''} onChange={(event) => set({ label: event.target.value || undefined }, 'label')} />
                     </Field>
                 )}
 
@@ -244,9 +255,9 @@ export function Inspector() {
                         </Field>
                         {element.shape.type === 'circle' ? (
                             <Field label={`${t('inspector.radius')} (m)`}>
-                                <input type="number" className="input num" min={1} max={20000} value={Math.round(element.shape.radiusM)} onChange={(event) => {
-                                    const radiusM = Number(event.target.value);
-                                    if (radiusM > 0 && element.shape.type === 'circle') {
+                                <input type="number" className="input num" min={1} max={MAX.radiusM} value={Math.round(element.shape.radiusM)} onChange={(event) => {
+                                    const radiusM = Math.min(MAX.radiusM, Number(event.target.value));
+                                    if (Number.isFinite(radiusM) && radiusM > 0 && element.shape.type === 'circle') {
                                         set({ shape: { ...element.shape, radiusM } } as Partial<Element>, 'radius');
                                     }
                                 }} />
@@ -282,7 +293,7 @@ export function Inspector() {
                 <PhaseChips element={element} project={project} />
 
                 <Field label={t('common.notes')} htmlFor={notesId}>
-                    <textarea id={notesId} className="textarea" rows={3} value={element.notes ?? ''} onChange={(event) => set({ notes: event.target.value || undefined }, 'notes')} />
+                    <textarea id={notesId} className="textarea" rows={3} maxLength={MAX.longText} value={element.notes ?? ''} onChange={(event) => set({ notes: event.target.value || undefined }, 'notes')} />
                 </Field>
             </fieldset>
 

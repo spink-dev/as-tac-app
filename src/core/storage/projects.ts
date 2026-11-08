@@ -84,6 +84,14 @@ async function write(): Promise<boolean> {
         return true;
     }
     useSaveState.setState({ state: 'saving' });
+    // Last line of defence: never store a record that loadProject would refuse.
+    const valid = ProjectSchema.safeParse(project);
+    if (!valid.success) {
+        const issue = valid.error.issues[0];
+        console.error('refusing to store invalid project', valid.error.issues.slice(0, 5));
+        useSaveState.setState({ state: 'error', error: `invalid: ${issue?.path.join('.') ?? ''}` });
+        return false;
+    }
     try {
         await saveProject(project);
         useSaveState.setState({ state: pending ? 'saving' : 'saved', error: undefined });

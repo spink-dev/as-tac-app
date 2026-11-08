@@ -4,14 +4,16 @@ import { useT } from '../../i18n';
 import { useProject } from '../../core/store/project';
 import { useUi } from '../../core/store/ui';
 import { Button, Empty } from '../../ui/components';
-import { logEvent } from '../../core/actions';
+import { canLog, logEvent } from '../../core/actions';
+import { MAX } from '../../core/model/schema';
 import { flyTo } from '../../map/MapView';
 import { elementAnchor } from '../../map/planFeatures';
 
 export function LogPanel() {
     const t = useT();
     const project = useProject((state) => state.project);
-    const readOnly = useProject((state) => state.readOnly);
+    useProject((state) => state.readOnly);
+    const mode = useUi((state) => state.mode);
     const selection = useUi((state) => state.selection);
     const [text, setText] = useState('');
     if (!project) {
@@ -29,15 +31,16 @@ export function LogPanel() {
     const entries = [...project.log].reverse();
     return (
         <div className="stack">
-            {!readOnly ? (
+            {canLog() ? (
                 <form className="row-gap log-form" onSubmit={(event) => {
                     event.preventDefault();
                     submit();
                 }}>
-                    <input className="input" value={text} placeholder={t('log.placeholder')} aria-label={t('log.add')} onChange={(event) => setText(event.target.value)} />
+                    <input className="input" maxLength={MAX.log} value={text} placeholder={t('log.placeholder')} aria-label={t('log.add')} onChange={(event) => setText(event.target.value)} />
                     <Button type="submit" variant="primary" disabled={!text.trim()}><Plus size={18} /><span className="sr-only">{t('log.add')}</span></Button>
                 </form>
             ) : null}
+            {canLog() && mode === 'field' ? <p className="field__hint">{t('log.fieldHint')}</p> : null}
             {entries.length === 0 ? <Empty>{t('log.empty')}</Empty> : (
                 <ol className="log-list">
                     {entries.map((entry) => {

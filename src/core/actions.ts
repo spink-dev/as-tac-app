@@ -113,9 +113,40 @@ export function deleteSelection() {
     });
     useUi.getState().set({ selection: [] });
     const name = removable.length === 1 ? (removable[0].label || typeLabel(removable[0])) : '';
-    toast(removed.size === 1 && name ? t('inspector.deleted', { name }) : t('inspector.deletedMany', { n: removed.size }), {
-        action: { label: t('common.undo'), run: () => useProject.getState().undo() },
+    toastUndoable(removed.size === 1 && name ? t('inspector.deleted', { name }) : t('inspector.deletedMany', { n: removed.size }));
+}
+
+/**
+ * Toast whose Undo reverts exactly the step just made: only while it is still the newest
+ * history entry and editing is allowed (not after a switch to field mode).
+ */
+export function toastUndoable(message: string) {
+    const { past } = useProject.getState();
+    const entry = past[past.length - 1];
+    toast(message, {
+        action: {
+            label: t('common.undo'),
+            run: () => {
+                const state = useProject.getState();
+                if (!entry || state.past[state.past.length - 1] !== entry || !canEdit()) {
+                    toast(t('common.undoGone'), { tone: 'warn' });
+                    return;
+                }
+                state.undo();
+            },
+        },
     });
+}
+
+/** Whether a known team id still exists (stale ids from deleted teams are ignored). */
+export function existingTeamId(project: Project, teamId: string | null | undefined): string | undefined {
+    return teamId && project.teams.some((team) => team.id === teamId) ? teamId : undefined;
+}
+
+/** Log entries are an operations record: allowed in field mode, never for viewers or copies. */
+export function canLog(): boolean {
+    const { readOnly, project } = useProject.getState();
+    return Boolean(project) && !readOnly;
 }
 
 export function duplicateSelection() {
@@ -264,10 +295,17 @@ export function cycleStreamer() {
     const next = order[(order.indexOf(ui.streamer) + 1) % order.length];
     // Privacy overlay only: tool, drafts, selection and panels stay as they are.
     ui.set({ streamer: next, streamerInk: next === 'off' ? [] : ui.streamerInk });
-    toast(next === 'off' ? `${t('streamer.title')}: ${t('streamer.off')}` : t('streamer.badge', { profile: t(`streamer.${next}`) }));
+    toastStreamer(next);
+}
+
+export function toastStreamer(profile: 'off' | 'field' | 'public') {
+    toast(profile === 'off' ? `${t('streamer.title')}: ${t('streamer.off')}` : t('streamer.badge', { profile: t(`streamer.${profile}`) }));
 }
 
 export function logEvent(text: string, elementId?: string, teamId?: string) {
+    if (!canLog()) {
+        return;
+    }
     mutate(t('panel.log'), (draft) => {
         draft.log.push({ id: uid('log'), t: nowIso(), text, elementId, teamId });
     });

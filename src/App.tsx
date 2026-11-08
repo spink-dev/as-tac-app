@@ -7,6 +7,9 @@ import { AreaDownloadDialog } from './features/areas/AreaDownloadDialog';
 import { ShortcutsDialog } from './features/workspace/ShortcutsDialog';
 import { startAutosave } from './core/storage/projects';
 import { registerPwa } from './core/pwa';
+import { onMutationRejected } from './core/store/project';
+import { toast } from './core/store/ui';
+import { t } from './i18n';
 
 const Workspace = lazy(() => import('./features/workspace/Workspace').then((module) => ({ default: module.Workspace })));
 
@@ -15,8 +18,19 @@ export function App() {
 
     useEffect(() => {
         const stop = startAutosave();
+        let last = 0;
+        const stopRejected = onMutationRejected(() => {
+            // One hint per burst, not one per keystroke.
+            if (Date.now() - last > 4000) {
+                last = Date.now();
+                toast(t('common.rejected'), { tone: 'warn' });
+            }
+        });
         void registerPwa();
-        return stop;
+        return () => {
+            stop();
+            stopRejected();
+        };
     }, []);
 
     return (

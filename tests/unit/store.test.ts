@@ -236,3 +236,41 @@ describe('privacy filtering (P1-fix)', () => {
         expect(buildPlanCollections(project, { ...base, streamer: 'public' }, 1, true).ink.features).toHaveLength(0);
     });
 });
+
+describe('change validation', () => {
+    beforeEach(() => {
+        useProject.getState().load(createProject({ name: 'Test', areaId: 'mahlwinkel' }));
+    });
+
+    it('rejects a change that would make the stored plan unloadable', () => {
+        const { mutate } = useProject.getState();
+        const layerId = useProject.getState().project!.layers[0].id;
+        expect(mutate('rename', (draft) => {
+            draft.layers[0].name = 'x'.repeat(90);
+        })).toBe(false);
+        expect(useProject.getState().project!.layers[0].name).not.toHaveLength(90);
+        expect(mutate('orphan', (draft) => {
+            draft.elements.push({ ...marker('a'), layerId: 'nope' });
+        })).toBe(false);
+        expect(mutate('too many teams', (draft) => {
+            for (let i = 0; i < 201; i++) {
+                draft.teams.push({ id: `t${i}`, name: `T${i}`, color: '#2f6fc4' });
+            }
+        })).toBe(false);
+        expect(mutate('fine', (draft) => {
+            draft.elements.push({ ...marker('b'), layerId });
+        })).toBe(true);
+        expect(ProjectSchema.safeParse(useProject.getState().project).success).toBe(true);
+    });
+
+    it('rejects removing a layer that elements still reference', () => {
+        const { mutate } = useProject.getState();
+        mutate('layer', (draft) => {
+            draft.layers.push({ id: 'l2', name: 'Two', visible: true, opacity: 1, locked: false });
+            draft.elements.push({ ...marker('a'), layerId: 'l2' });
+        });
+        expect(mutate('drop layer', (draft) => {
+            draft.layers = draft.layers.filter((l) => l.id !== 'l2');
+        })).toBe(false);
+    });
+});

@@ -126,11 +126,25 @@ export function PanelHost() {
                 <span className="panel__handle" />
             </div>
             <div className="panel__head">
-                <div className="tabs" role="tablist" aria-label="Panels">
+                <div className="tabs" role="tablist" aria-label={t('panel.tabs')} onKeyDown={(event) => {
+                    // Roving focus: arrows / Home / End move between tabs and activate them.
+                    const index = defs.findIndex((def) => def.id === active.id);
+                    const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? index + 1
+                        : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? index - 1
+                            : event.key === 'Home' ? 0 : event.key === 'End' ? defs.length - 1 : null;
+                    if (next === null) {
+                        return;
+                    }
+                    event.preventDefault();
+                    const target = defs[(next + defs.length) % defs.length];
+                    useUi.getState().set({ panel: target.id });
+                    requestAnimationFrame(() => document.getElementById(`tab-${target.id}`)?.focus());
+                }}>
                     {defs.map((def) => {
                         const Icon = def.icon;
+                        const selected = def.id === active.id;
                         return (
-                            <button key={def.id} type="button" role="tab" className="tab" aria-selected={def.id === active.id} onClick={() => useUi.getState().set({ panel: def.id })} title={t(def.label)}>
+                            <button key={def.id} id={`tab-${def.id}`} type="button" role="tab" className="tab" aria-selected={selected} aria-controls="panel-body" tabIndex={selected ? 0 : -1} onClick={() => useUi.getState().set({ panel: def.id })} title={t(def.label)}>
                                 <Icon size={16} strokeWidth={1.9} />
                                 <span className="tab__label">{t(def.label)}</span>
                                 {def.id === 'live' && unread > 0 ? <span className="tab__badge num">{unread}</span> : null}
@@ -141,7 +155,7 @@ export function PanelHost() {
                 <IconButton label={t('common.close')} onClick={() => useUi.getState().openPanel(null)}><X {...ICON} /></IconButton>
             </div>
             <div className="panel__body" ref={body}>
-                <div className="panel__content" role="tabpanel">
+                <div className="panel__content" role="tabpanel" id="panel-body" aria-labelledby={`tab-${active.id}`} tabIndex={0}>
                     {open ? <Body /> : null}
                 </div>
             </div>

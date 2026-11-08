@@ -7,6 +7,13 @@ import { Button, Dialog, IconButton } from '../../ui/components';
 import { bindingFor, eventCombo, findConflict, formatCombo, SHORTCUTS, type ShortcutGroup } from '../../core/shortcuts/registry';
 
 const GROUPS: ShortcutGroup[] = ['tools', 'edit', 'view', 'briefing'];
+
+/** Keys that drive focus, buttons, nudging or the draw width; never offered as custom bindings. */
+const ARROWS = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+const RESERVED = new Set([
+    'tab', 'shift+tab', 'space', 'shift+space', 'enter', 'shift+enter', 'escape', 'home', 'end', 'pageup', 'pagedown', '[', ']',
+    ...ARROWS, ...ARROWS.map((key) => `shift+${key}`),
+]);
 const GROUP_LABEL: Record<ShortcutGroup, 'mode.plan' | 'common.edit' | 'settings.device' | 'mode.briefing'> = { tools: 'mode.plan', edit: 'common.edit', view: 'settings.device', briefing: 'mode.briefing' };
 
 /** Overview doubles as the rebinding UI: press-a-key capture, conflicts, per-binding reset. */
@@ -20,7 +27,14 @@ export function ShortcutsDialog() {
     const [conflict, setConflict] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!capturing) {
+        if (!open) {
+            setCapturing(null);
+            setConflict(null);
+        }
+    }, [open]);
+
+    useEffect(() => {
+        if (!capturing || !open) {
             return;
         }
         const onKey = (event: KeyboardEvent) => {
@@ -38,6 +52,11 @@ export function ShortcutsDialog() {
                 setConflict(t('shortcuts.hint'));
                 return;
             }
+            // A reserved key is only accepted as the action's own default (e.g. Enter to finish).
+            if (RESERVED.has(combo) && bindingFor(capturing, {}) !== combo) {
+                setConflict(t('shortcuts.reserved'));
+                return;
+            }
             const clash = findConflict(capturing, combo, keybinds);
             if (clash) {
                 setConflict(t('shortcuts.conflict', { action: t(clash.label) }));
@@ -49,7 +68,7 @@ export function ShortcutsDialog() {
         };
         window.addEventListener('keydown', onKey, true);
         return () => window.removeEventListener('keydown', onKey, true);
-    }, [capturing, keybinds, set, t]);
+    }, [capturing, open, keybinds, set, t]);
 
     return (
         <Dialog open={open} onClose={() => {

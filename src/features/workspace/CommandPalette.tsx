@@ -33,11 +33,19 @@ export function CommandPalette() {
     const close = () => useUi.getState().set({ palette: false });
 
     useEffect(() => {
-        if (open) {
-            setQuery('');
-            setActive(0);
-            requestAnimationFrame(() => input.current?.focus());
+        if (!open) {
+            return;
         }
+        setQuery('');
+        setActive(0);
+        // Restore focus to where it was (e.g. the toolbar button) when the palette closes.
+        const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        requestAnimationFrame(() => input.current?.focus());
+        return () => {
+            if (previous?.isConnected) {
+                previous.focus();
+            }
+        };
     }, [open]);
 
     const items = useMemo<Item[]>(() => {
@@ -91,7 +99,13 @@ export function CommandPalette() {
                 close();
             }
         }}>
-            <div className="palette" role="dialog" aria-modal="true" aria-label={t('common.search')}>
+            <div className="palette" role="dialog" aria-modal="true" aria-label={t('common.search')} onKeyDown={(event) => {
+                // The input is the only tab stop: keep focus inside the modal.
+                if (event.key === 'Tab') {
+                    event.preventDefault();
+                    input.current?.focus();
+                }
+            }}>
                 <div className="palette__search">
                     <Search size={18} />
                     <input
@@ -107,6 +121,9 @@ export function CommandPalette() {
                             setActive(0);
                         }}
                         onKeyDown={(event) => {
+                            if (event.nativeEvent.isComposing) {
+                                return;
+                            }
                             if (event.key === 'ArrowDown') {
                                 setActive((i) => Math.min(results.length - 1, i + 1));
                                 event.preventDefault();
@@ -124,7 +141,7 @@ export function CommandPalette() {
                 <ul id="palette-results" className="palette__list" role="listbox">
                     {results.length === 0 ? <li className="palette__empty">{t('palette.empty')}</li> : null}
                     {results.map((item, i) => (
-                        <li key={item.id} id={`pal-${item.id}`} role="option" aria-selected={i === active} className="palette__item" onPointerEnter={() => setActive(i)} onClick={() => run(item)}>
+                        <li key={item.id} id={`pal-${item.id}`} role="option" aria-selected={i === active} className="palette__item" onPointerEnter={() => setActive(i)} onPointerDown={(event) => event.preventDefault()} onClick={() => run(item)}>
                             <span className="palette__label">{item.label}</span>
                             {item.meta ? <span className="palette__meta">{item.meta}</span> : null}
                             {item.hint ? <kbd className="kbd">{item.hint}</kbd> : null}

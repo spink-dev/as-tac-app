@@ -11,8 +11,29 @@ export const AssetRefSchema = z.string().regex(/^[a-f0-9]{64}$/, 'AssetRef must 
 const passiveMime = z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf', 'text/plain', 'application/octet-stream']);
 const imageMime = z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const id = z.string().min(1).max(80);
-const shortText = z.string().max(160);
-const longText = z.string().max(8000);
+
+/** Text limits shared by the schema and every input that writes into it (`maxLength`). */
+export const MAX = {
+    name: 80,
+    projectName: 120,
+    phaseName: 120,
+    trackName: 120,
+    imageName: 160,
+    shortText: 160,
+    text: 400,
+    longText: 8000,
+    log: 2000,
+    callsign: 40,
+    radio: 40,
+    unitNumber: 12,
+    radiusM: 200000,
+} as const;
+
+/** Entity count limits per collection. */
+export const LIMITS = { layers: 64, elements: 20000, drawings: 5000, images: 32, teams: 200, phases: 100, log: 5000, tracks: 200 } as const;
+
+const shortText = z.string().max(MAX.shortText);
+const longText = z.string().max(MAX.longText);
 
 export const AttachmentSchema = z.object({
     id,
@@ -66,7 +87,7 @@ export const RouteSchema = z.object({
 
 export const ZoneShapeSchema = z.discriminatedUnion('type', [
     z.object({ type: z.literal('polygon'), points: z.array(LngLatSchema).min(3).max(5000) }),
-    z.object({ type: z.literal('circle'), center: LngLatSchema, radiusM: z.number().positive().max(200000) }),
+    z.object({ type: z.literal('circle'), center: LngLatSchema, radiusM: z.number().positive().max(MAX.radiusM) }),
 ]);
 
 export const ZoneSchema = z.object({
@@ -84,7 +105,7 @@ export const TextSchema = z.object({
     kind: z.literal('text'),
     ...elementBase,
     pos: LngLatSchema,
-    text: z.string().max(400),
+    text: z.string().max(MAX.text),
     size: z.number().min(8).max(64).optional(),
 });
 
@@ -117,7 +138,7 @@ export const ControlPointSchema = z.object({
 
 export const ImageOverlaySchema = z.object({
     id,
-    name: z.string().min(1).max(160),
+    name: z.string().min(1).max(MAX.imageName),
     asset: AssetRefSchema,
     mime: imageMime,
     width: z.number().int().positive().max(16384),
@@ -138,7 +159,7 @@ export const ImageOverlaySchema = z.object({
 
 export const LayerSchema = z.object({
     id,
-    name: z.string().min(1).max(80),
+    name: z.string().min(1).max(MAX.name),
     visible: z.boolean(),
     opacity: z.number().min(0).max(1),
     locked: z.boolean(),
@@ -159,12 +180,12 @@ export const TeamPlanningSchema = z.object({
 
 export const TeamSchema = z.object({
     id,
-    name: z.string().min(1).max(80),
-    callsign: z.string().max(40).optional(),
-    unitNumber: z.string().max(12).optional(),
+    name: z.string().min(1).max(MAX.name),
+    callsign: z.string().max(MAX.callsign).optional(),
+    unitNumber: z.string().max(MAX.unitNumber).optional(),
     color: ColorSchema,
     side: z.enum(['friendly', 'enemy', 'neutral']).optional(),
-    radioChannel: z.string().max(40).optional(),
+    radioChannel: z.string().max(MAX.radio).optional(),
     strength: z.number().int().nonnegative().max(9999).optional(),
     leader: z.string().max(80).optional(),
     planning: TeamPlanningSchema.optional(),
@@ -186,7 +207,7 @@ export const CameraSchema = z.object({
 
 export const PhaseSchema = z.object({
     id,
-    name: z.string().min(1).max(120),
+    name: z.string().min(1).max(MAX.phaseName),
     notes: longText.optional(),
     start: z.string().max(40).optional(),
     end: z.string().max(40).optional(),
@@ -196,7 +217,7 @@ export const PhaseSchema = z.object({
 export const LogEntrySchema = z.object({
     id,
     t: z.string(),
-    text: z.string().min(1).max(2000),
+    text: z.string().min(1).max(MAX.log),
     teamId: id.optional(),
     elementId: id.optional(),
 });
@@ -209,7 +230,7 @@ export const TrackPointSchema = z.object({
 
 export const TrackSchema = z.object({
     id,
-    name: z.string().min(1).max(120),
+    name: z.string().min(1).max(MAX.trackName),
     startedAt: z.string(),
     endedAt: z.string().optional(),
     points: z.array(TrackPointSchema).max(50000),
@@ -240,20 +261,20 @@ export type SyncedCollection = typeof SYNCED_COLLECTIONS[number];
 export const ProjectSchema = z.object({
     id,
     formatVersion: z.literal(FORMAT_VERSION),
-    name: z.string().min(1).max(120),
+    name: z.string().min(1).max(MAX.projectName),
     createdAt: z.string(),
     updatedAt: z.string(),
     areaId: z.string().max(120).nullable(),
     view: CameraSchema.optional(),
     event: EventRefSchema.optional(),
-    layers: z.array(LayerSchema).min(1).max(64),
-    elements: z.array(ElementSchema).max(20000),
-    drawings: z.array(StrokeSchema).max(5000),
-    images: z.array(ImageOverlaySchema).max(32),
-    teams: z.array(TeamSchema).max(200),
-    phases: z.array(PhaseSchema).max(100),
-    log: z.array(LogEntrySchema).max(5000),
-    tracks: z.array(TrackSchema).max(200),
+    layers: z.array(LayerSchema).min(1).max(LIMITS.layers),
+    elements: z.array(ElementSchema).max(LIMITS.elements),
+    drawings: z.array(StrokeSchema).max(LIMITS.drawings),
+    images: z.array(ImageOverlaySchema).max(LIMITS.images),
+    teams: z.array(TeamSchema).max(LIMITS.teams),
+    phases: z.array(PhaseSchema).max(LIMITS.phases),
+    log: z.array(LogEntrySchema).max(LIMITS.log),
+    tracks: z.array(TrackSchema).max(LIMITS.tracks),
     settings: SettingsSchema,
 }).superRefine((project, ctx) => {
     const layerIds = new Set(project.layers.map((layer) => layer.id));

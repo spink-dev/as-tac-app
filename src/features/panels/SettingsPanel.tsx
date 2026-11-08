@@ -5,12 +5,14 @@ import { usePrefs } from '../../core/store/prefs';
 import { useUi } from '../../core/store/ui';
 import { Button, Field, Segmented, Switch } from '../../ui/components';
 import { showDialog } from '../../core/store/dialogs';
-import { cycleStreamer } from '../../core/actions';
+import { canEdit, toastStreamer } from '../../core/actions';
+import { MAX } from '../../core/model/schema';
 
 export function SettingsPanel() {
     const t = useT();
     const project = useProject((state) => state.project);
-    const readOnly = useProject((state) => state.readOnly);
+    useProject((state) => state.readOnly);
+    useUi((state) => state.mode);
     const prefs = usePrefs();
     const streamer = useUi((state) => state.streamer);
     if (!project) {
@@ -23,9 +25,9 @@ export function SettingsPanel() {
         <div className="stack">
             <section className="section">
                 <div className="section__title">{t('settings.plan')}</div>
-                <fieldset className="plain stack" disabled={Boolean(readOnly)}>
+                <fieldset className="plain stack" disabled={!canEdit()}>
                     <Field label={t('settings.name')}>
-                        <input className="input" value={project.name} onChange={(event) => mutate(t('common.rename'), (draft) => {
+                        <input className="input" maxLength={MAX.projectName} value={project.name} onChange={(event) => mutate(t('common.rename'), (draft) => {
                             draft.name = event.target.value || '–';
                         }, { key: 'project-name' })} />
                     </Field>
@@ -42,9 +44,9 @@ export function SettingsPanel() {
             <section className="section">
                 <div className="section__title">{t('streamer.title')}</div>
                 <Segmented block value={streamer} onChange={(value) => {
-                    while (useUi.getState().streamer !== value) {
-                        cycleStreamer();
-                    }
+                    // Jump straight to the chosen profile; privacy overlay only, nothing else changes.
+                    useUi.getState().set({ streamer: value, streamerInk: value === 'off' ? [] : useUi.getState().streamerInk });
+                    toastStreamer(value);
                 }} options={[{ value: 'off', label: t('streamer.off') }, { value: 'field', label: t('mode.field') }, { value: 'public', label: t('streamer.public') }]} />
                 <p className="field__hint">{t('streamer.hint')}</p>
             </section>

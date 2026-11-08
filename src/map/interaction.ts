@@ -1,7 +1,7 @@
 import type { Map as MlMap, MapMouseEvent, MapTouchEvent, PointLike } from 'maplibre-gl';
 import { useUi, DRAW_COLORS, toast, type ToolId } from '../core/store/ui';
 import { mutate, useProject } from '../core/store/project';
-import { addElement, canEdit, activeLayerId } from '../core/actions';
+import { addElement, canEdit, activeLayerId, existingTeamId } from '../core/actions';
 import { uid, nowIso } from '../core/model/factory';
 import type { Element, LngLat, Project, Stroke } from '../core/model/schema';
 import { insertVertex, isLocked, moveVertex, setRadius, simplify, translateElement } from '../core/model/geometry';
@@ -138,7 +138,7 @@ export function finishDraft(shiftKey = false) {
         const style = ui.routeStyle;
         const id = addElement({
             kind: 'route', id: uid('el'), points, style, arrow: style !== 'boundary',
-            teamId: draft.teamId ?? (style === 'boundary' ? undefined : ui.activeTeamId ?? undefined),
+            teamId: existingTeamId(project, draft.teamId) ?? (style === 'boundary' ? undefined : existingTeamId(project, ui.activeTeamId)),
         }, t('tool.route'));
         finishCreated(id, shiftKey);
         return;

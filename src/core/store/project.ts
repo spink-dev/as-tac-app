@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { Project } from '../model/schema';
 import { nowIso } from '../model/factory';
 import { applyOps, diffProjects, entityOf, HISTORY_COLLECTIONS, ORDER_ID, type EntityOp } from './diff';
+import { validateChange } from '../model/validate';
 
 /**
  * Undo history is stored as entity operations, not array-index patches. That keeps it
@@ -42,6 +43,15 @@ interface ProjectState {
 
 const HISTORY_LIMIT = 100;
 const listeners = new Set<ChangeListener>();
+const rejectListeners = new Set<(label: string, reason: string) => void>();
+
+/** Fires when a change was refused because it would break the schema (too long, too many). */
+export function onMutationRejected(listener: (label: string, reason: string) => void): () => void {
+    rejectListeners.add(listener);
+    return () => {
+        rejectListeners.delete(listener);
+    };
+}
 
 export function onProjectChange(listener: ChangeListener): () => void {
     listeners.add(listener);
@@ -158,6 +168,12 @@ export const useProject = create<ProjectState>((set, get) => ({
         const forward = diffProjects(project, changed, HISTORY_COLLECTIONS);
         const otherFields = changed.view !== project.view;
         if (forward.length === 0 && !otherFields) {
+            return false;
+        }
+        const problem = validateChange(changed, forward);
+        if (problem) {
+            console.warn('change rejected', label, problem);
+            rejectListeners.forEach((listener) => listener(label, problem));
             return false;
         }
         if (options.remote) {

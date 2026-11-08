@@ -7,7 +7,7 @@ import { showDialog } from '../../core/store/dialogs';
 import { Button, Empty, Field, IconButton } from '../../ui/components';
 import { BUNDLED_AREAS, listAreas } from '../../core/areas/store';
 import type { AreaMeta } from '../../core/areas/types';
-import { canEdit } from '../../core/actions';
+import { canEdit, toastUndoable } from '../../core/actions';
 import { addImageMap, boundCount, removeImage } from '../../core/images';
 import { pickFile } from '../../core/files/save';
 import { mapRef } from '../../map/MapView';
@@ -112,7 +112,7 @@ export function MapsPanel() {
                                         </IconButton>
                                         <IconButton small label={t('common.delete')} onClick={() => {
                                             removeImage(image.id);
-                                            toast(t('inspector.deleted', { name: image.name }), { action: { label: t('common.undo'), run: () => useProject.getState().undo() } });
+                                            toastUndoable(t('inspector.deleted', { name: image.name }));
                                         }}><Trash2 size={16} /></IconButton>
                                     </>
                                 ) : null}
