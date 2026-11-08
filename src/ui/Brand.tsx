@@ -1,4 +1,4 @@
-import { Moon, Sun, SunDim } from 'lucide-react';
+import { Languages, Moon, Sun, SunDim } from 'lucide-react';
 import { APPEARANCE_ORDER, usePrefs } from '../core/store/prefs';
 import { useT } from '../i18n';
 import { ICON, IconButton } from './components';
@@ -22,6 +22,20 @@ export function AppearanceToggle() {
     return (
         <IconButton label={label} tipPos="left" onClick={() => set({ appearance: next })} data-testid="appearance">
             {appearance === 'day' ? <Sun {...ICON} /> : appearance === 'dark' ? <Moon {...ICON} /> : <SunDim {...ICON} />}
+        </IconButton>
+    );
+}
+
+/** Two languages: one tap switches; German is the first language (see prefs). */
+export function LanguageToggle() {
+    const t = useT();
+    const locale = usePrefs((state) => state.locale);
+    const set = usePrefs((state) => state.set);
+    const next = locale === 'en' ? 'de' : 'en';
+    return (
+        <IconButton label={t('language.switch')} tipPos="left" onClick={() => set({ locale: next })} lang={next === 'en' ? 'en' : 'de-CH'} className="lang-toggle" data-testid="language">
+            <Languages size={18} strokeWidth={1.75} aria-hidden="true" />
+            <span className="lang-toggle__code" aria-hidden="true">{next.toUpperCase()}</span>
         </IconButton>
     );
 }

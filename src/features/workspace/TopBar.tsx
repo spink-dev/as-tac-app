@@ -39,7 +39,7 @@ export function TopBar() {
                 </div>
             </div>
 
-            <nav className="topbar__modes hud" aria-label="Modus">
+            <nav className="topbar__modes hud" aria-label={t('mode.label')}>
                 {modes.map(({ id, label, icon: Icon }) => (
                     <button key={id} type="button" className="mode-btn" aria-pressed={mode === id} onClick={() => setMode(id)} data-testid={`mode-${id}`}>
                         <Icon size={18} strokeWidth={1.9} />

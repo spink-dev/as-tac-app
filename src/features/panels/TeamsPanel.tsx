@@ -183,7 +183,7 @@ function TeamEditor({ team }: { team: Team }) {
                         {UNIT_SYMBOLS.map((symbol) => (
                             <button key={symbol} type="button" className="chip" aria-pressed={team.symbol === symbol} onClick={() => patch({ symbol }, 'symbol')}>{symbol}</button>
                         ))}
-                        <input className="input input--short" placeholder="AB" maxLength={2} aria-label="Initialen" value={team.symbol?.startsWith('text:') ? team.symbol.slice(5) : ''} onChange={(event) => patch({ symbol: event.target.value ? `text:${event.target.value}` : 'infantry' }, 'symbol')} />
+                        <input className="input input--short" placeholder="AB" maxLength={2} aria-label={t('teams.initials')} value={team.symbol?.startsWith('text:') ? team.symbol.slice(5) : ''} onChange={(event) => patch({ symbol: event.target.value ? `text:${event.target.value}` : 'infantry' }, 'symbol')} />
                     </div>
                 )}
             </Field>

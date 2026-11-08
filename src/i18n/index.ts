@@ -41,6 +41,10 @@ export function relativeTime(iso: string, locale: Locale): string {
     return new Date(iso).toLocaleDateString(locale === 'en' ? 'en' : 'de-CH');
 }
 
+export function formatDateTime(iso: string, locale: Locale): string {
+    return new Date(iso).toLocaleString(locale === 'en' ? 'en' : 'de-CH', { dateStyle: 'short', timeStyle: 'short' });
+}
+
 export function formatBytes(bytes: number): string {
     if (bytes < 1024) {
         return `${bytes} B`;

@@ -114,6 +114,7 @@ export function Field({ label, hint, children, htmlFor }: { label: ReactNode; hi
 }
 
 export function Swatches({ value, colors, onChange, allowCustom = true }: { value?: string; colors: string[]; onChange: (color: string) => void; allowCustom?: boolean }) {
+    const t = useT();
     return (
         <div className="swatches">
             {colors.map((color) => (
@@ -128,7 +129,7 @@ export function Swatches({ value, colors, onChange, allowCustom = true }: { valu
                 />
             ))}
             {allowCustom ? (
-                <label className="swatch swatch--custom" aria-label="custom colour" style={value && !colors.includes(value) ? { ['--swatch' as string]: value, background: value } : undefined}>
+                <label className="swatch swatch--custom" aria-label={t('color.custom')} style={value && !colors.includes(value) ? { ['--swatch' as string]: value, background: value } : undefined}>
                     <span aria-hidden>+</span>
                     <input type="color" value={value ?? '#888888'} onChange={(event) => onChange(event.target.value)} />
                 </label>

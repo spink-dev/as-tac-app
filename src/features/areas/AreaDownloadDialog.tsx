@@ -12,7 +12,7 @@ import { searchPlaces, type PlaceResult } from '../../core/areas/search';
 import { saveArea } from '../../core/areas/store';
 import { boundsSizeM, formatDistance, type Bounds } from '../../core/geo/geo';
 import { toast } from '../../core/store/ui';
-import { mapRef } from '../../map/MapView';
+import { mapLocale, mapRef } from '../../map/MapView';
 
 function onlineStyle() {
     return {
@@ -84,6 +84,7 @@ export function AreaDownloadDialog() {
                 maxPitch: 0,
                 dragRotate: false,
                 attributionControl: { compact: true },
+                locale: mapLocale(),
             });
             instance.touchZoomRotate.disableRotation();
             instance.keyboard.disableRotation();
@@ -253,7 +254,7 @@ export function AreaDownloadDialog() {
                     ) : null}
                 </form>
                 <Field label={t('area.name')} htmlFor={nameId}>
-                    <input id={nameId} className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="z. B. Gelände Nord" />
+                    <input id={nameId} className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder={t('area.namePlaceholder')} />
                 </Field>
             </div>
             <div className="area-dl__map">

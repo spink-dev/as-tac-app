@@ -3,6 +3,7 @@ export const S = {
     'app.tagline': ['Karte, Plan und Briefing – auch ohne Netz.', 'Map, plan and briefing – even without signal.'],
     'common.cancel': ['Abbrechen', 'Cancel'],
     'common.close': ['Schliessen', 'Close'],
+    'common.copy': ['Kopieren', 'Copy'],
     'common.save': ['Speichern', 'Save'],
     'common.apply': ['Übernehmen', 'Apply'],
     'common.delete': ['Löschen', 'Delete'],
@@ -49,6 +50,11 @@ export const S = {
     'appearance.dark': ['Dunkel', 'Dark'],
     'appearance.red': ['Rotlicht', 'Red light'],
     'appearance.toggle': ['Darstellung wechseln', 'Switch appearance'],
+    // Named in the language it switches to, so someone who can't read the current one still finds it.
+    'language.switch': ['Switch to English', 'Auf Deutsch wechseln'],
+    'map.title': ['Karte', 'Map'],
+    'map.toggleAttribution': ['Quellenangaben ein- oder ausblenden', 'Show or hide attribution'],
+    'color.custom': ['Eigene Farbe', 'Custom colour'],
 
     'library.title': ['Pläne', 'Plans'],
     'library.new': ['Neuer Plan', 'New plan'],
@@ -101,6 +107,7 @@ export const S = {
     'area.size': ['Ausschnitt {w} × {h}', 'Extent {w} × {h}'],
     'area.tooLarge': ['Zu gross: höchstens {max} km². Hineinzoomen.', 'Too large: at most {max} km². Zoom in.'],
     'area.name': ['Name des Gebiets', 'Area name'],
+    'area.namePlaceholder': ['z. B. Gelände Nord', 'e.g. North site'],
     'area.download': ['Herunterladen', 'Download'],
     'area.downloading': ['Lädt aus OpenStreetMap …', 'Loading from OpenStreetMap …'],
     'area.converting': ['Wird aufbereitet …', 'Preparing …'],
@@ -137,6 +144,7 @@ export const S = {
     'mode.plan': ['Planen', 'Plan'],
     'mode.field': ['Feld', 'Field'],
     'mode.briefing': ['Briefing', 'Briefing'],
+    'mode.label': ['Modus', 'Mode'],
     'mode.fieldLocked': ['Feldmodus: Plan ist gegen versehentliche Änderungen gesperrt.', 'Field mode: the plan is locked against accidental edits.'],
 
     'tool.select': ['Auswählen', 'Select'],
@@ -263,6 +271,7 @@ export const S = {
     'teams.strength': ['Stärke', 'Strength'],
     'teams.leader': ['Führer', 'Leader'],
     'teams.symbol': ['Symbol', 'Symbol'],
+    'teams.initials': ['Initialen', 'Initials'],
     'teams.logo': ['Logo', 'Logo'],
     'teams.logoUpload': ['Logo wählen', 'Choose logo'],
     'teams.mission': ['Auftrag', 'Mission'],

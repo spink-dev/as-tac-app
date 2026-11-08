@@ -6,7 +6,8 @@ import { mutate, useProject } from '../../core/store/project';
 import { uid, nowIso } from '../../core/model/factory';
 import { toast, useUi } from '../../core/store/ui';
 import { onBeforeClose } from '../../core/store/route';
-import { t } from '../../i18n';
+import { formatDateTime, t } from '../../i18n';
+import { usePrefs } from '../../core/store/prefs';
 import { distanceM } from '../../core/geo/geo';
 import { useCompass } from './compass';
 
@@ -168,7 +169,7 @@ export function stopRecording(save: boolean): boolean {
     }
     // Own tracks are local records, not plan edits: no undo step (an undo would delete the path).
     const saved = mutate(t('field.track'), (draft) => {
-        draft.tracks.push({ id: uid('trk'), name: new Date(recording.startedAt).toLocaleString(), startedAt: recording.startedAt, endedAt: nowIso(), points: recording.points.slice(0, MAX_TRACK_POINTS) });
+        draft.tracks.push({ id: uid('trk'), name: formatDateTime(recording.startedAt, usePrefs.getState().locale), startedAt: recording.startedAt, endedAt: nowIso(), points: recording.points.slice(0, MAX_TRACK_POINTS) });
     }, { noHistory: true });
     if (!saved) {
         useGps.setState({ saveFailed: true });

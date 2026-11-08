@@ -88,6 +88,22 @@
     touch-action: manipulation;
 }
 
+/* Language switch: icon plus the code of the language it switches to. */
+.icon-btn.lang-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: auto;
+    min-width: var(--tap);
+    padding-inline: 8px;
+}
+
+.lang-toggle__code {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
 .icon-btn:hover:not(:disabled) {
     background: var(--surface-2);
     color: var(--ink);

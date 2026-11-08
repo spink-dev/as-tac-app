@@ -19,12 +19,13 @@ const PALETTE = ['#2f6fc4', '#c8393f', '#2f9d5e', '#e09a1a', '#7a4cc2', '#1f9aa6
 const STATUSES: ObjectiveStatus[] = ['unknown', 'enemy', 'contested', 'secured', 'lost'];
 
 function Position({ p }: { p: LngLat }) {
+    const t = useT();
     const format = usePrefs((state) => state.coordFormat);
     const text = format === 'mgrs' ? toMgrs(p, 5) : formatLngLat(p);
     return (
         <div className="kv">
             <span className="kv__k">{format === 'mgrs' ? 'MGRS' : 'WGS84'}</span>
-            <button type="button" className="kv__v data copyable" title="Copy" onClick={() => void navigator.clipboard?.writeText(text)}>{text}</button>
+            <button type="button" className="kv__v data copyable" title={t('common.copy')} onClick={() => void navigator.clipboard?.writeText(text)}>{text}</button>
         </div>
     );
 }

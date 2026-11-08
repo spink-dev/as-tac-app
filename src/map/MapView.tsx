@@ -26,6 +26,11 @@ let planReady = false;
 
 let viewSaveGuard: (() => boolean) | null = null;
 
+/** MapLibre's own words (canvas label, attribution button) in the app language. */
+export function mapLocale(): Record<string, string> {
+    return { 'Map.Title': t('map.title'), 'AttributionControl.ToggleAttribution': t('map.toggleAttribution') };
+}
+
 /** Lets a feature veto remembering the camera (e.g. while it follows the own GPS position). */
 export function setViewSaveGuard(guard: (() => boolean) | null) {
     viewSaveGuard = guard;
@@ -188,6 +193,7 @@ export function MapView() {
             maxZoom: 21,
             clickTolerance: 4,
             cancelPendingTileRequestsWhileZooming: true,
+            locale: mapLocale(),
         });
         map.touchZoomRotate.enableRotation();
         map.keyboard.disable();
@@ -281,6 +287,9 @@ export function MapView() {
             }
         });
         const unsubPrefs = usePrefs.subscribe((state, prev) => {
+            if (state.locale !== prev.locale) {
+                map.getCanvas().setAttribute('aria-label', t('map.title'));
+            }
             if (state.appearance !== prev.appearance) {
                 const next = PALETTES[state.appearance];
                 applyBasemapPalette(map, next);

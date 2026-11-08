@@ -4,7 +4,7 @@ import { areaErrorText } from '../areas/areaErrors';
 import { useT, relativeTime, formatBytes } from '../../i18n';
 import { usePrefs } from '../../core/store/prefs';
 import { Button, ICON, IconButton, useSmoothScroll, useStaggerIn } from '../../ui/components';
-import { AppearanceToggle, BrandMark } from '../../ui/Brand';
+import { AppearanceToggle, BrandMark, LanguageToggle } from '../../ui/Brand';
 import { showDialog } from '../../core/store/dialogs';
 import { deleteProject, duplicateStored, listProjects, loadProject, saveProject } from '../../core/storage/projects';
 import type { ProjectIndexRow } from '../../core/storage/db';
@@ -127,6 +127,7 @@ export function Library() {
                         {navigator.onLine ? <Wifi size={14} strokeWidth={2} /> : null}
                         {pwa.offlineReady ? t('library.offlineReady') : navigator.onLine ? t('common.online') : t('common.offline')}
                     </span>
+                    <LanguageToggle />
                     <AppearanceToggle />
                 </header>
 

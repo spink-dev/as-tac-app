@@ -76,6 +76,11 @@ export function CommandPalette() {
             { id: 'shortcuts', label: t('shortcuts.title'), group: 'actions', run: () => showDialog('shortcuts') },
             { id: 'share', label: t('share.title'), group: 'actions', run: () => useUi.getState().set({ panel: 'share', sheet: 'half' }) },
             { id: 'back', label: t('common.back'), group: 'actions', run: () => void closeProject() },
+            (() => {
+                const next = usePrefs.getState().locale === 'en' ? 'de' : 'en';
+                // Found by either language's word ("Sprache", "Language", "English", "Deutsch").
+                return { id: 'language', label: `${t('settings.language')}: ${next === 'en' ? 'English' : 'Deutsch'}`, meta: next === 'en' ? 'Language' : 'Sprache', group: 'actions' as const, run: () => usePrefs.getState().set({ locale: next }) };
+            })(),
         ];
         return [...objects, ...actions];
     }, [project, keybinds, t]);
