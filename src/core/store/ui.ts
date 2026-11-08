@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LngLat, MarkerType, RouteStyle, Stroke, ZoneCategory } from '../model/schema';
+import type { Element, LngLat, MarkerType, RouteStyle, Stroke, ZoneCategory } from '../model/schema';
 
 export type Mode = 'plan' | 'field' | 'briefing';
 export type ToolId = 'select' | 'marker' | 'route' | 'zone' | 'text' | 'draw' | 'erase' | 'bearing' | 'measure';
@@ -14,6 +14,8 @@ export interface Draft {
     points: LngLat[];
     /** Live cursor position while drafting (rubber band). */
     hover?: LngLat;
+    /** Route seeded from a selected unit belongs to that unit's team. */
+    teamId?: string;
 }
 
 export interface Toast {
@@ -50,6 +52,10 @@ interface UiState {
     navTargetId: string | null;
     imageEditId: string | null;
     areaPicker: boolean;
+    /** Live preview of an element being dragged; committed as one undo step on release. */
+    override: Element | null;
+    /** Pending measurement (session only). */
+    measure: LngLat[] | null;
     setTool: (tool: ToolId) => void;
     set: (patch: Partial<UiState>) => void;
     select: (ids: string[], additive?: boolean) => void;
@@ -88,8 +94,10 @@ export const useUi = create<UiState>((set, get) => ({
     navTargetId: null,
     imageEditId: null,
     areaPicker: false,
+    override: null,
+    measure: null,
     setTool(tool) {
-        set({ tool, draft: null });
+        set({ tool, draft: null, measure: tool === 'measure' ? get().measure : null });
     },
     set(patch) {
         set(patch);
@@ -133,6 +141,7 @@ export const useUi = create<UiState>((set, get) => ({
         set({
             mode: 'plan', tool: 'select', selection: [], panel: null, sheet: 'closed', draft: null, phaseIndex: 0,
             briefingInk: [], streamerInk: [], streamer: 'off', navTargetId: null, imageEditId: null, activeLayerId: null, activeTeamId: null,
+            override: null, measure: null,
         });
     },
 }));

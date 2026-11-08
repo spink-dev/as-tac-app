@@ -39,7 +39,7 @@ function layers(p: Palette): LayerSpecification[] {
         },
         {
             id: 'plan-zone-pattern', type: 'fill', source: 'plan-zones', filter: ['!=', ['get', 'pattern'], ''] as never,
-            paint: { 'fill-pattern': ['get', 'pattern'] as never, 'fill-opacity': ['*', 0.85, op] as never },
+            paint: { 'fill-pattern': ['get', 'pattern'] as never, 'fill-opacity': ['*', 0.6, op] as never },
         },
         {
             id: 'plan-zone-sel', type: 'line', source: 'plan-zones', filter: isSel as never,
@@ -121,7 +121,7 @@ function layers(p: Palette): LayerSpecification[] {
             layout: {
                 'text-field': ['get', 'text'] as never, 'text-font': FONT, 'text-size': ['get', 'size'] as never, 'text-padding': 3, 'text-max-width': 12,
                 'symbol-sort-key': ['case', ['==', ['get', 'role'], 'zone'], 0, ['==', ['get', 'role'], 'route'], 1, 2] as never,
-                'text-offset': ['case', ['==', ['get', 'role'], 'route'], ['literal', [0, -1.4]], ['literal', [0, 0]]] as never,
+                'text-offset': ['match', ['get', 'role'], 'route', ['literal', [0, -1.4]], 'leg', ['literal', [0, 1.2]], ['literal', [0, 0]]] as never,
             },
             paint: { 'text-color': p.label, 'text-halo-color': p.labelHalo, 'text-halo-width': 1.8, 'text-opacity': op as never },
         },

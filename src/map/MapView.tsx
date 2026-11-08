@@ -16,6 +16,8 @@ import { PALETTES } from './palette';
 import { addPlanLayers, applyPlanPalette, setPlanData, setSourceData } from './planLayers';
 import { buildPlanCollections } from './planFeatures';
 import { syncImageOverlays } from './images';
+import { installInteraction } from './interaction';
+import { renderDraft, renderEdit } from './overlays';
 
 export const mapRef: { current: MlMap | null } = { current: null };
 /** True once plan sources and layers exist. `isStyleLoaded()` is false while big sources parse. */
@@ -77,7 +79,9 @@ export function renderPlan() {
     const ui = useUi.getState();
     const prefs = usePrefs.getState();
     const phase = ui.mode === 'briefing' && project.phases.length > 0 ? project.phases[Math.min(ui.phaseIndex, project.phases.length - 1)] : null;
-    const collections = buildPlanCollections(project, {
+    const override = ui.override;
+    const view = override ? { ...project, elements: project.elements.map((e) => (e.id === override.id ? override : e)) } : project;
+    const collections = buildPlanCollections(view, {
         mode: ui.mode,
         phaseId: phase?.id ?? null,
         streamer: ui.streamer,
@@ -87,6 +91,7 @@ export function renderPlan() {
         streamerInk: ui.streamerInk,
     }, project.settings.unitScale, project.settings.legLabels);
     setPlanData(map, collections);
+    renderEdit(map);
     void syncImageOverlays(map, project.images, ui.streamer === 'public');
     setBasemapLabels(map, project.settings.basemapLabels);
 }
@@ -185,9 +190,11 @@ export function MapView() {
         updateRedFilter(element);
 
         let disposed = false;
+        let stopInteraction: (() => void) | null = null;
         map.on('load', async () => {
             addPlanLayers(map, palette);
             planReady = true;
+            stopInteraction = installInteraction(map);
             renderPlan();
             const current = useProject.getState().project;
             if (current) {
@@ -234,8 +241,14 @@ export function MapView() {
         });
         const unsubUi = useUi.subscribe((state, prev) => {
             if (state.selection !== prev.selection || state.mode !== prev.mode || state.phaseIndex !== prev.phaseIndex || state.streamer !== prev.streamer
-                || state.briefingInk !== prev.briefingInk || state.streamerInk !== prev.streamerInk) {
+                || state.briefingInk !== prev.briefingInk || state.streamerInk !== prev.streamerInk || state.override !== prev.override) {
                 schedulePlanRender();
+            }
+            if ((state.draft !== prev.draft || state.measure !== prev.measure || state.zoneShape !== prev.zoneShape) && planReady) {
+                renderDraft(map);
+            }
+            if (state.tool !== prev.tool && planReady) {
+                renderEdit(map);
             }
         });
         const unsubPrefs = usePrefs.subscribe((state, prev) => {
@@ -257,6 +270,7 @@ export function MapView() {
 
         return () => {
             disposed = true;
+            stopInteraction?.();
             unsubProject();
             unsubUi();
             unsubPrefs();
