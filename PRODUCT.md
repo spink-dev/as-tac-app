@@ -6,11 +6,11 @@ product
 
 ## Users
 
-Airsoft-Spieler orientieren sich auf iPhone 16 Pro und Galaxy A24 draussen im Gelände. Organisatoren planen am grösseren Bildschirm und führen Briefings. Kartenautoren pflegen Gelände und unterschiedliche Events desselben Standorts. Root-Administratoren veröffentlichen geprüfte Kartenpakete.
+Airsoft-Spieler orientieren sich auf iPhone 16 Pro und Galaxy A24 draussen im Gelände. Organisatoren und Gruppenführer planen am grösseren Bildschirm – oft zu mehreren gleichzeitig – und führen Briefings. Kartenautoren legen Eventkarten als Bildkarten über das echte Gelände. Zuschauer (z. B. Spieler einer Gruppe) folgen einem Live-Plan nur lesend.
 
 ## Product Purpose
 
-AS-TAC verbindet offline nutzbare Orientierung, geografische Planung, Paketverteilung und gemeinsames Briefing. Die Karte bleibt während aller Aufgaben sichtbar. Mahlwinkel erhält eine gemeinsame Geländegrundlage und getrennte Event-Zonen und Gebäudebezeichnungen. Zivilschutz-Spezialisierungen folgen später.
+AS-TAC 1.0 verbindet offline nutzbare Orientierung auf echten OSM-Karten, die Bildkarten-Werkzeuge von TacMap, Briefing und Zusammenarbeit: Dateien teilen, QR-Links, Live-Planung mit Rollen. Die Karte bleibt während aller Aufgaben sichtbar. Eigene Gebiete lassen sich gezielt herunterladen; danach läuft alles ohne Netz.
 
 ## Brand Personality
 
@@ -26,7 +26,8 @@ Keine dekorative Kommandozentrale (UX-Spec). Keine endlose Formularspalte, die a
 - Werkzeuge erscheinen dort, wo sie gebraucht werden; sichere Feldansicht ist der Einstieg.
 - Gelände bleibt erhalten; Event-Layer und eigene Ergänzungen liegen transparent darüber.
 - Ein gespeicherter Stand ist nachvollziehbar, ein Entwurf erkennbar und eine Veröffentlichung bewusst.
-- Lokale Vorbereitung funktioniert ohne Konto; öffentliche Katalogpflege verlangt eine serverseitige Root-Rolle.
+- Lokale Vorbereitung funktioniert ohne Konto; Live-Zusammenarbeit ist optional und serverseitig durch Rollen geschützt.
+- Gleichzeitige Änderungen werden sichtbar gemacht, nie still überschrieben; die eigene Position verlässt das Gerät nie.
 
 ## Accessibility & Inclusion
 

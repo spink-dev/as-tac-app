@@ -7,6 +7,7 @@ import { AreaDownloadDialog } from './features/areas/AreaDownloadDialog';
 import { ShortcutsDialog } from './features/workspace/ShortcutsDialog';
 import { ImportDialog } from './features/share/ImportDialog';
 import { JoinDialog } from './features/live/JoinDialog';
+import { CreditsDialog } from './features/library/CreditsDialog';
 import { showDialog } from './core/store/dialogs';
 import { decodePlanLink, JOIN_PREFIX, LINK_PREFIX } from './core/files/link';
 import { startAutosave } from './core/storage/projects';
@@ -114,6 +115,7 @@ export function App() {
             <ShortcutsDialog />
             <ImportDialog />
             <JoinDialog />
+            <CreditsDialog />
             <Toasts />
         </>
     );

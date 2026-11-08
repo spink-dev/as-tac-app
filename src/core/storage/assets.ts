@@ -15,6 +15,27 @@ export function safeMime(mime: string | undefined): string {
     const normalized = (mime ?? '').toLowerCase().split(';')[0].trim();
     return (SAFE_MIME as readonly string[]).includes(normalized) ? normalized : 'application/octet-stream';
 }
+
+const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const MAX_DECODE_PIXELS = 50_000_000;
+
+/**
+ * The content type an asset is stored under: an image type only when the bytes really are an
+ * image within the decode limits, otherwise inert. Applies to every way into the store.
+ */
+function storedMime(bytes: Uint8Array, declared: string | undefined): string {
+    const mime = safeMime(declared);
+    if (!IMAGE_MIME.has(mime)) {
+        return mime;
+    }
+    const size = imageDimensions(bytes);
+    return size && size.width <= 16384 && size.height <= 16384 && size.width * size.height <= MAX_DECODE_PIXELS ? mime : 'application/octet-stream';
+}
+
+/** Only assets stored as a checked image type are ever decoded or shown. */
+export function isRenderableImage(row: Pick<AssetRow, 'mime'> | undefined | null): boolean {
+    return Boolean(row && IMAGE_MIME.has(row.mime));
+}
 const MAX_ASSET_BYTES = 40 * 1024 * 1024;
 
 export async function putAsset(blob: Blob, name?: string, extra: Partial<AssetRow> = {}): Promise<AssetRow> {
@@ -27,7 +48,7 @@ export async function putAsset(blob: Blob, name?: string, extra: Partial<AssetRo
     if (existing) {
         return existing;
     }
-    const mime = safeMime(blob.type);
+    const mime = storedMime(bytes, blob.type);
     const row: AssetRow = {
         hash,
         blob: new Blob([bytes], { type: mime }),
@@ -52,7 +73,7 @@ export async function putVerifiedAsset(hash: string, bytes: Uint8Array, mime: st
     }
     const copy = new Uint8Array(bytes.byteLength);
     copy.set(bytes);
-    const type = safeMime(mime);
+    const type = storedMime(bytes, mime);
     await db.assets.put({ hash, blob: new Blob([copy], { type }), mime: type, size: bytes.byteLength, name, createdAt: new Date().toISOString() });
 }
 
@@ -68,7 +89,7 @@ export async function assetUrl(hash: string): Promise<string | null> {
         return cached;
     }
     const row = await db.assets.get(hash);
-    if (!row) {
+    if (!row || !isRenderableImage(row)) {
         return null;
     }
     const url = URL.createObjectURL(row.blob);

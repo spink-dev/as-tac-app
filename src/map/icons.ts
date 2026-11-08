@@ -1,5 +1,5 @@
 import type { Map as MlMap } from 'maplibre-gl';
-import { getAsset } from '../core/storage/assets';
+import { getAsset, isRenderableImage } from '../core/storage/assets';
 
 const RATIO = 2;
 
@@ -379,10 +379,13 @@ function drawArrow(color: string, head: boolean) {
 
 async function drawLogo(hash: string, scale: number) {
     const asset = await getAsset(hash);
-    if (!asset) {
+    if (!isRenderableImage(asset)) {
         return null;
     }
-    const bitmap = await createImageBitmap(asset.blob);
+    const bitmap = await createImageBitmap(asset!.blob).catch(() => null);
+    if (!bitmap) {
+        return null;
+    }
     const size = Math.round(40 * scale);
     const { c, ctx } = canvas(size);
     const ratio = Math.min(size / bitmap.width, size / bitmap.height);

@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "e2e": "node tests/e2e/run.mjs",
     "check": "npm run typecheck && npm run test && npm run build",
-    "map:fetch": "node scripts/fetch-map.mjs"
+    "map:fetch": "node scripts/fetch-map.mjs",
+    "licenses": "node scripts/licenses.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",

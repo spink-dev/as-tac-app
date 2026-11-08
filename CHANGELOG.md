@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0-alpha.1 — 2026-11-08 (Branch `redesign/as-tac-2`)
+
+Neuentwicklung: as-tac 0.6 (echte OSM-Karten) und TacMap 0.12 (Bildkarten, Werkzeuge) in einer App.
+
+- **Technik:** Astro abgelöst durch Vite 8 + React 19 (reine Client-App), MapLibre GL 6, Zustand/Immer, Dexie, Zod 4. Neue IndexedDB `as-tac-v2`; die alte Datenbank `as-tac-projects` bleibt unangetastet und wird beim Start zur Übernahme angeboten.
+- **Karten:** mitgelieferte Gebiete Mahlwinkel, Benglen, Zürich bis Benglen; eigene Ausschnitte bis 36 km² per Overpass mit Ortssuche; lokale Schriften und Symbole, Tag/Dunkel/Rotlicht, MGRS-Gitter.
+- **Bildkarten:** auf die echte Karte legen, mit Passpunkten ausrichten (ähnlich ab 2, affin ab 4 gut verteilten Paaren), bekannte Mahlwinkel-Eventkarten per SHA-256 erkennen; gebundene Objekte, Zeichnungen und Ausschnitte bewegen sich mit.
+- **Planen:** Marker, Routen, Zonen, Text, Zeichnen, Radierer, Peilung, Messen, Ebenen, Teams mit Auftragskarte/Verbänden/Logos/Vorlagen, Protokoll, Undo/Redo als Entitäts-Operationen, Befehlspalette, frei belegbare Tastenkürzel, Inspector, Grenzen aus dem Schema an jeder Eingabe.
+- **Feld:** gesperrter Plan, eigene Position, Kompass mit Blickrichtung oben, Navigation, Pfadaufnahme (nur lokal, Export nur auf Wunsch).
+- **Briefing:** Phasen mit Ausschnitt, Zeit und Notizen, temporärer Stift, Präsentation leiten/folgen im Live-Betrieb.
+- **Teilen & Import:** `.astac` (ZIP mit SHA-256 für jede Datei, optional mit Grundkarte), QR/Link für kleine Pläne, Import von `.tacmap`, as-tac 0.x und `.astac-map.json`, Installations-Dateihandler.
+- **Live:** Supabase-Migration mit RLS und geprüften RPCs, Versionsprüfung statt stillem Überschreiben, dauerhafte Warteschlange pro Objekt (übersteht Neuladen und Funklöcher), Rollen Besitzer/Admin/Zuschauer, Einladungscodes per Link-Fragment oder QR, Sperren entfernter Mitglieder, Admin-Chat, Anwesenheit; lokaler Testmodus zwischen Tabs.
+- **Datenschutz:** GPS wird nie übertragen; Streamer Safe blendet Position, Navigation, Pläne, Codes und QR aus.
+- **Prüfung:** 66 Unit-Tests (inkl. Migration und Rechte unter PGlite, lokaler Testmodus mit denselben Regeln) und 7 Browser-Szenarien in Chromium bestanden. Nicht geprüft: echte Geräte und Sensoren, Safari, ein echtes Supabase-Projekt, Docker-Build.
+
 ## 0.6.0 — 2026-10-01 (main)
 
 - Freigegebene Integration aller Änderungen aus 0.5.1-alpha.1 bis 0.6.0-alpha.2: Mahlwinkel-Datenkorrekturen, einheitliche Kartensymbole und Schraffuren, lokale GPS-Pfadaufnahme, Standortabgleich, Desktop-Zeichentasten und Zürich–Benglen als Offline-Testgebiet.

@@ -8,7 +8,7 @@ import { createTeam, uid, TEAM_COLORS } from '../../core/model/factory';
 import { canEdit, addElement, toastUndoable } from '../../core/actions';
 import { LIMITS, MAX, TeamSchema, type Team } from '../../core/model/schema';
 import { UNIT_SYMBOLS } from '../../map/icons';
-import { getAsset, putAsset, prepareImage } from '../../core/storage/assets';
+import { getAsset, isRenderableImage, putAsset, prepareImage } from '../../core/storage/assets';
 import { pickFile, saveFile } from '../../core/files/save';
 import { mapCenter } from '../../map/interaction';
 import { z } from 'zod';
@@ -166,9 +166,17 @@ function TeamEditor({ team }: { team: Team }) {
                         if (!file) {
                             return;
                         }
-                        const prepared = await prepareImage(file);
-                        const asset = await putAsset(prepared.blob, file.name, { width: prepared.width, height: prepared.height });
-                        patch({ logoAsset: asset.hash }, 'logo');
+                        try {
+                            const prepared = await prepareImage(file);
+                            const asset = await putAsset(prepared.blob, file.name, { width: prepared.width, height: prepared.height });
+                            if (!isRenderableImage(asset)) {
+                                throw new Error('image-format');
+                            }
+                            patch({ logoAsset: asset.hash }, 'logo');
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : '';
+                            toast(message === 'asset-too-large' || message === 'image-too-large' ? t('maps.tooLarge') : t('maps.imageFailed'), { tone: 'warn' });
+                        }
                     }}><ImagePlus size={16} /> {t('teams.logoUpload')}</Button>
                 ) : (
                     <div className="chip-row">

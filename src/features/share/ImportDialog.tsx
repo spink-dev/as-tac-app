@@ -35,6 +35,9 @@ export function importErrorText(error: unknown): string {
     if (code.startsWith('archive-too')) {
         return translate('import.errorTooLarge');
     }
+    if (code === 'area-too-large') {
+        return translate('import.errorAreaTooLarge');
+    }
     if (code === 'project-newer') {
         return translate('import.errorNewer');
     }

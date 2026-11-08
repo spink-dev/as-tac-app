@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { zipSync, strToU8 } from 'fflate';
 import { createProject } from '../../src/core/model/factory';
 import type { Project } from '../../src/core/model/schema';
-import { putAsset, sha256Hex } from '../../src/core/storage/assets';
+import { assetUrl, getAsset, isRenderableImage, putAsset, putVerifiedAsset, sha256Hex } from '../../src/core/storage/assets';
 import { exportAstac, readImportFile } from '../../src/core/files/astac';
 import { readZip } from '../../src/core/files/zip';
 import { decodePlanLink, encodePlanLink } from '../../src/core/files/link';
@@ -160,5 +160,20 @@ describe('import hygiene', () => {
         const json = JSON.stringify({ maps: [], activeMapId: 'm' });
         const zip = zipSync({ 'manifest.json': strToU8(JSON.stringify({ format: 'tacmap', formatVersion: 1, assets: [] })), 'project.json': strToU8(json) });
         await expect(readImportFile(new Blob([new Uint8Array(zip)]), nowhere)).rejects.toThrow('archive-checksum');
+    });
+});
+
+describe('asset store', () => {
+    it('keeps bytes that are not really an image inert and never renders them', async () => {
+        const fake = new TextEncoder().encode('<svg onload="alert(1)"></svg>');
+        const row = await putAsset(new Blob([fake], { type: 'image/png' }), 'fake.png');
+        expect(row.mime).toBe('application/octet-stream');
+        expect(isRenderableImage(row)).toBe(false);
+        expect(await assetUrl(row.hash)).toBeNull();
+        const hash = await sha256Hex(fake.slice(0, 20));
+        await putVerifiedAsset(hash, fake.slice(0, 20), 'image/jpeg');
+        expect(isRenderableImage(await getAsset(hash))).toBe(false);
+        const real = await putAsset(new Blob([new Uint8Array(png())], { type: 'image/png' }), 'real.png');
+        expect(isRenderableImage(real)).toBe(true);
     });
 });
