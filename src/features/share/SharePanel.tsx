@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Copy, Download, Map as MapIcon, QrCode, Send } from 'lucide-react';
 import { encode } from 'uqr';
 import { useT, formatBytes } from '../../i18n';
 import { useProject } from '../../core/store/project';
-import { toast } from '../../core/store/ui';
+import { toast, useUi } from '../../core/store/ui';
 import { Button, Empty, Switch } from '../../ui/components';
 import { astacFilename, exportAstac } from '../../core/files/astac';
 import { encodePlanLink } from '../../core/files/link';
@@ -56,7 +56,10 @@ export function SharePanel() {
             setArea(null);
         }
     }, [areaId]);
-    const link = useMemo(() => (project && showQr ? encodePlanLink(project, appBaseUrl()) : null), [project, showQr]);
+    // Deferred: re-encoding the QR on every keystroke would stall typing in other panels.
+    const deferred = useDeferredValue(project);
+    const streamer = useUi((state) => state.streamer);
+    const link = useMemo(() => (deferred && showQr ? encodePlanLink(deferred, appBaseUrl()) : null), [deferred, showQr]);
     if (!project) {
         return null;
     }
@@ -68,19 +71,24 @@ export function SharePanel() {
     const run = async (mode: 'share' | 'download') => {
         setBusy(true);
         try {
-            const blob = await build();
+            const { blob, missing } = await build();
             const filename = astacFilename(project);
             if (mode === 'share') {
                 const how = await shareFile(blob, filename, project.name);
-                if (how !== 'cancelled') {
+                if (how === 'shared') {
                     toast(t('share.sent'), { tone: 'ok' });
+                } else if (how === 'downloaded') {
+                    toast(t('share.downloaded'), { tone: 'ok' });
                 }
             } else {
                 saveFile(blob, filename);
             }
+            if (missing > 0) {
+                toast(t('share.missingImages', { n: missing }), { tone: 'warn' });
+            }
         } catch (error) {
             console.warn('export failed', error);
-            toast(t('share.exportFailed'), { tone: 'danger' });
+            toast(t('share.exportError'), { tone: 'danger' });
         } finally {
             setBusy(false);
         }
@@ -108,7 +116,10 @@ export function SharePanel() {
             </section>
             <section className="section">
                 <div className="section__title">{t('share.qr')}</div>
-                {!showQr ? (
+                {streamer !== 'off' ? (
+                    // Streamer Safe: a full-plan QR code on screen would hand the plan to every viewer.
+                    <p className="notice">{t('share.qrStreamer')}</p>
+                ) : !showQr ? (
                     <Button onClick={() => setShowQr(true)} data-testid="share-qr"><QrCode size={18} /> {t('share.qr')}</Button>
                 ) : link ? (
                     <>

@@ -1,6 +1,7 @@
 import { deflateSync } from 'fflate';
 import type { Project } from '../model/schema';
 import { migrateProject } from './astac';
+import { inflateCapped } from './zip';
 
 /**
  * Small plans travel inside a link (`#plan=…`, deflate + base64url) so a QR code can carry them.
@@ -64,29 +65,11 @@ export async function decodePlanLink(hash: string): Promise<Project> {
         throw new Error('link-invalid');
     }
     const compressed = fromBase64Url(hash.slice(LINK_PREFIX.length));
-    const reader = new Blob([new Uint8Array(compressed)]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
-    const chunks: Uint8Array[] = [];
-    let length = 0;
+    let bytes: Uint8Array;
     try {
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) {
-                break;
-            }
-            length += value.length;
-            if (length > MAX_INFLATED) {
-                throw new Error('link-invalid');
-            }
-            chunks.push(value);
-        }
-    } finally {
-        await reader.cancel().catch(() => undefined);
-    }
-    const bytes = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.length;
+        bytes = await inflateCapped(compressed, MAX_INFLATED);
+    } catch {
+        throw new Error('link-invalid');
     }
     return migrateProject(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
 }

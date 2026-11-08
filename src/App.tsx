@@ -25,9 +25,23 @@ async function receiveLaunch() {
     queue?.setConsumer((params) => {
         const handle = params.files[0];
         if (handle) {
-            void handle.getFile().then((file) => showDialog('import', { file }));
+            void handle.getFile().then((file) => showDialog('import', { file })).catch(() => toast(t('import.errorFormat'), { tone: 'danger' }));
         }
     });
+    // Files dropped anywhere open the import dialog instead of navigating away from the app.
+    window.addEventListener('dragover', (event) => {
+        if (event.dataTransfer?.types.includes('Files')) {
+            event.preventDefault();
+        }
+    });
+    window.addEventListener('drop', (event) => {
+        const file = event.dataTransfer?.files[0];
+        if (file && !event.defaultPrevented) {
+            event.preventDefault();
+            showDialog('import', { file });
+        }
+    });
+    window.addEventListener('hashchange', () => void receiveLink());
     const params = new URLSearchParams(location.search);
     const join = params.get('join');
     if (join) {
@@ -37,6 +51,10 @@ async function receiveLaunch() {
         history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
         showDialog('join', { code: join.slice(0, 16) });
     }
+    await receiveLink();
+}
+
+async function receiveLink() {
     if (location.hash.startsWith(LINK_PREFIX)) {
         const hash = location.hash;
         // Drop the plan from the address bar and history right away.

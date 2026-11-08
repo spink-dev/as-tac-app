@@ -13,6 +13,8 @@ export interface AreaPackage {
     license: 'ODbL 1.0';
     byteSize: number;
     sha256: string;
+    /** SHA-256 of the sanitized data (what an import compares against, see importAreaPackage). */
+    contentSha256?: string;
     featureCount?: number;
     origin?: 'bundled' | 'download' | 'import' | 'legacy';
     installedAt?: string;

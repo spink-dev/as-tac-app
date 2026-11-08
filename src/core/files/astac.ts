@@ -1,5 +1,5 @@
 import { db } from '../storage/db';
-import { getAsset, putVerifiedAsset, safeMime, sha256Hex } from '../storage/assets';
+import { getAsset, imageDimensions, putVerifiedAsset, safeMime, sha256Hex } from '../storage/assets';
 import { saveProject } from '../storage/projects';
 import { ProjectSchema, FORMAT_VERSION, type Project } from '../model/schema';
 import { duplicateProject } from '../model/factory';
@@ -7,7 +7,7 @@ import { importAreaPackage } from '../areas/files';
 import { hasArea } from '../areas/store';
 import type { AreaMeta, AreaPackage } from '../areas/types';
 import { convertOldProject, isOldProject } from '../legacy/astac';
-import { convertTacMap, isTacMapProject, type TacMapAsset, type TacMapPlacement } from '../legacy/tacmap';
+import { convertTacMap, isTacMapProject, tacMapNeedsPlacement, type TacMapAsset, type TacMapPlacement } from '../legacy/tacmap';
 import { APP_VERSION } from '../../version';
 import { isZip, packZip, readJson, readZip } from './zip';
 
@@ -55,7 +55,7 @@ const encoder = new TextEncoder();
  * Own recorded paths stay on the device unless explicitly included (they are where the
  * user walked); everything else of the plan is exported.
  */
-export async function exportAstac(source: Project, options: { includeArea: boolean; includeTracks?: boolean }): Promise<Blob> {
+export async function exportAstac(source: Project, options: { includeArea: boolean; includeTracks?: boolean }): Promise<{ blob: Blob; missing: number }> {
     const project = options.includeTracks ? source : { ...source, tracks: [] };
     const parsed = ProjectSchema.safeParse(project);
     if (!parsed.success) {
@@ -69,10 +69,13 @@ export async function exportAstac(source: Project, options: { includeArea: boole
         project: { path: 'project.json', bytes: projectBytes.length, sha256: await sha256Hex(projectBytes) },
         assets: [],
     };
+    let missing = 0;
     for (const hash of assetRefs(project)) {
         const row = await getAsset(hash);
         if (!row) {
-            throw new Error('asset-missing');
+            // Leave it out (the receiver sees it as missing) instead of blocking the whole export.
+            missing += 1;
+            continue;
         }
         const bytes = new Uint8Array(await row.blob.arrayBuffer());
         if ((await sha256Hex(bytes)) !== hash) {
@@ -97,7 +100,7 @@ export async function exportAstac(source: Project, options: { includeArea: boole
     const zipped = packZip(files);
     const out = new ArrayBuffer(zipped.byteLength);
     new Uint8Array(out).set(zipped);
-    return new Blob([out], { type: 'application/x-astac' });
+    return { blob: new Blob([out], { type: 'application/x-astac' }), missing };
 }
 
 export function astacFilename(project: Project): string {
@@ -124,6 +127,28 @@ async function verifyEntry(files: Map<string, Uint8Array>, entry: unknown): Prom
         throw new Error('archive-checksum');
     }
     return bytes;
+}
+
+const MAX_ASSET = 40 * 1024 * 1024;
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+/**
+ * Store an archive asset under its verified hash. Images must really be images within the
+ * decode limits; anything else (or a mismatch) is kept inert as application/octet-stream.
+ */
+async function storeAsset(hash: string, bytes: Uint8Array, declaredMime: unknown): Promise<string> {
+    if (bytes.length > MAX_ASSET) {
+        throw new Error('archive-too-large');
+    }
+    let mime = safeMime(typeof declaredMime === 'string' ? declaredMime : undefined);
+    if (IMAGE_TYPES.has(mime)) {
+        const size = imageDimensions(bytes);
+        if (!size || size.width > 16384 || size.height > 16384 || size.width * size.height > 50_000_000) {
+            mime = 'application/octet-stream';
+        }
+    }
+    await putVerifiedAsset(hash, bytes, mime);
+    return mime;
 }
 
 const decode = (bytes: Uint8Array) => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown;
@@ -160,18 +185,21 @@ export function migrateProject(input: unknown): Project {
     return parsed.data as Project;
 }
 
-async function readAstacV2(files: Map<string, Uint8Array>, manifest: Record<string, unknown>): Promise<ImportResult> {
+async function readAstacV2(files: Map<string, Uint8Array>, manifest: Record<string, unknown>, signal?: AbortSignal): Promise<ImportResult> {
     const project = migrateProject(decode(await verifyEntry(files, manifest.project)));
     const declared = Array.isArray(manifest.assets) ? manifest.assets as Manifest['assets'] : [];
     let missingAssets = 0;
     const needed = new Set(assetRefs(project));
     for (const entry of declared) {
+        signal?.throwIfAborted();
         if (!entry || typeof entry.hash !== 'string' || !needed.has(entry.hash)) {
             continue;
         }
         const bytes = await verifyEntry(files, entry);
-        // The asset key is its own content hash; the stored type is always a passive one.
-        await putVerifiedAsset(entry.hash, bytes, safeMime(entry.mime));
+        if ((await sha256Hex(bytes)) !== entry.hash) {
+            throw new Error('archive-checksum');
+        }
+        await storeAsset(entry.hash, bytes, entry.mime);
         needed.delete(entry.hash);
     }
     for (const hash of needed) {
@@ -181,10 +209,11 @@ async function readAstacV2(files: Map<string, Uint8Array>, manifest: Record<stri
     }
     let area: AreaMeta | undefined;
     if (manifest.area) {
-        const bytes = await verifyEntry(files, manifest.area);
-        area = await importAreaPackage(decode(bytes));
-        // An existing area with the same id but different data was saved under a new id.
-        if (project.areaId && project.areaId === (manifest.area as { id?: string }).id) {
+        signal?.throwIfAborted();
+        const pkg = decode(await verifyEntry(files, manifest.area)) as { id?: unknown };
+        area = await importAreaPackage(pkg);
+        // The plan follows its area to wherever it now lives (reused or newly stored id).
+        if (project.areaId && project.areaId === pkg.id) {
             project.areaId = area.id;
         }
     }
@@ -192,15 +221,27 @@ async function readAstacV2(files: Map<string, Uint8Array>, manifest: Record<stri
 }
 
 /** as-tac 0.6 `.astac.zip`: fixed files, plan in the 0.x schema, map package included. */
-async function readAstacV1(files: Map<string, Uint8Array>, manifest: Record<string, unknown>): Promise<ImportResult> {
+async function readAstacV1(files: Map<string, Uint8Array>, manifest: Record<string, unknown>, signal?: AbortSignal): Promise<ImportResult> {
     const resources = Array.isArray(manifest.resources) ? manifest.resources : [];
+    const covered = new Set<string>();
     for (const resource of resources) {
         await verifyEntry(files, resource);
+        covered.add((resource as FileEntry).path);
+    }
+    // Everything in the package must be covered by the manifest (as 0.6 required).
+    for (const name of files.keys()) {
+        if (name !== 'manifest.json' && !covered.has(name)) {
+            throw new Error('archive-checksum');
+        }
+    }
+    if (!covered.has('project.json')) {
+        throw new Error('archive-checksum');
     }
     const old = decode(files.get('project.json') ?? new Uint8Array());
     if (!isOldProject(old)) {
         throw new Error('project-invalid');
     }
+    signal?.throwIfAborted();
     let area: AreaMeta | undefined;
     if (files.has('maps/area.json')) {
         area = await importAreaPackage(decode(files.get('maps/area.json')!));
@@ -209,39 +250,57 @@ async function readAstacV1(files: Map<string, Uint8Array>, manifest: Record<stri
     return { kind: 'project', project, source: 'astac-legacy', area, unaligned: [], skipped: 0, missingAssets: 0 };
 }
 
-async function readTacMap(files: Map<string, Uint8Array>, manifest: Record<string, unknown>, place: PlacementResolver): Promise<ImportResult> {
-    const projectBytes = files.get('project.json');
-    if (!projectBytes) {
-        throw new Error('archive');
+/** Hashes a TacMap project really uses (map images, inset images, team logos). */
+function tacMapRefs(raw: unknown): Set<string> {
+    const refs = new Set<string>();
+    const add = (value: unknown) => typeof value === 'string' && refs.add(value.toLowerCase());
+    const project = raw as { maps?: { image?: unknown; overlays?: { image?: unknown }[] }[]; teams?: { logoAsset?: unknown }[] };
+    for (const map of Array.isArray(project.maps) ? project.maps : []) {
+        add(map?.image);
+        for (const overlay of Array.isArray(map?.overlays) ? map.overlays : []) {
+            add(overlay?.image);
+        }
     }
-    // TacMap's checksum covers the exact project.json text.
-    if (typeof manifest.checksum === 'string' && manifest.checksum.toLowerCase() !== await sha256Hex(projectBytes)) {
+    for (const team of Array.isArray(project.teams) ? project.teams : []) {
+        add(team?.logoAsset);
+    }
+    return refs;
+}
+
+async function readTacMap(files: Map<string, Uint8Array>, manifest: Record<string, unknown>, place: PlacementResolver, signal?: AbortSignal): Promise<ImportResult> {
+    const projectBytes = files.get('project.json');
+    // TacMap always writes a checksum over the exact project.json text.
+    if (!projectBytes || typeof manifest.checksum !== 'string') {
+        throw new Error('archive-checksum');
+    }
+    if (manifest.checksum.toLowerCase() !== await sha256Hex(projectBytes)) {
         throw new Error('archive-checksum');
     }
     const raw = decode(projectBytes);
     if (!isTacMapProject(raw)) {
         throw new Error('project-invalid');
     }
+    const used = tacMapRefs(raw);
     const assets = new Map<string, TacMapAsset>();
     const declared = Array.isArray(manifest.assets) ? manifest.assets as { hash?: unknown; mime?: unknown }[] : [];
     for (const entry of declared) {
+        signal?.throwIfAborted();
         const hash = typeof entry?.hash === 'string' ? entry.hash.toLowerCase() : '';
-        if (!/^[a-f0-9]{64}$/.test(hash)) {
+        if (!/^[a-f0-9]{64}$/.test(hash) || !used.has(hash) || assets.has(hash)) {
             continue;
         }
         const path = [...files.keys()].find((name) => name.toLowerCase().startsWith(`assets/${hash}.`));
         const bytes = path ? files.get(path) : undefined;
-        if (!bytes) {
+        if (!bytes || (await sha256Hex(bytes)) !== hash) {
             continue;
         }
-        const mime = safeMime(typeof entry.mime === 'string' ? entry.mime : undefined);
-        await putVerifiedAsset(hash, bytes, mime);
+        const mime = await storeAsset(hash, bytes, entry.mime);
         assets.set(hash, { hash, mime });
     }
-    // Only ask where to put the map when some map lacks geo tie points.
-    const maps = (raw as { maps: { calibration?: { kind?: unknown } }[] }).maps;
-    const needsPlacement = maps.some((map) => map?.calibration?.kind !== 'geo');
-    const placement = needsPlacement ? await place() : { center: [0, 0] as [number, number], widthM: 1000 };
+    signal?.throwIfAborted();
+    // Only ask where to put the map when some map has no usable geo tie points.
+    const placement = tacMapNeedsPlacement(raw) ? await place() : { center: [0, 0] as [number, number], widthM: 1000 };
+    signal?.throwIfAborted();
     const result = convertTacMap(raw, assets, placement);
     const project = migrateProject(result.project);
     return { kind: 'project', project, source: 'tacmap', unaligned: result.unaligned, skipped: result.skipped, missingAssets: 0 };
@@ -261,13 +320,13 @@ export async function readImportFile(file: Blob, place: PlacementResolver, signa
         const files = await readZip(bytes, undefined, signal);
         const manifest = readJson(files, 'manifest.json') as Record<string, unknown>;
         if (manifest?.format === 'as-tac' && manifest.formatVersion === 2) {
-            return readAstacV2(files, manifest);
+            return readAstacV2(files, manifest, signal);
         }
         if (manifest?.format === 'as-tac' && manifest.formatVersion === 1) {
-            return readAstacV1(files, manifest);
+            return readAstacV1(files, manifest, signal);
         }
         if (manifest?.format === 'tacmap') {
-            return readTacMap(files, manifest, place);
+            return readTacMap(files, manifest, place, signal);
         }
         if (manifest?.format === 'as-tac' && typeof manifest.formatVersion === 'number' && manifest.formatVersion > 2) {
             throw new Error('project-newer');

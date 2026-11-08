@@ -129,9 +129,20 @@ export function setImagePlacement(id: string, corners: Corners, patch: Partial<I
         }
         Object.assign(target, patch, { corners });
         if (moveBound) {
+            const map = (p: LngLat) => remapThroughImage(p, from, corners, image.width, image.height);
             draft.elements.forEach((element, i) => {
                 if (element.anchorImageId === id && !element.locked) {
                     draft.elements[i] = remapElement(element as Element, from, corners, image.width, image.height, scale) as Draft<Element>;
+                }
+            });
+            draft.drawings.forEach((stroke) => {
+                if (stroke.anchorImageId === id) {
+                    stroke.points = stroke.points.map((p) => map(p as LngLat)) as typeof stroke.points;
+                }
+            });
+            draft.images.forEach((inset) => {
+                if (inset.anchorImageId === id && inset.id !== id && !inset.locked) {
+                    inset.corners = inset.corners.map((p) => map(p as LngLat)) as typeof inset.corners;
                 }
             });
         }
@@ -209,9 +220,9 @@ export function removeImage(id: string) {
     }
     mutate(t('common.delete'), (draft) => {
         draft.images = draft.images.filter((image) => image.id !== id);
-        for (const element of draft.elements) {
-            if (element.anchorImageId === id) {
-                delete element.anchorImageId;
+        for (const item of [...draft.elements, ...draft.drawings, ...draft.images]) {
+            if (item.anchorImageId === id) {
+                delete item.anchorImageId;
             }
         }
     });
@@ -220,8 +231,10 @@ export function removeImage(id: string) {
     }
 }
 
+/** Objects, ink and inset images that move with this image map. */
 export function boundCount(project: Project, imageId: string): number {
-    return project.elements.filter((element) => element.anchorImageId === imageId).length;
+    const bound = (item: { anchorImageId?: string }) => item.anchorImageId === imageId;
+    return project.elements.filter(bound).length + project.drawings.filter(bound).length + project.images.filter(bound).length;
 }
 
 export { translateElement };

@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, FileUp, MapPin } from 'lucide-react';
 import { useT, t as translate } from '../../i18n';
 import { useDialogs } from '../../core/store/dialogs';
 import { Button, Dialog, Field } from '../../ui/components';
 import { readImportFile, storeImported, type ImportResult } from '../../core/files/astac';
 import type { TacMapPlacement } from '../../core/legacy/tacmap';
-import { pickFile } from '../../core/files/save';
+import { isIos, pickFile } from '../../core/files/save';
 import { BUNDLED_AREAS, listAreas } from '../../core/areas/store';
 import type { AreaMeta } from '../../core/areas/types';
 import { boundsSizeM } from '../../core/geo/geo';
@@ -57,6 +57,7 @@ function PlacementStep({ onPlace }: { onPlace: (placement: TacMapPlacement) => v
     const t = useT();
     const [areas, setAreas] = useState<AreaOption[]>([]);
     const [choice, setChoice] = useState('');
+    const selectId = useId();
     const map = mapRef.current;
     useEffect(() => {
         void listAreas().then((installed: AreaMeta[]) => {
@@ -81,8 +82,8 @@ function PlacementStep({ onPlace }: { onPlace: (placement: TacMapPlacement) => v
     return (
         <div className="stack">
             <p className="dialog__lead">{t('share.placeLead')}</p>
-            <Field label={t('share.placeTitle')}>
-                <select className="select" value={choice} onChange={(event) => setChoice(event.target.value)}>
+            <Field label={t('share.placeTitle')} htmlFor={selectId}>
+                <select id={selectId} className="select" autoFocus value={choice} onChange={(event) => setChoice(event.target.value)}>
                     {map ? <option value="view">{t('share.placeHere')}</option> : null}
                     {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
                 </select>
@@ -100,24 +101,31 @@ export function ImportDialog() {
     const hide = useDialogs((state) => state.hide);
     const [step, setStep] = useState<Step>({ name: 'pick' });
     const [dragging, setDragging] = useState(false);
+    const [storing, setStoring] = useState(false);
     const abort = useRef<AbortController | null>(null);
 
     const read = async (file: File) => {
         abort.current?.abort();
         const controller = new AbortController();
         abort.current = controller;
+        // Only the current import may change the dialog (a cancelled one finishes silently).
+        const current = () => abort.current === controller && !controller.signal.aborted;
         setStep({ name: 'reading' });
         try {
             const ask = () => new Promise<TacMapPlacement>((resolve, reject) => {
-                setStep({ name: 'place', resolve });
+                if (!current()) {
+                    reject(new Error('aborted'));
+                    return;
+                }
                 controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+                setStep({ name: 'place', resolve });
             });
             const result = await readImportFile(file, ask, controller.signal);
-            if (!controller.signal.aborted) {
+            if (current()) {
                 setStep({ name: 'done', result });
             }
         } catch (error) {
-            if (!controller.signal.aborted) {
+            if (current()) {
                 console.warn('import failed', error);
                 setStep({ name: 'error', reason: importErrorText(error) });
             }
@@ -134,11 +142,14 @@ export function ImportDialog() {
             setStep({ name: 'done', result: payload.result });
         } else if (payload?.file) {
             void read(payload.file);
+        } else {
+            setStep({ name: 'pick' });
         }
     }, [open, payload]);
 
     const close = () => {
         abort.current?.abort();
+        abort.current = null;
         hide();
     };
 
@@ -147,7 +158,12 @@ export function ImportDialog() {
             close();
             return;
         }
+        if (storing) {
+            return;
+        }
+        setStoring(true);
         if (useRoute.getState().route.name === 'workspace' && !(await closeProject())) {
+            setStoring(false);
             return;
         }
         try {
@@ -162,6 +178,8 @@ export function ImportDialog() {
         } catch (error) {
             console.warn('storing import failed', error);
             setStep({ name: 'error', reason: t('error.storage') });
+        } finally {
+            setStoring(false);
         }
     };
 
@@ -187,8 +205,9 @@ export function ImportDialog() {
                     >
                         <FileUp size={28} strokeWidth={1.6} aria-hidden />
                         <p>{t('share.importHint')}</p>
-                        <Button variant="primary" data-testid="import-pick" onClick={async () => {
-                            const file = await pickFile(IMPORT_ACCEPT);
+                        <Button variant="primary" data-testid="import-pick" autoFocus onClick={async () => {
+                            // iOS greys out files whose extension it doesn't know: no filter there.
+                            const file = await pickFile(isIos() ? '' : IMPORT_ACCEPT);
                             if (file) {
                                 void read(file);
                             }
@@ -233,7 +252,7 @@ export function ImportDialog() {
                         {result.unaligned.length > 0 ? <p className="notice notice--warn">{t('import.needsAlign', { n: result.unaligned.length })}</p> : null}
                         {result.skipped > 0 ? <p className="notice notice--warn">{t('import.skipped', { n: result.skipped })}</p> : null}
                         {result.missingAssets > 0 ? <p className="notice notice--warn">{t('import.missingAssets', { n: result.missingAssets })}</p> : null}
-                        {result.source === 'link' ? <p className="field__hint">{t('share.qrHint')}</p> : null}
+                        {result.source === 'link' ? <p className="field__hint">{t('import.linkNote')}</p> : null}
                     </div>
                 );
             }
@@ -244,11 +263,11 @@ export function ImportDialog() {
         ? (
             <>
                 <Button variant="ghost" onClick={close}>{t('common.cancel')}</Button>
-                <Button variant="primary" data-testid="import-open" onClick={() => void openImported(step.result)}>{step.result.kind === 'project' ? t('share.openCopy') : t('common.done')}</Button>
+                <Button variant="primary" data-testid="import-open" autoFocus disabled={storing} onClick={() => void openImported(step.result)}>{step.result.kind === 'project' ? t('share.openCopy') : t('common.done')}</Button>
             </>
         )
         : step.name === 'error'
-            ? <Button onClick={() => setStep({ name: 'pick' })}>{t('common.retry')}</Button>
+            ? <Button autoFocus onClick={() => setStep({ name: 'pick' })}>{t('common.retry')}</Button>
             : step.name === 'reading' ? <Button variant="ghost" onClick={close}>{t('common.cancel')}</Button> : undefined;
 
     return (

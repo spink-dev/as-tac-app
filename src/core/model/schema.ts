@@ -128,6 +128,8 @@ export const StrokeSchema = z.object({
     briefingOnly: z.boolean().optional(),
     phaseIds: z.array(id).max(200).optional(),
     createdAt: z.string().optional(),
+    /** Ink drawn on an image map follows it when the image is re-aligned. */
+    anchorImageId: id.optional(),
 });
 
 export const ControlPointSchema = z.object({
@@ -155,6 +157,8 @@ export const ImageOverlaySchema = z.object({
         maxM: z.number().nonnegative().optional(),
     }).optional(),
     knownId: z.string().max(80).optional(),
+    /** An inset image placed on another image map follows it when that one is re-aligned. */
+    anchorImageId: id.optional(),
 });
 
 export const LayerSchema = z.object({

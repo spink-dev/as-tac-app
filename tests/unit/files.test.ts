@@ -26,7 +26,7 @@ describe('.astac archive', () => {
         const project = createProject({ name: 'Roundtrip', areaId: null });
         project.images.push({ id: 'img1', name: 'Scan', asset: asset.hash, mime: 'image/png', width: 100, height: 80, corners: placeImage([8.54, 47.37], 100, 80, 1), opacity: 0.8, visible: true });
         project.elements.push({ kind: 'marker', id: 'm1', pos: [8.54, 47.37], type: 'objective', label: 'Alpha', anchorImageId: 'img1' });
-        const blob = await exportAstac(project, { includeArea: false });
+        const { blob } = await exportAstac(project, { includeArea: false });
         const result = await readImportFile(blob, nowhere);
         expect(result.kind).toBe('project');
         if (result.kind === 'project') {
@@ -38,7 +38,7 @@ describe('.astac archive', () => {
 
     it('rejects a tampered project file', async () => {
         const project = createProject({ name: 'Tamper', areaId: null });
-        const blob = await exportAstac(project, { includeArea: false });
+        const { blob } = await exportAstac(project, { includeArea: false });
         const files = await readZip(new Uint8Array(await blob.arrayBuffer()));
         const changed = new TextEncoder().encode(new TextDecoder().decode(files.get('project.json')).replace('Tamper', 'Tampex'));
         const rezipped = zipSync({ 'manifest.json': files.get('manifest.json')!, 'project.json': changed });
@@ -106,5 +106,59 @@ describe('plan links', () => {
         expect(link).not.toBeNull();
         const decoded = await decodePlanLink(link!.slice('https://example.test/'.length));
         expect(decoded.elements).toEqual(project.elements);
+    });
+});
+
+describe('import hygiene', () => {
+    it('reuses an area already on the device instead of forking it on every import', async () => {
+        const { saveArea } = await import('../../src/core/areas/store');
+        const { db } = await import('../../src/core/storage/db');
+        // Feature ids are dropped by sanitizing, so the stored (raw) hash differs from an import's.
+        const data: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature', id: 'way/1', properties: { highway: 'track' }, geometry: { type: 'LineString', coordinates: [[8.5, 47.3], [8.51, 47.31]] } }] };
+        await saveArea({ format: 'as-tac-map', formatVersion: 1, id: 'testfeld', name: 'Testfeld', bounds: [8.49, 47.29, 8.52, 47.32], dataTimestamp: '2026-11-01', source: 'test', attribution: '© OpenStreetMap contributors', license: 'ODbL 1.0', byteSize: 100, sha256: await sha256Hex(JSON.stringify(data)), data });
+        const project = createProject({ name: 'Mit Gebiet', areaId: 'testfeld' });
+        const { blob } = await exportAstac(project, { includeArea: true });
+        const before = await db.areaMeta.count();
+        for (let i = 0; i < 2; i++) {
+            const result = await readImportFile(blob, nowhere);
+            expect(result.kind === 'project' && result.project.areaId).toBeTruthy();
+        }
+        // At most one sanitized copy is added, and repeated imports reuse it.
+        expect(await db.areaMeta.count()).toBeLessThanOrEqual(before + 1);
+        const again = await readImportFile(blob, nowhere);
+        const once = await readImportFile(blob, nowhere);
+        expect(again.kind === 'project' && once.kind === 'project' && again.project.areaId === once.project.areaId).toBe(true);
+    });
+
+    it('drops TacMap objects with broken coordinates instead of failing the import, and binds ink to the map', async () => {
+        const image = png();
+        const hash = await sha256Hex(image);
+        const project = {
+            id: 'p2', formatVersion: 1, name: 'Kaputt', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', activeMapId: 'm',
+            teams: [], phases: [], eventLog: [], tracks: [{ id: 't', name: 'x', mapId: 'm', startedAt: 'x', points: [{ pos: { x: 1, y: 1 }, lon: 200, lat: 47, t: 'x' }, { pos: { x: 2, y: 2 }, t: 'y' }] }],
+            maps: [{
+                id: 'm', name: 'Skizze', image: hash, width: 1000, height: 800, overlays: [],
+                calibration: { kind: 'geo', points: [{ px: { x: 0, y: 0 }, lat: 47.38, lon: 8.53 }, { px: { x: 1000, y: 800 }, lat: 47.372, lon: 8.5432 }] },
+                elements: [{ kind: 'marker', id: 'ok', pos: { x: 10, y: 10 }, symbol: 'unit' }, { kind: 'marker', id: 'bad', pos: { x: 10, y: -1e8 }, symbol: 'unit' }],
+                drawings: [{ id: 's', points: [{ x: 0, y: 0 }, { x: 50, y: 50 }], color: '#ff0000', width: 4 }],
+            }],
+            settings: { gridEnabled: false },
+        };
+        const json = JSON.stringify(project);
+        const manifest = { format: 'tacmap', formatVersion: 1, appVersion: '0.12.0', createdWith: 'x', checksum: await sha256Hex(json), assets: [{ hash, mime: 'image/png', size: image.length }] };
+        const zip = zipSync({ 'manifest.json': strToU8(JSON.stringify(manifest)), 'project.json': strToU8(json), [`assets/${hash}.png`]: image });
+        const result = await readImportFile(new Blob([new Uint8Array(zip)]), nowhere);
+        expect(result.kind).toBe('project');
+        if (result.kind === 'project') {
+            expect(result.project.elements).toHaveLength(1);
+            expect(result.skipped).toBeGreaterThanOrEqual(1);
+            expect(result.project.drawings[0].anchorImageId).toBe(result.project.images[0].id);
+        }
+    });
+
+    it('rejects a TacMap file without its checksum', async () => {
+        const json = JSON.stringify({ maps: [], activeMapId: 'm' });
+        const zip = zipSync({ 'manifest.json': strToU8(JSON.stringify({ format: 'tacmap', formatVersion: 1, assets: [] })), 'project.json': strToU8(json) });
+        await expect(readImportFile(new Blob([new Uint8Array(zip)]), nowhere)).rejects.toThrow('archive-checksum');
     });
 });

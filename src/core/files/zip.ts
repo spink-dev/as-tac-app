@@ -114,38 +114,61 @@ export async function readZip(bytes: Uint8Array, limits: ZipLimits = DEFAULT_ZIP
             files.set(entry.name, input);
             continue;
         }
-        const reader = new Blob([input]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
-        const chunks: Uint8Array[] = [];
-        let length = 0;
-        try {
-            while (true) {
-                signal?.throwIfAborted();
-                const { value, done } = await reader.read();
-                if (done) {
-                    break;
-                }
-                length += value.length;
-                total += value.length;
-                if (length > entry.expanded || total > limits.maxTotal) {
-                    throw new Error('archive-too-large');
-                }
-                chunks.push(value);
-            }
-        } finally {
-            await reader.cancel().catch(() => undefined);
-        }
-        if (length !== entry.expanded) {
+        const out = await inflateCapped(input, entry.expanded, limits.maxTotal - total, signal);
+        if (out.length !== entry.expanded) {
             throw new Error('archive');
         }
-        const out = new Uint8Array(length);
-        let offset = 0;
-        for (const chunk of chunks) {
-            out.set(chunk, offset);
-            offset += chunk.length;
-        }
+        total += out.length;
         files.set(entry.name, out);
     }
     return files;
+}
+
+const SLICE = 4 * 1024;
+
+/**
+ * Inflate raw deflate data with hard output caps. The input is fed in small slices from a
+ * pull-based stream, so a bomb is stopped after a few slices instead of after the browser has
+ * inflated the whole compressed blob in one go.
+ */
+export async function inflateCapped(input: Uint8Array, maxOut: number, budget = maxOut, signal?: AbortSignal): Promise<Uint8Array> {
+    let offset = 0;
+    const source = new ReadableStream<Uint8Array<ArrayBuffer>>({
+        pull(controller) {
+            if (offset >= input.length) {
+                controller.close();
+                return;
+            }
+            controller.enqueue(input.slice(offset, offset + SLICE));
+            offset += SLICE;
+        },
+    }, { highWaterMark: 0 });
+    const reader = source.pipeThrough(new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array<ArrayBuffer>>).getReader();
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+    try {
+        while (true) {
+            signal?.throwIfAborted();
+            const { value, done } = await reader.read();
+            if (done) {
+                break;
+            }
+            length += value.length;
+            if (length > maxOut || length > budget) {
+                throw new Error('archive-too-large');
+            }
+            chunks.push(value);
+        }
+    } finally {
+        await reader.cancel().catch(() => undefined);
+    }
+    const out = new Uint8Array(length);
+    let at = 0;
+    for (const chunk of chunks) {
+        out.set(chunk, at);
+        at += chunk.length;
+    }
+    return out;
 }
 
 export function readJson(files: Map<string, Uint8Array>, name: string): unknown {

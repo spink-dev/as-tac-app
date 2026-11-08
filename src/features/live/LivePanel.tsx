@@ -83,7 +83,17 @@ function Invite() {
     const t = useT();
     const [role, setRole] = useState<'viewer' | 'admin'>('viewer');
     const [code, setCode] = useState<string | null>(null);
+    const streamer = useUi((state) => state.streamer);
     const link = code ? `${appBaseUrl()}?join=${code}` : null;
+    if (streamer !== 'off') {
+        // An invite code on a stream would let any viewer join the plan.
+        return (
+            <section className="section">
+                <div className="section__title">{t('live.invite')}</div>
+                <p className="notice">{t('live.inviteStreamer')}</p>
+            </section>
+        );
+    }
     return (
         <section className="section">
             <div className="section__title">{t('live.invite')}</div>

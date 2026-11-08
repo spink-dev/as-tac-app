@@ -1,5 +1,5 @@
 import { createLayer, createProject, TEAM_COLORS, uid } from '../model/factory';
-import { MAX, type ControlPoint, type Element, type ImageOverlay, type LngLat, type MarkerType, type Phase, type Project, type Stroke, type Team, type ZoneCategory } from '../model/schema';
+import { LIMITS, MAX, type ControlPoint, type Element, type ImageOverlay, type LngLat, type MarkerType, type Phase, type Project, type Stroke, type Team, type ZoneCategory } from '../model/schema';
 import { cornersFromGeoref, fitControlPoints, georefFromCorners, pixelToLngLat, placeImage, type Corners, type Georef } from '../geo/affine';
 
 /**
@@ -53,35 +53,67 @@ const vec = (value: unknown): Vec | null => {
     return x === undefined || y === undefined ? null : { x, y };
 };
 
-/** Place one TacMap map: geo tie points if present, else scale/heading at the placement centre. */
+const inWorld = (p: LngLat) => Number.isFinite(p[0]) && Number.isFinite(p[1]) && Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 85.06;
+const validCorners = (corners: Corners) => corners.every(inWorld);
+
+/** Geo placement from TacMap tie points, with the same plausibility guards as manual alignment. */
+function geoPlacement(map: Raw, width: number, height: number): { corners: Corners; controlPoints: ControlPoint[]; fit: ImageOverlay['fit'] } | null {
+    const calibration = obj(map.calibration);
+    if (calibration?.kind !== 'geo') {
+        return null;
+    }
+    const controlPoints: ControlPoint[] = [];
+    for (const raw of arr(calibration.points).slice(0, 64)) {
+        const p = obj(raw);
+        const px = vec(p?.px);
+        const lat = num(p?.lat);
+        const lon = num(p?.lon);
+        if (px && lat !== undefined && lon !== undefined && Math.abs(lat) <= 85 && Math.abs(lon) <= 180) {
+            controlPoints.push({ px: [px.x, px.y], lngLat: [lon, lat] });
+        }
+    }
+    if (controlPoints.length < 2) {
+        return null;
+    }
+    try {
+        let result = fitControlPoints(controlPoints, controlPoints.length >= 4 && calibration.method !== 'similarity' ? 'affine' : 'similarity');
+        const { a, b, d, e } = result.georef.affine;
+        const sum = a * a + b * b + d * d + e * e;
+        const det = Math.abs(a * e - b * d);
+        const root = Math.sqrt(Math.max(0, sum * sum - 4 * det * det));
+        if (result.method === 'affine' && Math.sqrt((sum + root) / 2) / Math.sqrt(Math.max(1e-30, (sum - root) / 2)) > 1.5) {
+            result = fitControlPoints(controlPoints, 'similarity');
+        }
+        if (!(result.metersPerPixel > 0.005 && result.metersPerPixel < 1000)) {
+            return null;
+        }
+        const corners = cornersFromGeoref(result.georef, width, height);
+        if (!validCorners(corners)) {
+            return null;
+        }
+        const exact = result.method === 'similarity' && controlPoints.length === 2;
+        return { corners, controlPoints, fit: exact ? { method: result.method } : { method: result.method, rmsM: Math.round(result.rmsM * 10) / 10, maxM: Math.round(result.maxM * 10) / 10 } };
+    } catch {
+        return null;
+    }
+}
+
+/** Whether any map would need a rough placement (no usable geo tie points). */
+export function tacMapNeedsPlacement(raw: unknown): boolean {
+    return arr(obj(raw)?.maps).some((value) => {
+        const map = obj(value);
+        const width = num(map?.width);
+        const height = num(map?.height);
+        return !map || !width || !height || !geoPlacement(map, Math.round(width), Math.round(height));
+    });
+}
+
+/** Place one TacMap map: geo tie points if usable, else scale/heading at the placement centre. */
 function placeMap(map: Raw, width: number, height: number, placement: TacMapPlacement): { corners: Corners; controlPoints?: ControlPoint[]; fit: ImageOverlay['fit']; aligned: boolean } {
     const calibration = obj(map.calibration);
-    if (calibration?.kind === 'geo') {
-        const controlPoints: ControlPoint[] = [];
-        for (const raw of arr(calibration.points).slice(0, 64)) {
-            const p = obj(raw);
-            const px = vec(p?.px);
-            const lat = num(p?.lat);
-            const lon = num(p?.lon);
-            if (px && lat !== undefined && lon !== undefined && Math.abs(lat) <= 85 && Math.abs(lon) <= 180) {
-                controlPoints.push({ px: [px.x, px.y], lngLat: [lon, lat] });
-            }
-        }
-        if (controlPoints.length >= 2) {
-            try {
-                const result = fitControlPoints(controlPoints, controlPoints.length >= 4 ? 'affine' : 'similarity');
-                const corners = cornersFromGeoref(result.georef, width, height);
-                const exact = result.method === 'similarity' && controlPoints.length === 2;
-                return {
-                    corners,
-                    controlPoints,
-                    fit: exact ? { method: result.method } : { method: result.method, rmsM: Math.round(result.rmsM * 10) / 10, maxM: Math.round(result.maxM * 10) / 10 },
-                    aligned: true,
-                };
-            } catch {
-                // Degenerate tie points: fall through to a rough placement.
-            }
-        }
+    const geo = geoPlacement(map, width, height);
+    if (geo) {
+        return { ...geo, aligned: true };
     }
     const pxPerMeter = num(calibration?.pxPerMeter);
     const metersPerPixel = pxPerMeter && pxPerMeter > 0 ? 1 / pxPerMeter : placement.widthM / width;
@@ -174,14 +206,18 @@ export function convertTacMap(raw: unknown, assets: Map<string, TacMapAsset>, pl
         const width = num(map?.width);
         const height = num(map?.height);
         const asset = image ? assets.get(image) : undefined;
-        if (!map || !image || !asset || !IMAGE_MIME.has(asset.mime) || !width || !height || width > 16384 || height > 16384) {
+        if (!map || !image || !asset || !IMAGE_MIME.has(asset.mime) || !width || !height || width > 16384 || height > 16384 || project.images.length >= LIMITS.images) {
+            skipped += 1;
+            continue;
+        }
+        const placed = placeMap(map, Math.round(width), Math.round(height), placement);
+        if (!validCorners(placed.corners)) {
             skipped += 1;
             continue;
         }
         const mapName = str(map.name, MAX.imageName) ?? 'Karte';
         const layer = createLayer(mapName.slice(0, MAX.name));
         project.layers.push(layer);
-        const placed = placeMap(map, Math.round(width), Math.round(height), placement);
         const overlay: ImageOverlay = {
             id: uid('img'), name: mapName, asset: image, mime: asset.mime as ImageOverlay['mime'], width: Math.round(width), height: Math.round(height),
             corners: placed.corners, opacity: 0.85, visible: true, fit: placed.fit, controlPoints: placed.controlPoints,
@@ -196,11 +232,16 @@ export function convertTacMap(raw: unknown, assets: Map<string, TacMapAsset>, pl
         if (oldMapId) {
             mapGeorefs.set(oldMapId, georef);
         }
+        // Points outside the world (broken pixel values) drop their whole object, never the import.
         const at = (v: unknown): LngLat | null => {
             const p = vec(v);
-            return p ? pixelToLngLat(georef, [p.x, p.y]) : null;
+            const ll = p ? pixelToLngLat(georef, [p.x, p.y]) : null;
+            return ll && inWorld(ll) ? ll : null;
         };
-        const pts = (v: unknown): LngLat[] => arr(v).map(at).filter((p): p is LngLat => p !== null);
+        const pts = (v: unknown): LngLat[] => {
+            const all = arr(v).map(at);
+            return all.every((p) => p !== null) ? all as LngLat[] : [];
+        };
 
         // Sub-images inside a map keep their pixel rectangle on that map.
         for (const rawOverlay of arr(map.overlays).slice(0, 8)) {
@@ -212,21 +253,27 @@ export function convertTacMap(raw: unknown, assets: Map<string, TacMapAsset>, pl
             const y = num(rect?.y);
             const w = num(rect?.width);
             const h = num(rect?.height);
-            if (!o || !oImage || !oAsset || !IMAGE_MIME.has(oAsset.mime) || x === undefined || y === undefined || !w || !h || project.images.length >= 32) {
+            if (!o || !oImage || !oAsset || !IMAGE_MIME.has(oAsset.mime) || x === undefined || y === undefined || !w || !h || w <= 0 || h <= 0 || project.images.length >= LIMITS.images) {
                 skipped += 1;
                 continue;
             }
             const corners: Corners = [pixelToLngLat(georef, [x, y]), pixelToLngLat(georef, [x + w, y]), pixelToLngLat(georef, [x + w, y + h]), pixelToLngLat(georef, [x, y + h])];
+            if (!validCorners(corners)) {
+                skipped += 1;
+                continue;
+            }
             project.images.push({
                 id: uid('img'), name: str(o.name, MAX.imageName) ?? mapName, asset: oImage, mime: oAsset.mime as ImageOverlay['mime'],
-                width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)), corners, opacity: Math.max(0, Math.min(1, num(o.opacity) ?? 1)),
+                width: Math.max(1, Math.min(16384, Math.round(w))), height: Math.max(1, Math.min(16384, Math.round(h))), corners, opacity: Math.max(0, Math.min(1, num(o.opacity) ?? 1)),
                 visible: o.visible !== false, locked: o.locked === true ? true : undefined, fit: { method: 'manual' },
+                // Inset images follow their map when it is re-aligned.
+                anchorImageId: overlay.id,
             });
         }
 
         for (const rawElement of arr(map.elements).slice(0, 20000)) {
             const e = obj(rawElement);
-            if (!e) {
+            if (!e || project.elements.length >= LIMITS.elements) {
                 skipped += 1;
                 continue;
             }
@@ -299,6 +346,8 @@ export function convertTacMap(raw: unknown, assets: Map<string, TacMapAsset>, pl
                     break;
                 }
             }
+            // Attachments and route waypoints have no place in the 1.0 model yet: counted, not hidden.
+            skipped += arr(e.attachments).length + arr(e.waypoints).length;
             if (element) {
                 project.elements.push(JSON.parse(JSON.stringify(element)) as Element);
             } else {
@@ -309,13 +358,14 @@ export function convertTacMap(raw: unknown, assets: Map<string, TacMapAsset>, pl
         for (const rawStroke of arr(map.drawings).slice(0, 5000)) {
             const s = obj(rawStroke);
             const points = pts(s?.points).slice(0, 4000);
-            if (!s || points.length < 2) {
+            if (!s || points.length < 2 || project.drawings.length >= LIMITS.drawings) {
                 skipped += 1;
                 continue;
             }
             const stroke: Stroke = {
                 id: uid('ink'), points, color: color(s.color) ?? '#e8402a', width: Math.max(1, Math.min(24, num(s.width) ?? 4)),
                 opacity: Math.max(0.1, Math.min(1, num(s.opacity) ?? 0.95)), layerId: layer.id, briefingOnly: s.briefingOnly === true ? true : undefined,
+                anchorImageId: overlay.id,
             };
             project.drawings.push(JSON.parse(JSON.stringify(stroke)) as Stroke);
         }
@@ -327,7 +377,7 @@ export function convertTacMap(raw: unknown, assets: Map<string, TacMapAsset>, pl
     for (const value of arr(source.eventLog).slice(0, 5000)) {
         const entry = obj(value);
         const text = str(entry?.text, MAX.log);
-        if (text) {
+        if (text && project.log.length < LIMITS.log) {
             project.log.push(JSON.parse(JSON.stringify({ id: uid('log'), t: str(entry?.t, 40) ?? project.createdAt, text, teamId: typeof entry?.teamId === 'string' ? teamIds.get(entry.teamId) : undefined })));
         }
     }
@@ -343,8 +393,8 @@ export function convertTacMap(raw: unknown, assets: Map<string, TacMapAsset>, pl
             const lon = num(p?.lon);
             const px = vec(p?.pos);
             const t = str(p?.t, 40) ?? project.createdAt;
-            const position: LngLat | null = lat !== undefined && lon !== undefined && Math.abs(lat) <= 85 ? [lon, lat] : georef && px ? pixelToLngLat(georef, [px.x, px.y]) : null;
-            if (position) {
+            const position: LngLat | null = lat !== undefined && lon !== undefined && Math.abs(lat) <= 85 && Math.abs(lon) <= 180 ? [lon, lat] : georef && px ? pixelToLngLat(georef, [px.x, px.y]) : null;
+            if (position && inWorld(position)) {
                 points.push({ p: position, t, acc: num(p?.accuracy) !== undefined ? Math.max(0, num(p?.accuracy)!) : undefined });
             }
         }
