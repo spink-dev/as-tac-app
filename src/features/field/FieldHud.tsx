@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Circle, Compass, Crosshair, Info, LocateFixed, LocateOff, Navigation2, X } from 'lucide-react';
 import { t as translate, useT } from '../../i18n';
 import { toast, useUi } from '../../core/store/ui';
@@ -95,7 +95,8 @@ export function useFieldLayers() {
                 return;
             }
             renderPosition();
-            if (!compass.headingUp || compass.heading === null || hiddenNow() || useGps.getState().follow || map.isMoving()) {
+            // While following, the follow move carries the bearing; between fixes we still turn (not mid-move).
+            if (!compass.headingUp || compass.heading === null || hiddenNow() || map.isMoving()) {
                 return;
             }
             const now = performance.now();
@@ -240,6 +241,7 @@ function NavCard({ from }: { from: LngLat | null }) {
     const heading = useCompass((state) => state.heading);
     const unit = usePrefs((state) => state.bearingUnit);
     const gpsOn = useGps((state) => state.active);
+    const angle = useRef(0);
     // Without a live fix the card measures from the map centre; follow map moves then.
     const [view, setView] = useState<{ center: LngLat; bearing: number } | null>(null);
     useEffect(() => {
@@ -265,9 +267,13 @@ function NavCard({ from }: { from: LngLat | null }) {
     const bearing = bearingDeg(origin, to);
     // Arrow relative to where the phone points (compass) or to screen-up (map bearing).
     const reference = heading ?? view?.bearing ?? 0;
+    // Continuous angle: always turn the short way, also across 180° (no full spin in the transition).
+    const wanted = signed(bearing - reference);
+    const previous = angle.current;
+    angle.current = previous + signed(wanted - previous);
     return (
         <div className="navcard">
-            <span className="navcard__arrow" style={{ transform: `rotate(${signed(bearing - reference)}deg)` }} aria-hidden>
+            <span className="navcard__arrow" style={{ transform: `rotate(${angle.current}deg)` }} aria-hidden>
                 <Navigation2 size={28} strokeWidth={2} fill="currentColor" />
             </span>
             <div className="navcard__main">

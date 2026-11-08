@@ -17,6 +17,10 @@ export async function openProject(id: string, readOnly: false | 'viewer' | 'copy
 }
 
 export function showProject(project: Project, readOnly: false | 'viewer' | 'copy' = false) {
+    if (useProject.getState().project) {
+        // Opening another plan straight from an open one (import, join): same hand-over as closing.
+        runBeforeClose();
+    }
     resetSaveState();
     useUi.getState().resetSession();
     useProject.getState().load(project, readOnly);
@@ -39,7 +43,7 @@ export function onBeforeClose(fn: () => void): () => void {
     };
 }
 
-export async function closeProject(force = false): Promise<boolean> {
+function runBeforeClose() {
     for (const fn of beforeClose) {
         try {
             fn();
@@ -47,6 +51,10 @@ export async function closeProject(force = false): Promise<boolean> {
             console.warn('before-close handler failed', error);
         }
     }
+}
+
+export async function closeProject(force = false): Promise<boolean> {
+    runBeforeClose();
     const saved = await flushNow();
     if (!saved && !force) {
         // Keep the workspace open: closing would drop edits that only live in memory.

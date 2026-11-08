@@ -57,6 +57,7 @@ export function Segmented<T extends string>({ value, options, onChange, block, l
 export function NameInput({ value, onCommit, className = 'input', ...rest }: { value: string; onCommit: (value: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
     const [draft, setDraft] = useState(value);
     const editing = useRef(false);
+    const original = useRef(value);
     useEffect(() => {
         if (!editing.current) {
             setDraft(value);
@@ -69,6 +70,7 @@ export function NameInput({ value, onCommit, className = 'input', ...rest }: { v
             value={draft}
             onFocus={(event) => {
                 editing.current = true;
+                original.current = value;
                 rest.onFocus?.(event);
             }}
             onChange={(event) => {
@@ -80,7 +82,11 @@ export function NameInput({ value, onCommit, className = 'input', ...rest }: { v
             onBlur={(event) => {
                 editing.current = false;
                 if (!draft.trim()) {
-                    setDraft(value);
+                    // Left blank: back to the name it had before this edit (partial commits are undone).
+                    setDraft(original.current);
+                    if (original.current !== value) {
+                        onCommit(original.current);
+                    }
                 }
                 rest.onBlur?.(event);
             }}

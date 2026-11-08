@@ -37,6 +37,8 @@ interface GpsState {
 export const useGps = create<GpsState>(() => ({ active: false, follow: false, fix: null, error: null, recording: null, saveFailed: false, now: Date.now() }));
 
 let watchId: number | null = null;
+/** Last point the camera was centred on by follow: a view around it is the own position. */
+let followedAt: LngLat | null = null;
 let resumeOnVisible = false;
 let ticker = 0;
 
@@ -66,6 +68,7 @@ function followCamera(fix: Fix) {
     const compass = useCompass.getState();
     // Heading-up and follow in one camera move, so neither cancels the other.
     const bearing = compass.headingUp && compass.heading !== null ? compass.heading : map.getBearing();
+    followedAt = fix.p;
     map.easeTo({ center: fix.p, bearing, duration: 400 });
 }
 
@@ -219,8 +222,15 @@ export function installGpsLifecycle(): () => void {
             useCompass.setState({ headingUp: false });
         }
     });
-    // Never remember a camera that is just the own position (rule 5).
-    setViewSaveGuard(() => !useGps.getState().follow);
+    // Never remember a camera that is just the own position (rule 5): not while following, and
+    // not afterwards either while the view is still centred on the last followed point.
+    setViewSaveGuard(() => {
+        if (useGps.getState().follow) {
+            return false;
+        }
+        const current = mapRef.current?.getCenter();
+        return !followedAt || !current || distanceM([current.lng, current.lat], followedAt) > 50;
+    });
     const stopBeforeClose = onBeforeClose(() => {
         if (useGps.getState().recording) {
             stopRecording(true);

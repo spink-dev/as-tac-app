@@ -106,7 +106,7 @@ export function SharePanel() {
                 {project.tracks.length > 0 ? (
                     <>
                         <Switch checked={includeTracks} onChange={setIncludeTracks}>{t('field.includeTracks', { n: project.tracks.length })}</Switch>
-                        <p className="field__hint">{t('field.trackPrivacy')}</p>
+                        <p className="field__hint">{includeTracks ? t('field.tracksIncluded') : t('field.trackPrivacy')}</p>
                     </>
                 ) : null}
                 <div className="row-gap">
