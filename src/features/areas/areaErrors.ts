@@ -32,15 +32,17 @@ export function areaErrorText(error: unknown, kept = 0, total = 0): string {
         // An answer that is not map data (maintenance page, wrong file): the server's side.
         cause = t('area.serverOdd');
     } else if (/^HTTP (408|429)$/.test(message)) {
-        cause = t('area.busy');
+        // Overpass rate limits arrive as `rate-limit`: a plain 408/429 is another server.
+        cause = t('area.serverBusy');
     } else if (/^HTTP 4\d\d$/.test(message)) {
         cause = t('area.serverRefused');
     } else if (/^(stalled|download|timeout)$/.test(message) || name === 'TypeError' && /fetch|network|load failed/i.test(message)) {
         // Failed fetches are TypeErrors; a database "aborted" is not the connection.
         cause = t('area.unstable');
     } else {
-        // Not the network: a problem on this device or in the data. Retrying won't help by itself.
-        return t('area.localFailure');
+        // Not the network: a problem on this device or in the data. Retrying won't help by itself
+        // (and a reload would lose the parts already loaded, so it is not suggested then).
+        return kept > 0 ? `${t('area.localFailureKept')} ${t('area.failedPartial', { done: kept, total })}` : t('area.localFailure');
     }
     return kept > 0 ? `${cause} ${t('area.failedPartial', { done: kept, total })}` : `${cause} ${t('area.tryAgain')}`;
 }

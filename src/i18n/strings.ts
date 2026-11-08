@@ -116,6 +116,7 @@ export const S = {
     'area.serverRefused': ['Der Server hat die Anfrage abgelehnt.', 'The server refused the request.'],
     'area.serverBusy': ['Der Server ist gerade nicht erreichbar.', 'The server is not reachable right now.'],
     'area.storageFull': ['Der Speicher dieses Geräts ist voll. Platz schaffen (z. B. ein altes Gebiet löschen) und nochmals versuchen.', 'This device’s storage is full. Free some space (e.g. delete an old area) and try again.'],
+    'area.localFailureKept': ['Das hat auf diesem Gerät nicht geklappt.', 'That didn’t work on this device.'],
     'area.localFailure': ['Das hat auf diesem Gerät nicht geklappt. Die App neu laden und nochmals versuchen.', 'That didn’t work on this device. Reload the app and try again.'],
     'area.unstable': ['Die Verbindung ist zu langsam oder wurde unterbrochen.', 'The connection is too slow or was interrupted.'],
     'area.tryAgain': ['Später nochmals versuchen.', 'Try again later.'],
