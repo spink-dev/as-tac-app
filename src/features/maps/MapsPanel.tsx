@@ -13,7 +13,13 @@ import { pickFile } from '../../core/files/save';
 import { mapRef } from '../../map/MapView';
 import { assetUrl } from '../../core/storage/assets';
 import { registerPanel } from '../panels/registry';
-import type { ImageOverlay } from '../../core/model/schema';
+import { LIMITS, type ImageOverlay } from '../../core/model/schema';
+import { t as translate } from '../../i18n';
+
+function imageError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    return message === 'asset-too-large' || message === 'image-too-large' ? translate('maps.tooLarge') : translate('maps.imageFailed');
+}
 
 function Thumb({ image }: { image: ImageOverlay }) {
     const [url, setUrl] = useState<string | null>(null);
@@ -34,7 +40,8 @@ export async function pickAndAddImage() {
     try {
         await addImageMap(file, { center: [center.lng, center.lat], bounds: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()] });
     } catch (error) {
-        toast(String(error instanceof Error ? error.message : error), { tone: 'danger' });
+        console.warn('image import failed', error);
+        toast(imageError(error), { tone: 'danger' });
     }
 }
 
@@ -42,6 +49,8 @@ export function MapsPanel() {
     const t = useT();
     const project = useProject((state) => state.project);
     const editing = useUi((state) => state.imageEditId);
+    useUi((state) => state.mode);
+    useProject((state) => state.readOnly);
     const [areas, setAreas] = useState<AreaMeta[]>([]);
     useEffect(() => {
         void listAreas().then(setAreas);
@@ -80,7 +89,7 @@ export function MapsPanel() {
                 <div className="section__title">
                     {t('maps.images')}
                     <span className="spacer" />
-                    {editable ? <Button small variant="primary" onClick={() => void pickAndAddImage()}><ImagePlus size={16} /> {t('maps.addImage')}</Button> : null}
+                    {editable ? <Button small variant="primary" disabled={project.images.length >= LIMITS.images} title={project.images.length >= LIMITS.images ? t('maps.limit', { n: LIMITS.images }) : undefined} onClick={() => void pickAndAddImage()}><ImagePlus size={16} /> {t('maps.addImage')}</Button> : null}
                 </div>
                 {project.images.length === 0 ? <Empty>{t('maps.imageHint')}</Empty> : null}
                 <ul className="image-list">
@@ -104,13 +113,13 @@ export function MapsPanel() {
                                 </IconButton>
                                 {editable ? (
                                     <>
-                                        <IconButton small label={t('maps.align')} pressed={editing === image.id} onClick={() => useUi.getState().set({ imageEditId: editing === image.id ? null : image.id, tool: 'select', selection: [] })}>
+                                        <IconButton small label={image.locked ? t('align.locked') : t('maps.align')} pressed={editing === image.id} disabled={Boolean(image.locked) && editing !== image.id} onClick={() => useUi.getState().set({ imageEditId: editing === image.id ? null : image.id, tool: 'select', selection: [] })}>
                                             <Crosshair size={16} />
                                         </IconButton>
                                         <IconButton small label={image.locked ? t('common.unlock') : t('common.lock')} pressed={Boolean(image.locked)} onClick={() => patchImage(image.id, { locked: !image.locked || undefined }, `img-lock:${image.id}`)}>
                                             {image.locked ? <Lock size={16} /> : <LockOpen size={16} />}
                                         </IconButton>
-                                        <IconButton small label={t('common.delete')} onClick={() => {
+                                        <IconButton small label={t('common.delete')} disabled={Boolean(image.locked)} onClick={() => {
                                             removeImage(image.id);
                                             toastUndoable(t('inspector.deleted', { name: image.name }));
                                         }}><Trash2 size={16} /></IconButton>

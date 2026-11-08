@@ -66,3 +66,9 @@ export async function syncImageOverlays(map: MlMap, images: ImageOverlay[], hidd
         }
     }
 }
+
+/** Move an image on screen without touching the project (drag preview); `null` restores. */
+export function previewImageCorners(map: MlMap, image: ImageOverlay, corners: ImageOverlay['corners'] | null) {
+    const source = map.getSource(layerId(image.id)) as ImageSource | undefined;
+    source?.setCoordinates(corners ?? image.corners);
+}

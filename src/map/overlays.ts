@@ -10,7 +10,7 @@ import { EMPTY_FC } from './basemap';
 import { setSourceData } from './planLayers';
 import { DRAW_COLORS } from '../core/store/ui';
 import { isElementVisible } from './planFeatures';
-import { renderAlign } from './align';
+import { alignActive, renderAlign } from './align';
 
 type F = GeoJSON.Feature;
 const point = (coordinates: LngLat, properties: Record<string, unknown> = {}): F => ({ type: 'Feature', properties, geometry: { type: 'Point', coordinates } });
@@ -64,7 +64,7 @@ export function renderDraft(map: MlMap) {
 /** Vertex, midpoint and radius handles for the single selected editable element. */
 export function renderEdit(map: MlMap) {
     const ui = useUi.getState();
-    if (ui.imageEditId) {
+    if (alignActive()) {
         renderAlign(map);
         return;
     }

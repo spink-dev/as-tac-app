@@ -328,7 +328,7 @@ export const S = {
     'maps.fitQuality': ['Genauigkeit ± {rms} m (max. {max} m)', 'Accuracy ± {rms} m (max {max} m)'],
 
     'align.title': ['Bildkarte ausrichten', 'Align image map'],
-    'align.lead': ['Setze Paare: zuerst einen Punkt im Bild, dann denselben Ort auf der Karte. Ab zwei Paaren wird die Bildkarte live ausgerichtet; drei oder mehr gut verteilte Punkte gleichen auch Verzerrungen aus.', 'Set pairs: first a point on the image, then the same place on the map. From two pairs the image aligns live; three or more well-spread points also correct distortion.'],
+    'align.lead': ['Setze Paare: zuerst einen Punkt im Bild, dann denselben Ort auf der Karte. Ab zwei Paaren wird die Bildkarte live ausgerichtet; ab vier gut verteilten Punkten werden auch Verzerrungen ausgeglichen.', 'Set pairs: first a point on the image, then the same place on the map. From two pairs the image aligns live; four or more well-spread points also correct distortion.'],
     'align.pickImage': ['Punkt im Bild antippen', 'Tap a point on the image'],
     'align.pickMap': ['Denselben Ort auf der Karte antippen', 'Tap the same place on the map'],
     'align.pairs': ['{n} Passpunkte', '{n} control points'],
@@ -338,6 +338,13 @@ export const S = {
     'align.scale': ['Massstab', 'Scale'],
     'align.rotation': ['Drehung', 'Rotation'],
     'align.reset': ['Passpunkte löschen', 'Clear control points'],
+    'align.outOfRange': ['Diese Ausrichtung läge ausserhalb der Karte – Passpunkte prüfen.', 'This alignment would leave the map – check the control points.'],
+    'align.implausible': ['Diese Passpunkte passen nicht zusammen – Paar prüfen oder neu setzen.', 'These control points don’t agree – check or reset the pair.'],
+    'align.locked': ['Diese Bildkarte ist gesperrt. In «Karten» entsperren, um sie auszurichten.', 'This image map is locked. Unlock it under “Maps” to align it.'],
+    'align.exact': ['Exakt durch die Paare – ab einem weiteren Paar wird die Genauigkeit messbar.', 'Exact through the pairs – one more pair makes accuracy measurable.'],
+    'maps.limit': ['Höchstens {n} Bildkarten pro Plan.', 'At most {n} image maps per plan.'],
+    'maps.tooLarge': ['Das Bild ist zu gross (max. 64 MB und 50 Megapixel).', 'The image is too large (max 64 MB and 50 megapixels).'],
+    'maps.imageFailed': ['Dieses Bild kann nicht gelesen werden (PNG, JPEG, WebP oder GIF).', 'This image can’t be read (PNG, JPEG, WebP or GIF).'],
 
     'share.title': ['Teilen & Sichern', 'Share & save'],
     'share.file': ['Plan als Datei', 'Plan as file'],

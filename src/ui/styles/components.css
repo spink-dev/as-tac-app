@@ -111,6 +111,18 @@
     height: 32px;
 }
 
+/* Rule 11: compact controls grow to the 48 px touch size on coarse pointers. */
+@media (pointer: coarse) {
+    .btn--sm {
+        min-height: var(--tap);
+    }
+
+    .icon-btn--sm {
+        width: var(--tap);
+        height: var(--tap);
+    }
+}
+
 /* Segmented control */
 .seg {
     display: inline-flex;

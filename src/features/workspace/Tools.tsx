@@ -14,6 +14,7 @@ import { ICON, IconButton } from '../../ui/components';
 import { MARKER_COLORS, ROUTE_COLORS, ZONE_COLORS } from '../../map/planFeatures';
 import type { MarkerType } from '../../core/model/schema';
 import { pathLengthM, formatDistance } from '../../core/geo/geo';
+import { alignActive } from '../../map/align';
 
 const TOOL_ICONS: Record<ToolId, typeof MapPin> = {
     select: MousePointer2, marker: MapPin, route: Route, zone: Hexagon, text: Type, draw: Pencil, erase: Eraser, bearing: CompassIcon, measure: Ruler,
@@ -182,7 +183,8 @@ export function HintBar() {
     const zoneShape = useUi((state) => state.zoneShape);
     const readOnly = useProject((state) => state.readOnly);
     const aligning = useUi((state) => state.imageEditId);
-    if (mode !== 'plan' || readOnly || aligning) {
+    useUi((state) => state.streamer);
+    if (mode !== 'plan' || readOnly || (aligning && alignActive())) {
         return null;
     }
     const started = Boolean(draft && draft.points.length > 0);

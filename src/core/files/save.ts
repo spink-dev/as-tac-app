@@ -39,14 +39,26 @@ export function pickFile(accept: string): Promise<File | null> {
         input.style.position = 'fixed';
         input.style.left = '-9999px';
         input.setAttribute('aria-hidden', 'true');
+        let settled = false;
         const done = (file: File | null) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            window.removeEventListener('focus', onFocus);
             input.remove();
             resolve(file);
+        };
+        // Browsers without the `cancel` event: the window regains focus when the picker closes;
+        // give `change` a moment to arrive, then treat it as cancelled.
+        const onFocus = () => {
+            window.setTimeout(() => done(input.files?.[0] ?? null), 1500);
         };
         input.addEventListener('change', () => done(input.files?.[0] ?? null), { once: true });
         input.addEventListener('cancel', () => done(null), { once: true });
         document.body.append(input);
         input.click();
+        window.setTimeout(() => window.addEventListener('focus', onFocus, { once: true }), 0);
     });
 }
 

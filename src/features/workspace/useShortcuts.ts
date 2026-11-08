@@ -5,6 +5,7 @@ import { usePrefs } from '../../core/store/prefs';
 import { bindingFor, eventCombo, SHORTCUTS } from '../../core/shortcuts/registry';
 import { applySubtype, armTool, cycleAppearance, cycleStreamer, deleteSelection, duplicateSelection, nudgeSelection, toggleLockSelection } from '../../core/actions';
 import { cancelDraft, finishDraft, removeLastDraftPoint } from '../../map/interaction';
+import { cancelAlign } from '../../map/align';
 import { mapRef } from '../../map/MapView';
 import { setMode } from './modes';
 import { showDialog } from '../../core/store/dialogs';
@@ -132,7 +133,7 @@ export function useShortcuts() {
                     finishDraft(event.shiftKey);
                     break;
                 case 'edit.cancel':
-                    if (!cancelDraft()) {
+                    if (!cancelDraft() && !cancelAlign()) {
                         if (ui.palette || ui.shortcutsOpen) {
                             ui.set({ palette: false, shortcutsOpen: false });
                         } else if (ui.mode === 'briefing') {

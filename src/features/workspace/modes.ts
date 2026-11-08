@@ -14,6 +14,8 @@ export function setMode(mode: Mode) {
     const patch: Partial<ReturnType<typeof useUi.getState>> = { mode, draft: null };
     if (mode !== 'plan') {
         patch.tool = 'select';
+        // Alignment edits plan data: it never survives leaving plan mode.
+        patch.imageEditId = null;
     }
     if (ui.mode === 'briefing') {
         patch.briefingInk = [];

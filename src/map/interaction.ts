@@ -2,6 +2,7 @@ import type { Map as MlMap, MapMouseEvent, MapTouchEvent, PointLike } from 'mapl
 import { useUi, DRAW_COLORS, toast, type ToolId } from '../core/store/ui';
 import { mutate, useProject } from '../core/store/project';
 import { addElement, canEdit, activeLayerId, existingTeamId } from '../core/actions';
+import { alignActive } from './align';
 import { uid, nowIso } from '../core/model/factory';
 import type { Element, LngLat, Project, Stroke } from '../core/model/schema';
 import { insertVertex, isLocked, moveVertex, setRadius, simplify, translateElement } from '../core/model/geometry';
@@ -372,7 +373,7 @@ export function installInteraction(map: MlMap): () => void {
     function startPress(event: MapMouseEvent | MapTouchEvent): boolean {
         const ui = useUi.getState();
         const project = useProject.getState().project;
-        if (!project || gesture || ui.imageEditId) {
+        if (!project || gesture || alignActive()) {
             return false;
         }
         const point = event.point;
@@ -559,7 +560,7 @@ export function installInteraction(map: MlMap): () => void {
         }
         const ui = useUi.getState();
         const project = useProject.getState().project;
-        if (!project || ui.imageEditId) {
+        if (!project || alignActive()) {
             return;
         }
         const shiftKey = (event.originalEvent as MouseEvent).shiftKey;

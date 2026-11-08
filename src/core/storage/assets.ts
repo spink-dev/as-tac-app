@@ -76,6 +76,61 @@ export async function assetUrl(hash: string): Promise<string | null> {
     return url;
 }
 
+const MAX_INPUT_BYTES = 64 * 1024 * 1024;
+const MAX_PIXELS = 50_000_000;
+
+/** Width and height from the PNG, JPEG, GIF or WebP header; `null` for anything else. */
+export function imageDimensions(b: Uint8Array): { width: number; height: number } | null {
+    const u16be = (i: number) => (b[i] << 8) | b[i + 1];
+    const u16le = (i: number) => b[i] | (b[i + 1] << 8);
+    const u24le = (i: number) => b[i] | (b[i + 1] << 8) | (b[i + 2] << 16);
+    const ascii = (i: number, n: number) => String.fromCharCode(...b.subarray(i, i + n));
+    if (b.length >= 24 && b[0] === 0x89 && ascii(1, 3) === 'PNG') {
+        return { width: ((b[16] << 24) >>> 0) + (b[17] << 16) + (b[18] << 8) + b[19], height: ((b[20] << 24) >>> 0) + (b[21] << 16) + (b[22] << 8) + b[23] };
+    }
+    if (b.length >= 10 && ascii(0, 4) === 'GIF8') {
+        return { width: u16le(6), height: u16le(8) };
+    }
+    if (b.length >= 30 && ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') {
+        const chunk = ascii(12, 4);
+        if (chunk === 'VP8 ') {
+            return { width: u16le(26) & 0x3fff, height: u16le(28) & 0x3fff };
+        }
+        if (chunk === 'VP8L') {
+            const [b0, b1, b2, b3] = [b[21], b[22], b[23], b[24]];
+            return { width: 1 + (((b1 & 0x3f) << 8) | b0), height: 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6)) };
+        }
+        if (chunk === 'VP8X') {
+            return { width: 1 + u24le(24), height: 1 + u24le(27) };
+        }
+        return null;
+    }
+    if (b.length >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+        let i = 2;
+        while (i + 9 < b.length) {
+            if (b[i] !== 0xff) {
+                i += 1;
+                continue;
+            }
+            const marker = b[i + 1];
+            if (marker === 0xff) {
+                i += 1;
+                continue;
+            }
+            if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+                return { width: u16be(i + 7), height: u16be(i + 5) };
+            }
+            if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+                i += 2;
+                continue;
+            }
+            i += 2 + u16be(i + 2);
+        }
+        return null;
+    }
+    return null;
+}
+
 export interface PreparedImage {
     blob: Blob;
     width: number;
@@ -89,7 +144,19 @@ export interface PreparedImage {
  * their fingerprint); oversized images are downscaled to a 4096 px long edge for phones.
  */
 export async function prepareImage(file: Blob): Promise<PreparedImage> {
-    const originalHash = await sha256Hex(new Uint8Array(await file.arrayBuffer()));
+    if (file.size > MAX_INPUT_BYTES) {
+        throw new Error('image-too-large');
+    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    // Read the header first: a small file can still decode into gigabytes (decompression bomb).
+    const size = imageDimensions(bytes);
+    if (!size) {
+        throw new Error('image-format');
+    }
+    if (size.width > 16384 || size.height > 16384 || size.width * size.height > MAX_PIXELS) {
+        throw new Error('image-too-large');
+    }
+    const originalHash = await sha256Hex(bytes);
     const bitmap = await createImageBitmap(file);
     const { width, height } = bitmap;
     const longEdge = Math.max(width, height);

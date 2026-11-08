@@ -97,7 +97,8 @@ export const useUi = create<UiState>((set, get) => ({
     override: null,
     measure: null,
     setTool(tool) {
-        set({ tool, draft: null, measure: tool === 'measure' ? get().measure : null });
+        // Arming a creation tool ends image alignment (the two would fight over map input).
+        set({ tool, draft: null, measure: tool === 'measure' ? get().measure : null, imageEditId: tool === 'select' ? get().imageEditId : null });
     },
     set(patch) {
         set(patch);
