@@ -15,7 +15,12 @@ export interface ProjectIndexRow {
     elementCount: number;
     eventLabel?: string;
     live?: boolean;
-    /** Plan format of the stored record; a newer one than this app knows is shown, not opened. */
+    /**
+     * Plan format of the stored record; a newer one than this app knows is shown, not opened.
+     * Contract for every version: whoever writes a plan record writes this field in the same
+     * transaction (also a database upgrade that rewrites plans) — saves rely on it to never replace
+     * a newer record. Absent only on rows of 1.0.0-alpha.1 (format 1).
+     */
     formatVersion?: number;
 }
 

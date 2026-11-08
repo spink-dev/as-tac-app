@@ -396,10 +396,20 @@ class Session {
         // A newer app took this plan over on the device: this window's edits now go to a local copy,
         // which is not the live plan. Stop syncing (the queue stays for the newer app to send).
         this.stop.push(onSavedAsCopy((original) => {
-            if (original === this.link.projectId) {
-                toast(t('live.stoppedCopy'), { tone: 'warn' });
-                void disconnectLive();
+            if (original !== this.link.projectId) {
+                return;
             }
+            toast(t('live.stoppedCopy'), { tone: 'warn' });
+            // What this window queued in this session now lives only in the local copy: it must not
+            // reach the live plan through the newer window, whose plan never had it.
+            for (const key of this.touched) {
+                const row = this.pending.get(key);
+                if (row) {
+                    this.pending.delete(key);
+                    this.forget(row);
+                }
+            }
+            void disconnectLive();
         }));
         // Before an update reloads the page: queued changes and the sync position are on disk.
         this.stop.push(onBeforeUpdate(async () => {
@@ -735,11 +745,15 @@ class Session {
         }
     }
 
+    /** Keys this window queued in this session (see the copy takeover in `start`). */
+    private touched = new Set<string>();
+
     /** Synchronous: the pending map is always current; Dexie writes follow in order. */
     enqueue(ops: (Omit<PushOp, 'base'> & { prev?: unknown | null })[]) {
         const now = new Date().toISOString();
         for (const op of ops) {
             const key = keyOf(op.collection, op.entityId);
+            this.touched.add(key);
             const existing = this.pending.get(key);
             // Repeated edits of one entity before sending collapse into one op with the original base.
             const data = wire(op.data);

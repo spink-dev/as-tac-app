@@ -46,7 +46,7 @@ Jeder gespeicherte oder verschickte Datensatz trägt die Formatversion, in der e
 
 Im Live-Betrieb trägt jedes verschickte Objekt sein Format (`_fv`). Ältere Objekte von Partnern werden beim Empfang mit denselben Schritten migriert; Objekte aus einer neueren App werden nicht angewendet: Die App meldet «Update nötig», hält die eigenen Änderungen in der Warteschlange (sie gehen nach dem Update raus, mit Versionsprüfung) und holt die neueren Objekte nach dem Update erneut. Wer einem Live-Plan mit neueren Objekten beitreten will, wird zuerst zum Aktualisieren aufgefordert. Die Warteschlange übersteht Updates und wird dabei ebenfalls migriert.
 
-Formatänderung: `FORMAT_VERSION` in `src/core/model/schema.ts` erhöhen, Schritt in `src/core/model/migrations.ts` ergänzen (pro Objekt, damit Live-Daten denselben Weg nehmen), neue Datenbankversion nur anhängen, nie eine alte ändern. Die eingefrorenen Beispieldateien in `tests/fixtures/formats` (mit Prüfsummen) müssen weiterhin öffnen.
+Formatänderung: `FORMAT_VERSION` in `src/core/model/schema.ts` erhöhen, Schritt in `src/core/model/migrations.ts` ergänzen (pro Objekt, damit Live-Daten denselben Weg nehmen), neue Datenbankversion nur anhängen, nie eine alte ändern. Wer einen Plan-Datensatz schreibt (auch ein Datenbank-Upgrade), schreibt in derselben Transaktion `formatVersion` in die Indexzeile: Daran erkennt das Speichern, dass ein Datensatz aus einer neueren App stammt, und ersetzt ihn nicht. Die eingefrorenen Beispieldateien in `tests/fixtures/formats` (mit Prüfsummen) müssen weiterhin öffnen.
 
 ## Live-Zusammenarbeit einrichten (optional)
 

@@ -39,7 +39,8 @@ export async function saveProject(project: Project, current: number = FORMAT_VER
     const live = Boolean(await db.liveLinks.get(project.id));
     await db.transaction('rw', db.projects, db.projectIndex, db.backups, async () => {
         const index = await db.projectIndex.get(project.id);
-        const stored = index ? index.formatVersion ?? 1 : null;
+        // Without an index row (should not happen) the record itself tells its format.
+        const stored = index ? index.formatVersion ?? 1 : await db.projects.get(project.id).then((row) => (row ? versionOf(row.data) || 1 : null));
         if (stored !== null && stored > current) {
             throw new Error('newer');
         }

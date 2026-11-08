@@ -226,10 +226,9 @@ export function checkForUpdate(manual = false): Promise<void> {
         if (!manual) {
             return checking;
         }
-        manualQueued ??= checking.then(() => {
+        manualQueued ??= checking.finally(() => {
             manualQueued = null;
-            return checkForUpdate(true);
-        });
+        }).then(() => checkForUpdate(true));
         return manualQueued;
     }
     checking = runCheck(manual).finally(() => {
@@ -401,6 +400,8 @@ async function finishReload() {
             await Promise.resolve().then(guard).catch(() => null);
         }
         await flushNow().catch(() => false);
+        // The last save may have gone to a copy (a newer window took the plan over meanwhile).
+        rememberResume();
     })();
     // A stalled write must not keep the "updating" screen up for ever.
     await Promise.race([last, new Promise((resolve) => window.setTimeout(resolve, 5000))]);
