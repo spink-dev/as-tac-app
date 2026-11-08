@@ -161,6 +161,12 @@ class Session {
     /** Partner changes that arrived while my push of the same object was in flight. */
     private deferred = new Map<string, RemoteEntity>();
     private leaderSeen = 0;
+    /** Last phase/camera applied while following: heartbeats that change nothing move nobody. */
+    private lastApplied: string | null = null;
+    /** Set while stepping back for another leader, so followers are handed over to them. */
+    private yieldTo: string | null = null;
+    /** Highest seq that may be stored: an entity this device couldn't apply is pulled again next time. */
+    private holdSeq = Number.POSITIVE_INFINITY;
     private leaderTimer = 0;
     private heartbeat = 0;
     private persistChain: Promise<unknown> = Promise.resolve();
@@ -211,6 +217,22 @@ class Session {
                 this.transport.broadcast({ type: 'briefing', from: this.clientId, name: displayName(), leading: true, phaseIndex: state.phaseIndex, camera: state.camera });
             }
         }, () => ({ phaseIndex: useUi.getState().phaseIndex, camera: mapRef.current ? currentCamera(mapRef.current) : null }));
+        // Leaving the briefing ends leading and following (no one is pulled back into it).
+        this.stop.push(useUi.subscribe((state, prev) => {
+            if (state.mode !== prev.mode && state.mode !== 'briefing') {
+                if (this.leading) {
+                    setLeading(false);
+                }
+                if (useLive.getState().following) {
+                    useLive.setState({ following: false });
+                }
+            }
+        }));
+        this.stop.push(useLive.subscribe((state, prev) => {
+            if (state.following && !prev.following) {
+                this.lastApplied = null;
+            }
+        }));
         const onOnline = () => void (this.subscribed ? this.catchUp() : this.connect());
         window.addEventListener('online', onOnline);
         this.stop.push(() => window.removeEventListener('online', onOnline));
@@ -289,13 +311,14 @@ class Session {
 
     /** Leading: announce now and every few seconds, so late joiners learn who leads. */
     setLeading(on: boolean) {
+        const was = this.leading;
         this.leading = on;
         window.clearInterval(this.heartbeat);
         this.heartbeat = 0;
         if (on) {
             this.heartbeat = window.setInterval(() => broadcastNow(), LEADER_HEARTBEAT_MS);
-        } else if (!this.closed) {
-            this.transport.broadcast({ type: 'briefing', from: this.clientId, name: displayName(), leading: false, phaseIndex: 0, camera: null });
+        } else if (was && !this.closed) {
+            this.transport.broadcast({ type: 'briefing', from: this.clientId, name: displayName(), leading: false, to: this.yieldTo ?? undefined, phaseIndex: 0, camera: null });
         }
     }
 
@@ -317,9 +340,17 @@ class Session {
             }
         }, LEADER_TIMEOUT_MS);
         if (live.leaderId === id) {
+            if (name && live.leaderName !== name) {
+                useLive.setState({ leaderName: name });
+            }
             return;
         }
-        useLive.setState({ leaderId: id, leaderName: name, following: false });
+        // A handover (another admin takes over the same briefing) keeps followers following.
+        const handover = Boolean(live.leaderId) && live.leaderId !== this.clientId;
+        useLive.setState({ leaderId: id, leaderName: name, following: handover ? live.following : false });
+        if (handover && live.following) {
+            return;
+        }
         toast(t('briefing.leaderStarted', { name: name ?? '?' }), {
             action: {
                 label: t('briefing.follow'),
@@ -405,10 +436,14 @@ class Session {
         window.clearTimeout(this.versionTimer);
         this.versionTimer = window.setTimeout(() => {
             void kvSet(versionsKey(this.link.projectId), Object.fromEntries(this.versions));
-            void db.liveLinks.update(this.link.projectId, { lastSeq: this.lastSeq });
+            void db.liveLinks.update(this.link.projectId, { lastSeq: this.storedSeq() });
         }, 800);
     }
     private versionTimer = 0;
+
+    private storedSeq(): number {
+        return Math.max(this.link.lastSeq, Math.min(this.lastSeq, this.holdSeq));
+    }
 
     private nextBatch(): OutboxRow[] {
         const rows = [...this.pending.values()].sort((a, b) => a.order - b.order);
@@ -717,8 +752,9 @@ class Session {
             return;
         }
         if (!this.applyRemote([entity])) {
-            // Invalid for this device: not applied and its version not recorded. A later change of
-            // the same object (or reopening the plan) brings it again.
+            // Not applied (invalid for this device, or the plan was just closed): its version is not
+            // recorded and the stored seq stays below it, so the next session pulls it again.
+            this.holdSeq = Math.min(this.holdSeq, entity.seq - 1);
             return;
         }
         this.versions.set(key, entity.version);
@@ -765,15 +801,35 @@ class Session {
         }
         if (message.leading === false) {
             if (useLive.getState().leaderId === message.from) {
-                this.setLeader(null, null);
+                // Stepping back for another admin hands the followers over instead of dropping them.
+                const to = typeof message.to === 'string' && message.to !== this.clientId ? message.to : null;
+                if (to) {
+                    this.setLeader(to, useLive.getState().presence.find((p) => p.clientId === to)?.name ?? null);
+                } else {
+                    this.setLeader(null, null);
+                }
             }
             return;
+        }
+        if (this.leading) {
+            // Two admins started at once: the smaller client id keeps leading, the other yields.
+            if (message.from > this.clientId) {
+                return;
+            }
+            this.yieldTo = message.from;
+            setLeading(false);
+            this.yieldTo = null;
         }
         this.setLeader(message.from, typeof message.name === 'string' ? message.name.slice(0, 40) : null);
         const live = useLive.getState();
         if (!live.following || message.from !== live.leaderId || !Number.isInteger(message.phaseIndex) || message.phaseIndex < 0) {
             return;
         }
+        const signature = JSON.stringify([message.phaseIndex, message.camera]);
+        if (signature === this.lastApplied) {
+            return;
+        }
+        this.lastApplied = signature;
         const camera = message.camera;
         const validCamera = camera && Array.isArray(camera.center) && camera.center.every(Number.isFinite) && Number.isFinite(camera.zoom) && Number.isFinite(camera.bearing);
         void import('../../features/briefing/briefing').then(({ goToPhase }) => {
@@ -802,7 +858,7 @@ class Session {
         window.clearTimeout(this.versionTimer);
         await this.persistChain;
         await kvSet(versionsKey(this.link.projectId), Object.fromEntries(this.versions)).catch(() => undefined);
-        await db.liveLinks.update(this.link.projectId, { lastSeq: this.lastSeq }).catch(() => undefined);
+        await db.liveLinks.update(this.link.projectId, { lastSeq: this.storedSeq() }).catch(() => undefined);
         setBriefingSender(null, () => null);
         this.transport.close();
     }
@@ -886,7 +942,7 @@ export async function goLive(kind: 'supabase' | 'loopback'): Promise<void> {
 }
 
 /** Join with an invite code: download the live plan, store it locally and open it. */
-export async function joinLive(code: string, kind: 'supabase' | 'loopback'): Promise<{ project: Project; info: JoinInfo }> {
+export async function joinLive(code: string, kind: 'supabase' | 'loopback'): Promise<{ project: Project; info: JoinInfo; alreadyMember: boolean }> {
     const backend = backendFor(kind);
     const userId = await backend.userId();
     if (!userId) {
@@ -899,7 +955,7 @@ export async function joinLive(code: string, kind: 'supabase' | 'loopback'): Pro
         await db.liveLinks.update(existing.projectId, { role: existing.role === 'owner' ? 'owner' : info.role });
         const stored = await db.projects.get(existing.projectId);
         if (stored) {
-            return { project: stored.data, info };
+            return { project: stored.data, info, alreadyMember: true };
         }
     }
     const entities = await backend.open(info.planId).pull(0);
@@ -908,7 +964,7 @@ export async function joinLive(code: string, kind: 'supabase' | 'loopback'): Pro
     // The versions this copy is based on, so the first edit isn't mistaken for a clash.
     await kvSet(versionsKey(project.id), Object.fromEntries(entities.map((e) => [keyOf(e.collection, e.entityId), e.version])));
     await db.liveLinks.put({ projectId: project.id, remoteId: info.planId, role: info.role, backend: kind, lastSeq: Math.max(0, ...entities.map((e) => e.seq)), name: info.name, userId });
-    return { project, info };
+    return { project, info, alreadyMember: false };
 }
 
 /** Stop syncing this plan on this device; the local copy stays (unsent changes are dropped). */
@@ -939,8 +995,12 @@ export async function sendChat(body: string): Promise<void> {
 let stopCameraShare: (() => void) | null = null;
 
 /** Lead the briefing: phase changes and (throttled) map moves go to everyone following. */
+export function isLeading(): boolean {
+    return session?.leading ?? false;
+}
+
 export function setLeading(on: boolean) {
-    if (!session || session.role === 'viewer') {
+    if (!session || session.role === 'viewer' || (!on && !session.leading && useLive.getState().leaderId !== session.clientId)) {
         return;
     }
     session.setLeading(on);

@@ -38,13 +38,14 @@ export function JoinDialog() {
             if (backend === 'supabase' && !(await currentUser())) {
                 await signInDevice();
             }
-            const { project, info } = await joinLive(normalized, backend);
+            const { project, info, alreadyMember } = await joinLive(normalized, backend);
             if (useRoute.getState().route.name === 'workspace' && !(await closeProject())) {
                 return;
             }
             hide();
             await openProject(project.id);
-            toast(t('live.joined', { name: info.name }), { tone: 'ok' });
+            // A code never changes the role of someone who is already a member (the owner does that).
+            toast(alreadyMember ? t('live.alreadyMember', { name: info.name, role: t(`live.role.${info.role}`) }) : t('live.joined', { name: info.name }), { tone: 'ok' });
         } catch (err) {
             console.warn('join failed', err);
             setError(err instanceof Error && err.message === 'invite' ? t('live.codeInvalid') : t('live.failed'));

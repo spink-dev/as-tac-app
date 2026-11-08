@@ -169,6 +169,35 @@ await owner.getByTestId('lead').click();
 await settle(1200);
 check('leader-stopped', (await viewer.getByTestId('follow').count()) === 0);
 
+// Leaving the briefing (mode tab) ends leading; a follower who left stays where they are.
+const mode = (page) => page.evaluate(() => document.querySelector('.ws')?.getAttribute('data-mode'));
+await owner.getByTestId('lead').click();
+await settle(1500);
+await viewer.getByTestId('follow').click();
+await settle(500);
+await owner.getByRole('button', { name: 'Planen' }).first().click();
+await settle(1200);
+check('leave-ends-lead', (await viewer.getByTestId('follow').count()) === 0);
+await viewer.getByRole('button', { name: 'Planen' }).first().click();
+await settle(6000);
+check('follower-stays-out', (await mode(viewer)) === 'plan');
+
+// Two admins press Lead at the same moment: exactly one keeps leading, the other can follow.
+for (const page of [owner, admin]) {
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'h' })));
+}
+await settle(800);
+// (DOM clicks: the second Lead button correctly disappears as soon as the first leader is heard.)
+const pressLead = (page) => page.evaluate(() => document.querySelector('[data-testid="lead"]')?.click());
+await Promise.all([pressLead(owner), pressLead(admin)]);
+await settle(7000);
+const leading = async (page) => (await page.getByTestId('lead').count()) > 0 && (await page.getByTestId('lead').getAttribute('aria-pressed')) === 'true';
+const leaders = (await leading(owner) ? 1 : 0) + (await leading(admin) ? 1 : 0);
+check('one-leader', leaders === 1);
+const other = (await leading(owner)) ? admin : owner;
+check('other-can-follow', (await other.getByTestId('follow').count()) === 1);
+
 await browser.close();
 console.log(JSON.stringify(results, null, 1));
 console.log(errors.length ? errors.join('\n') : 'no page errors');

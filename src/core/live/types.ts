@@ -32,6 +32,8 @@ export interface BriefingMessage {
     name?: string;
     /** `false` ends the sender's leadership; leaders re-send `true` as a heartbeat. */
     leading?: boolean;
+    /** With `leading: false`: the admin who takes over (followers keep following). */
+    to?: string;
     phaseIndex: number;
     camera: { center: [number, number]; zoom: number; bearing: number } | null;
 }

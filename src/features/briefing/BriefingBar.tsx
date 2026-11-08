@@ -9,7 +9,7 @@ import { visibleInPhase } from '../../map/planFeatures';
 import { goToPhase, stepPhase } from './briefing';
 import { setMode } from '../workspace/modes';
 import { useLive } from '../../core/live/state';
-import { myClientId, setFollowing, setLeading } from '../../core/live/session';
+import { isLeading, myClientId, setFollowing, setLeading } from '../../core/live/session';
 
 /**
  * Presentation controls: phase navigation, the phase's notes and a temporary pen.
@@ -106,7 +106,8 @@ export function BriefingBar() {
                     </Button>
                 ) : null}
                 <Button variant="ghost" onClick={() => {
-                    if (leaderId === myClientId()) {
+                    // Ending always stops my own leading, whatever the shown leader is.
+                    if (isLeading()) {
                         setLeading(false);
                     }
                     setFollowing(false);
