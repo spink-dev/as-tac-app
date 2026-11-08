@@ -6,7 +6,7 @@ Taktische Kartenplanung für Airsoft – auf echten OpenStreetMap-Karten, offlin
 
 ## Was die App kann
 
-- **Echte Karten offline:** mitgelieferte Gebiete (Mahlwinkel, Benglen, Zürich bis Benglen) und eigene Ausschnitte bis 36 km² direkt aus OpenStreetMap (Overpass) herunterladen. Danach läuft alles ohne Netz.
+- **Echte Karten offline:** mitgelieferte Gebiete (Mahlwinkel, Benglen, Zürich bis Benglen) und eigene Ausschnitte bis 36 km² direkt aus OpenStreetMap (Overpass) herunterladen. Danach läuft alles ohne Netz. Grosse Ausschnitte kommen in Teilen von höchstens 4 km²; bricht die Verbindung ab, setzt «Fortsetzen» beim fehlenden Teil an.
 - **Bildkarten wie in TacMap:** Eventkarten, Skizzen oder Luftbilder auf die echte Karte legen und mit Passpunkten ausrichten (ab 2 Paaren ähnlich, ab 4 gut verteilten Paaren mit Verzerrungsausgleich). Bekannte Mahlwinkel-Eventkarten werden am SHA-256 erkannt und sofort ausgerichtet. Objekte, Zeichnungen und Ausschnitte auf einer Bildkarte bewegen sich beim Neuausrichten mit.
 - **Werkzeuge:** Marker (M→1–9), Routen (R→1–4), Zonen als Fläche oder Kreis (Z→1–8, Tab), Text, freies Zeichnen (D), Radierer, Peilung, Messen, Ebenen, Teams mit Auftragskarte, Verbände, Logos, Teamvorlagen, Protokoll, Rückgängig/Wiederholen, Befehlspalette (⌘K / Ctrl+K), frei belegbare Tastenkürzel.
 - **Feldmodus:** Plan gesperrt, eigene Position mit Genauigkeit, MGRS, Kompass mit «Blickrichtung oben», Navigation zu angetippten Objekten, Pfadaufnahme (bleibt auf dem Gerät).
@@ -14,6 +14,7 @@ Taktische Kartenplanung für Airsoft – auf echten OpenStreetMap-Karten, offlin
 - **Teilen:** `.astac`-Datei (Plan, Bildkarten, optional Grundkarte) über das Teilen-Menü des Geräts oder als Download; kleine Pläne als QR-Code/Link (der Plan steckt im Link nach dem `#`, kein Server).
 - **Importieren:** `.astac`, TacMap `.tacmap`, as-tac 0.x `.astac.zip`/Plan-JSON, Kartenpakete `.astac-map.json`. Alte as-tac-Pläne im Browser werden beim Start angeboten.
 - **Live-Zusammenarbeit:** mehrere Admins planen gleichzeitig, Zuschauer sehen alles nur lesend, Admin-Chat, Einladungscodes mit QR. Gleichzeitige Änderungen am selben Objekt werden angezeigt statt still überschrieben.
+- **Schwaches Mobilfunknetz:** Änderungen reisen in kleinen, sich anpassenden Paketen und gehen nie verloren; ein Empfang setzt nach einem Funkloch dort fort, wo er abbrach. Ohne Echtzeit-Verbindung (blockierter Websocket) gleicht die App alle 20 s über normales HTTP ab. Bildkarten und Logos laufen im Hintergrund, in fortsetzbaren Stücken; mit «Bildkarten laden: Manuell / Nur WLAN» (Einstellungen) erst auf Antippen.
 - **Datenschutz:** Die eigene GPS-Position wird nie übertragen und nur auf ausdrücklichen Wunsch als Pfad gespeichert. «Streamer Safe» blendet Navigation, eigene Position, Planungs- und Freundinformationen aus.
 - **Darstellung:** Tag, Dunkel, Rotlicht; grosse Touch-Ziele; Telefon mit Bottom Sheet, Desktop mit Seitenpanel.
 
@@ -78,7 +79,7 @@ Die beiden Werte werden beim Build eingebunden; ohne sie läuft die App rein lok
 
 ## Was geprüft ist – und was nicht
 
-- Geprüft: Typprüfung, Unit-Tests (Geometrie, MGRS, Speicher, Undo mit Partnern, Dateiformate, ZIP-Grenzen, TacMap-Umwandlung, Live-Migration und RLS unter PGlite, gleiche Regeln im lokalen Testmodus), Browser-Szenarien in Chromium (Werkzeuge, Panels, Bildkarten mit erzeugtem Bild und Ablehnung ungültiger Bilder, Feld mit simuliertem GPS/Kompass, Teilen/Import, Live im lokalen Testmodus mit drei Tabs), auch gegen die nginx-Konfiguration aus `docker/`.
+- Geprüft: Typprüfung, Unit-Tests (Geometrie, MGRS, Speicher, Undo mit Partnern, Dateiformate, ZIP-Grenzen, TacMap-Umwandlung, Live-Migration und RLS unter PGlite, gleiche Regeln im lokalen Testmodus), Browser-Szenarien in Chromium (Werkzeuge, Panels, Bildkarten mit erzeugtem Bild und Ablehnung ungültiger Bilder, Feld mit simuliertem GPS/Kompass, Teilen/Import, Live im lokalen Testmodus mit drei Tabs, Live über ein simuliertes schwaches Netz mit 64 kbit/s, 300 ms Latenz und 20 % verlorenen Anfragen samt Funkloch, Bildkarten über schwaches Netz mit Datensparmodus), auch gegen die nginx-Konfiguration aus `docker/`. Gebietsdownloads in Teilen und fortsetzbare Bildübertragungen sind gegen nachgebildete Server geprüft (Overpass ist aus der Testumgebung nicht erreichbar).
 - **Nicht** geprüft: echte Geräte (iPhone, Android) und echte Sensoren, Safari/WebKit, ein echtes Supabase-Projekt (Realtime, Storage, Auth), Offline-Betrieb auf einem installierten Telefon, der Docker-Build selbst, die Erkennung bekannter Eventkarten (braucht die eigene Bilddatei: `node tests/e2e/images.mjs <ordner> <eventkarte>`).
 
 ## Lizenzen

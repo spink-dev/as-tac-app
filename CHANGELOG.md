@@ -12,8 +12,9 @@ Neuentwicklung: as-tac 0.6 (echte OSM-Karten) und TacMap 0.12 (Bildkarten, Werkz
 - **Briefing:** Phasen mit Ausschnitt, Zeit und Notizen, temporärer Stift, Präsentation leiten/folgen im Live-Betrieb.
 - **Teilen & Import:** `.astac` (ZIP mit SHA-256 für jede Datei, optional mit Grundkarte), QR/Link für kleine Pläne, Import von `.tacmap`, as-tac 0.x und `.astac-map.json`, Installations-Dateihandler.
 - **Live:** Supabase-Migration mit RLS und geprüften RPCs, Versionsprüfung statt stillem Überschreiben, dauerhafte Warteschlange pro Objekt (übersteht Neuladen und Funklöcher), Rollen Besitzer/Admin/Zuschauer, Einladungscodes per Link-Fragment oder QR, Sperren entfernter Mitglieder, Admin-Chat, Anwesenheit; lokaler Testmodus zwischen Tabs.
+- **Schwaches Netz:** Live-Abgleich in sich anpassenden, fortsetzbaren Seiten mit Abbruch nur bei Stillstand; Senden in Paketen von 8 KB bis 1,5 MB je nach Leitung; Betrieb ohne Echtzeit über HTTP («Eingeschränkt»); keine Rücksendung eigener Änderungen; Bildkarten im Hintergrund, fortsetzbar (Range/TUS), mit Datensparmodus; Gebietsdownloads in Teilen mit Wiederholung, Fortsetzen und ehrlichen Fehlermeldungen.
 - **Datenschutz:** GPS wird nie übertragen; Streamer Safe blendet Position, Navigation, Pläne, Codes und QR aus.
-- **Prüfung:** 69 Unit-Tests (inkl. Migration und Rechte unter PGlite, lokaler Testmodus mit denselben Regeln) und 7 Browser-Szenarien in Chromium bestanden, auch ausgeliefert über die nginx-Konfiguration aus `docker/`. Nicht geprüft: echte Geräte und Sensoren, Safari, ein echtes Supabase-Projekt, der Docker-Build selbst, die Erkennung bekannter Eventkarten (braucht die eigene Bilddatei).
+- **Prüfung:** 93 Unit-Tests (inkl. Migration und Rechte unter PGlite, lokaler Testmodus mit denselben Regeln) und 9 Browser-Szenarien in Chromium bestanden (zwei davon über ein simuliertes schwaches Netz), auch ausgeliefert über die nginx-Konfiguration aus `docker/`. Nicht geprüft: echte Geräte und Sensoren, Safari, ein echtes Supabase-Projekt, der Docker-Build selbst, die Erkennung bekannter Eventkarten (braucht die eigene Bilddatei).
 
 ## 0.6.0 — 2026-10-01 (main)
 
