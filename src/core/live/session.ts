@@ -293,6 +293,8 @@ class Session {
     private uploadQueue = new Set<string>();
     /** Uploads that failed and wait for their retry (restarted early when the link comes back). */
     private failedUploads = new Set<string>();
+    /** Uploads refused for a lasting reason (quota, auth): left alone until their one long retry. */
+    private refusedUploads = new Set<string>();
     /** Pictures the user tapped «Laden» for: fetched as soon as they exist, whatever the data saver says. */
     private requested = new Set<string>();
     /** Picture hashes seen in rows (only a new hash resets a waiting picture's backoff). */
@@ -929,6 +931,7 @@ class Session {
         this.pending.clear();
         this.uploadQueue.clear();
         this.failedUploads.clear();
+        this.refusedUploads.clear();
         useProject.getState().setReadOnly('viewer');
         useLive.setState({ role: 'viewer', queued: 0 });
         if (!this.demoted) {
@@ -968,7 +971,8 @@ class Session {
         for (const row of rows) {
             const data = row.data as { asset?: string; logoAsset?: string } | null;
             const hash = row.collection === 'images' ? data?.asset : row.collection === 'teams' ? data?.logoAsset : undefined;
-            if (hash && !this.uploaded.has(hash)) {
+            // A refused picture is not re-sent on every edit of its row (dragging corners).
+            if (hash && !this.uploaded.has(hash) && !this.refusedUploads.has(hash)) {
                 this.uploadQueue.add(hash);
             }
         }
@@ -1028,13 +1032,19 @@ class Session {
                     const retry = this.assetRetry.get(`up:${hash}`);
                     const wait = retry ? Math.min(retry.wait * 2, 15 * 60 * 1000) : 15000;
                     this.assetRetry.set(`up:${hash}`, { at: Date.now() + wait, wait });
-                    if ((error as { permanent?: boolean })?.permanent || permanentError(error) || /quota|exceed|location|unauthenticated/i.test(String((error as Error)?.message ?? error))) {
-                        // Refused for a reason that won't change by itself: only its own (long) timer
-                        // tries again, never every poll.
-                        this.later(() => {
-                            this.uploadQueue.add(hash);
-                            void this.runUploads();
-                        }, 15 * 60 * 1000);
+                    const text = String((error as Error)?.message ?? error);
+                    const lasting = (error as { permanent?: boolean })?.permanent || permanentError(error) || /quota|storage.*(full|exceed)|location|unauthenticated|too large/i.test(text);
+                    if (lasting && !/rate.?limit|too many requests|429/i.test(text)) {
+                        // Refused for a reason that won't change by itself: one timer per picture tries
+                        // again later; polls and row edits leave it alone meanwhile.
+                        if (!this.refusedUploads.has(hash)) {
+                            this.refusedUploads.add(hash);
+                            this.later(() => {
+                                this.refusedUploads.delete(hash);
+                                this.uploadQueue.add(hash);
+                                void this.runUploads();
+                            }, 15 * 60 * 1000);
+                        }
                         continue;
                     }
                     this.failedUploads.add(hash);
@@ -1168,7 +1178,8 @@ class Session {
         const retry = this.assetRetry.get(hash);
         if (retry?.at === Number.POSITIVE_INFINITY) {
             // Arrived before but wasn't this picture (or too large): fetching again won't help.
-            if (force) {
+            if (force && Date.now() - this.notYetToastAt > 3000) {
+                this.notYetToastAt = Date.now();
                 toast(t('maps.imageUnusable'), { tone: 'warn' });
             }
             return Promise.resolve();
