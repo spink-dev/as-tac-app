@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Download, Map as MapIcon } from 'lucide-react';
+import { areaErrorText } from '../areas/areaErrors';
 import { useT, formatBytes } from '../../i18n';
 import { Button, Dialog, Field, ICON } from '../../ui/components';
 import { useDialogs } from '../../core/store/dialogs';
@@ -65,7 +66,7 @@ export function NewPlanDialog() {
             await createAndOpen(project);
         } catch (error) {
             setBusy(null);
-            toast(t('area.failed', { reason: error instanceof Error ? error.message : String(error) }), { tone: 'danger' });
+            toast(areaErrorText(error instanceof Error ? error.message : String(error)), { tone: 'danger' });
         } finally {
             creating.current = false;
         }

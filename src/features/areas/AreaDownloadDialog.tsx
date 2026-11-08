@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Map as MlMap } from 'maplibre-gl';
 import { Search, WifiOff } from 'lucide-react';
-import { useT, formatBytes, t as translate } from '../../i18n';
+import { useT, formatBytes } from '../../i18n';
+import { areaErrorText } from './areaErrors';
 import { usePrefs } from '../../core/store/prefs';
 import { useDialogs } from '../../core/store/dialogs';
 import { Button, CountUp, Dialog, Field, ICON } from '../../ui/components';
@@ -30,22 +31,6 @@ function onlineStyle() {
             { id: 'osm', type: 'raster' as const, source: 'osm' },
         ],
     };
-}
-
-/** What to tell the user after a failed download, and whether tapping again will help. */
-function areaErrorText(message: string, kept: number, total: number): string {
-    const wait = /^rate-limit:(\d+)$/.exec(message);
-    if (wait) {
-        return translate('area.rateLimitWait', { s: wait[1] });
-    }
-    if (message === 'offline') {
-        return translate('area.needsNetwork');
-    }
-    if (message === 'area-too-large' || message === 'area-too-many-features') {
-        return translate('area.tooDetailed');
-    }
-    const cause = message === 'rate-limit' ? translate('area.busy') : translate('area.unstable');
-    return kept > 0 ? `${cause} ${translate('area.failedPartial', { done: kept, total })}` : `${cause} ${translate('area.tryAgain')}`;
 }
 
 export function AreaDownloadDialog() {
@@ -286,6 +271,8 @@ export function AreaDownloadDialog() {
                         <Button small variant="ghost" onClick={() => {
                             abort.current?.abort();
                             setBusy(null);
+                            // Finished tiles stay: the button now offers to continue.
+                            setResumable(bounds ? cachedTiles(bounds) : 0);
                         }}>{t('common.cancel')}</Button>
                     </div>
                 ) : null}

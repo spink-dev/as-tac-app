@@ -262,8 +262,11 @@ async function fetchTile(query: string, signal: AbortSignal, budget: number, onB
     let lastError: unknown = null;
     let incomplete = 0;
     for (let round = 0; round < TILE_ROUNDS; round++) {
+        let retryAfter = 0;
         for (const endpoint of OVERPASS_ENDPOINTS) {
             try {
+                // A new attempt: back to «loading» (not stuck on the last countdown).
+                onBytes(0);
                 const result = await fetchOverpass(endpoint, query, signal, budget, onBytes);
                 used.add(endpoint);
                 return result;
@@ -272,6 +275,7 @@ async function fetchTile(query: string, signal: AbortSignal, budget: number, onB
                     throw error;
                 }
                 lastError = error;
+                retryAfter = Math.max(retryAfter, (error as { retryAfter?: number }).retryAfter ?? 0);
                 // A server that ran out of time or memory on this tile will most likely again.
                 if (error instanceof Error && error.message === 'overpass-incomplete' && ++incomplete >= 2) {
                     throw error;
@@ -279,7 +283,6 @@ async function fetchTile(query: string, signal: AbortSignal, budget: number, onB
             }
         }
         if (round < TILE_ROUNDS - 1) {
-            const retryAfter = (lastError as { retryAfter?: number } | null)?.retryAfter ?? 0;
             const limited = lastError instanceof Error && lastError.message === 'rate-limit';
             const ms = retryAfter > 0 ? retryAfter * 1000 : limited ? 20000 * (round + 1) : 3000 * 3 ** round;
             // Say why nothing moves: a pause on a weak link should not look like a hang.
@@ -310,7 +313,8 @@ export async function downloadArea(options: DownloadOptions): Promise<AreaPackag
     if (!navigator.onLine) {
         throw new Error('offline');
     }
-    const resuming = pending !== null && pending.bounds === bounds;
+    // Only a download with finished tiles is continued (a bare retap is a new request burst).
+    const resuming = pending !== null && pending.bounds === bounds && pending.tiles.size > 0;
     // Continuing an interrupted download is not a new request burst: no pause needed.
     const wait = resuming ? 0 : secondsUntilNextDownload();
     if (wait > 0) {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Copy, Download, FileUp, HardDrive, Map as MapIcon, MoreHorizontal, Pencil, Plus, Radio, Trash2, Wifi } from 'lucide-react';
+import { areaErrorText } from '../areas/areaErrors';
 import { useT, relativeTime, formatBytes } from '../../i18n';
 import { usePrefs } from '../../core/store/prefs';
 import { Button, ICON, IconButton, useSmoothScroll, useStaggerIn } from '../../ui/components';
@@ -87,7 +88,7 @@ export function Library() {
             await installBundled(id, (fraction) => setInstalling((state) => ({ ...state, [id]: fraction ?? state[id] ?? 0 })));
             toast(t('area.saved', { name: BUNDLED_AREAS.find((a) => a.id === id)?.name ?? id }), { tone: 'ok' });
         } catch (error) {
-            toast(t('area.failed', { reason: error instanceof Error ? error.message : String(error) }), { tone: 'danger' });
+            toast(areaErrorText(error instanceof Error ? error.message : String(error)), { tone: 'danger' });
         } finally {
             setInstalling((state) => {
                 const next = { ...state };

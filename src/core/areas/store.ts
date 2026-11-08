@@ -104,8 +104,16 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
             if (typeof navigator !== 'undefined' && navigator.onLine === false) {
                 throw new Error('offline');
             }
+            // A transfer that stops moving for 30 s is cut and tried again (mobile links stall silently).
+            const transfer = new AbortController();
+            let stall = setTimeout(() => transfer.abort(), 60000);
+            const alive = () => {
+                clearTimeout(stall);
+                stall = setTimeout(() => transfer.abort(), 30000);
+            };
             try {
-                const response = await fetch(url, init);
+                const response = await fetch(url, { ...init, signal: transfer.signal });
+                alive();
                 if (!response.ok || !response.body) {
                     void response.body?.cancel().catch(() => undefined);
                     lastError = new Error(`HTTP ${response.status}`);
@@ -119,6 +127,7 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
                     let received = 0;
                     while (true) {
                         const { value, done } = await reader.read();
+                        alive();
                         if (done) {
                             break;
                         }
@@ -135,7 +144,9 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
                     return bytes;
                 }
             } catch (error) {
-                lastError = error;
+                lastError = transfer.signal.aborted ? new Error('stalled') : error;
+            } finally {
+                clearTimeout(stall);
             }
             if (attempt < 2) {
                 await new Promise((resolve) => setTimeout(resolve, 2000 * 3 ** attempt));
