@@ -102,6 +102,12 @@ describe('live database', () => {
         await as(admin);
         const redeemed = (await db.query<{ r: { role: string } }>("select public.live_redeem_invite($1, 'x') as r", [viewerCode])).rows[0].r;
         expect(redeemed.role).toBe('admin');
+        // Nor does an admin code raise an existing member: only the owner changes roles.
+        await as(owner);
+        const promote = (await db.query<{ c: string }>("select public.live_create_invite($1, 'admin') as c", [plan])).rows[0].c;
+        await as(viewer);
+        expect((await db.query<{ r: { role: string } }>("select public.live_redeem_invite($1, 'x') as r", [promote])).rows[0].r.role).toBe('viewer');
+        await as(admin);
         await expect(db.query('select public.live_set_role($1, $2, $3)', [plan, viewer, 'admin'])).rejects.toThrow('forbidden');
         await as(owner);
         await db.query('select public.live_set_role($1, $2, $3)', [plan, viewer, 'admin']);
@@ -141,10 +147,35 @@ describe('live invites and removal', () => {
         await db.query('select public.live_remove_member($1, $2)', [plan, viewer]);
         await as(viewer);
         await expect(db.query("select public.live_redeem_invite($1, 'x')", [viewerCode])).rejects.toThrow('invite');
+        // Only the owner lifts a ban; then a valid code works again.
+        await as(admin);
+        await expect(db.query('select public.live_unban($1, $2)', [plan, viewer])).rejects.toThrow('forbidden');
+        await as(owner);
+        await db.query('select public.live_unban($1, $2)', [plan, viewer]);
+        await as(viewer);
+        expect((await db.query<{ r: { role: string } }>("select public.live_redeem_invite($1, 'x') as r", [viewerCode])).rows[0].r.role).toBe('viewer');
+        // A demoted admin can't use the owner's admin code to become admin again.
+        await as(owner);
+        const adminCode = (await db.query<{ c: string }>("select public.live_create_invite($1, 'admin') as c", [plan])).rows[0].c;
+        await as(admin);
+        expect((await db.query<{ r: { role: string } }>("select public.live_redeem_invite($1, 'x') as r", [adminCode])).rows[0].r.role).toBe('viewer');
         // The owner can revoke a code.
         await as(owner);
         await db.query('select public.live_revoke_invite($1, $2)', [plan, viewerCode]);
         await as(outsider);
         await expect(db.query("select public.live_redeem_invite($1, 'x')", [viewerCode])).rejects.toThrow('invite');
+    });
+
+    it('keeps 1000 chat messages per plan, independent of other plans', async () => {
+        const a = await newPlan();
+        const b = await newPlan();
+        await as(owner);
+        await db.query('select public.live_chat_send($1, $2)', [a.plan, 'erste']);
+        // Fill plan B past the global id distance without the rate limit (direct insert as table owner).
+        await db.exec('reset role');
+        await db.query("insert into public.live_chat (plan_id, user_id, display_name, body) select $1, $2, 'x', 'b' from generate_series(1, 1100)", [b.plan, owner]);
+        await as(owner);
+        await db.query('select public.live_chat_send($1, $2)', [a.plan, 'zweite']);
+        expect((await db.query('select body from public.live_chat where plan_id = $1', [a.plan])).rows).toHaveLength(2);
     });
 });

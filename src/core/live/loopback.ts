@@ -99,8 +99,8 @@ export class LoopbackBackend implements LiveBackend {
             if (!state || !creator || !(creator === 'owner' || (invite.role === 'viewer' && creator === 'admin'))) {
                 throw new Error('invite');
             }
-            const current = state.members[this.user]?.role;
-            const role: LiveRole = !current ? invite.role : current === 'viewer' && invite.role === 'admin' ? 'admin' : current;
+            // Codes only add new members; an existing member keeps their role (owner decides roles).
+            const role: LiveRole = state.members[this.user]?.role ?? invite.role;
             state.members[this.user] = { role, name: displayName };
             this.write(invite.planId, state);
             return { planId: invite.planId, name: state.name, areaId: state.areaId, role };
@@ -221,6 +221,12 @@ class LoopbackTransport implements LiveTransport {
     private people = new Map<string, { person: Presence; seen: number }>();
     private me: Presence | null = null;
     private timer = 0;
+    /** Leaving the page (reload, close) says goodbye right away instead of after the timeout. */
+    private readonly onPageHide = () => {
+        if (this.me) {
+            this.post({ type: 'leave', clientId: this.me.clientId });
+        }
+    };
 
     constructor(private server: LoopbackBackend, readonly planId: string, private user: string) {
         this.channel = new BroadcastChannel(`${PREFIX}:${planId}`);
@@ -252,6 +258,7 @@ class LoopbackTransport implements LiveTransport {
             this.prune();
         }, 5000);
         this.post({ type: 'hello' });
+        window.addEventListener('pagehide', this.onPageHide);
         handlers.status(true);
     }
 
@@ -296,7 +303,7 @@ class LoopbackTransport implements LiveTransport {
                 if (!senderRole) {
                     break;
                 }
-                const person: Presence = { ...message.person, role: senderRole, userId: message.user, leading: Boolean(message.person.leading) && senderRole !== 'viewer' };
+                const person: Presence = { clientId: String(message.person.clientId), name: String(message.person.name ?? '').slice(0, 40), color: String(message.person.color ?? '#888888'), role: senderRole, userId: message.user };
                 this.people.set(person.clientId, { person, seen: Date.now() });
                 this.emitPresence();
                 break;
@@ -363,6 +370,7 @@ class LoopbackTransport implements LiveTransport {
             this.post({ type: 'leave', clientId: this.me.clientId });
         }
         window.clearInterval(this.timer);
+        window.removeEventListener('pagehide', this.onPageHide);
         this.channel.close();
         this.handlers = null;
     }

@@ -28,6 +28,10 @@ export interface PushResult {
 export interface BriefingMessage {
     type: 'briefing';
     from: string;
+    /** Sender's display name (only owners and admins can broadcast). */
+    name?: string;
+    /** `false` ends the sender's leadership; leaders re-send `true` as a heartbeat. */
+    leading?: boolean;
     phaseIndex: number;
     camera: { center: [number, number]; zoom: number; bearing: number } | null;
 }

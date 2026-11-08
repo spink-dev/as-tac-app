@@ -10,7 +10,6 @@ export interface Presence {
     role: LiveRole;
     color: string;
     selection?: string[];
-    leading?: boolean;
     /** Account behind this device, filled in from the membership list (not self-reported). */
     userId?: string;
 }
@@ -33,6 +32,7 @@ interface LiveState {
     chat: ChatMessage[];
     unread: number;
     leaderId: string | null;
+    leaderName: string | null;
     following: boolean;
     error: string | null;
     conflicts: LiveConflict[];
@@ -48,11 +48,12 @@ export const useLive = create<LiveState>(() => ({
     chat: [],
     unread: 0,
     leaderId: null,
+    leaderName: null,
     following: false,
     error: null,
     conflicts: [],
 }));
 
 export function resetLive() {
-    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, presence: [], chat: [], unread: 0, leaderId: null, following: false, error: null, conflicts: [] });
+    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, presence: [], chat: [], unread: 0, leaderId: null, leaderName: null, following: false, error: null, conflicts: [] });
 }

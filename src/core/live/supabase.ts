@@ -38,14 +38,11 @@ export async function currentUser(): Promise<{ id: string; email: string | null;
 }
 
 /**
- * The account stored on this device, even when its token expired and can't be refreshed
- * (offline). Used to decide whose copy a plan is — not to authorise anything.
+ * The account stored on this device, read without any network call (an expired token offline
+ * would otherwise keep auth retrying for many seconds). Used to decide whose copy a plan is —
+ * not to authorise anything; the server checks the real session.
  */
 export async function storedUserId(): Promise<string | null> {
-    const live = await currentUser().catch(() => null);
-    if (live) {
-        return live.id;
-    }
     try {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -57,9 +54,9 @@ export async function storedUserId(): Promise<string | null> {
             }
         }
     } catch {
-        // Storage unavailable: no stored account.
+        // Storage unavailable: ask the client below.
     }
-    return null;
+    return (await currentUser().catch(() => null))?.id ?? null;
 }
 
 /** Quick start: an anonymous account bound to this device (can be upgraded with an email later). */
@@ -147,6 +144,7 @@ class SupabaseTransport implements LiveTransport {
     private closed = false;
     /** Roles by account, from the membership table (presence claims are not trusted). */
     private roles = new Map<string, LiveRole>();
+    private rolesAt = 0;
 
     constructor(readonly planId: string) {}
 
@@ -183,6 +181,7 @@ class SupabaseTransport implements LiveTransport {
         const sb = await supabaseClient();
         const { data } = await sb.from('live_members').select('user_id, role').eq('plan_id', this.planId);
         this.roles = new Map((data ?? []).map((row) => [String(row.user_id), row.role as LiveRole]));
+        this.rolesAt = Date.now();
     }
 
     async subscribe(handlers: TransportHandlers): Promise<void> {
@@ -208,7 +207,7 @@ class SupabaseTransport implements LiveTransport {
                     continue;
                 }
                 for (const p of entries) {
-                    people.push({ clientId: String(p.clientId), name: String(p.name ?? '').slice(0, 40), role, userId, color: String(p.color ?? '#888888'), leading: Boolean(p.leading) && role !== 'viewer' });
+                    people.push({ clientId: String(p.clientId), name: String(p.name ?? '').slice(0, 40), role, userId, color: String(p.color ?? '#888888') });
                 }
             }
             handlers.presence(people);
@@ -225,8 +224,9 @@ class SupabaseTransport implements LiveTransport {
                 handlers.chat({ id: String(row.id), author: String(row.user_id), authorName: String(row.display_name ?? ''), body: String(row.body ?? ''), createdAt: String(row.created_at) });
             })
             .on('presence', { event: 'sync' }, () => {
+                // Reload roles for newcomers, and now and then so a changed role shows up.
                 const unknown = Object.keys(channel.presenceState()).some((userId) => !this.roles.has(userId));
-                if (unknown) {
+                if (unknown || Date.now() - this.rolesAt > 30000) {
                     void this.loadRoles().then(emitPresence);
                 } else {
                     emitPresence();

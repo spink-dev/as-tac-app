@@ -10,7 +10,7 @@ import { usePrefs } from '../store/prefs';
 import { toast, useUi } from '../store/ui';
 import { t } from '../../i18n';
 import { resetLive, useLive, type LiveRole, type Presence } from './state';
-import { setBriefingSender } from './briefingSync';
+import { broadcastBriefing, setBriefingSender } from './briefingSync';
 import { currentCamera, mapRef, renderPlan } from '../../map/MapView';
 import { LoopbackBackend } from './loopback';
 import { SupabaseBackend, supabaseConfigured } from './supabase';
@@ -34,6 +34,10 @@ export interface LiveConflict {
 
 const PRESENCE_COLORS = ['#e8402a', '#2f9fe0', '#3bb273', '#f2c230', '#b5487f', '#1f9aa6', '#d08a1e', '#7a4cc2'];
 const BATCH = 400;
+/** A leader re-announces itself this often; silence for the timeout ends its leadership. */
+const LEADER_HEARTBEAT_MS = 5000;
+const LEADER_TIMEOUT_MS = 15000;
+const broadcastNow = () => broadcastBriefing();
 
 export function backendFor(kind: 'supabase' | 'loopback'): LiveBackend {
     return kind === 'supabase' ? new SupabaseBackend() : new LoopbackBackend();
@@ -154,6 +158,11 @@ class Session {
     private order = 0;
     private timers = new Set<number>();
     private seenAbove = new Set<number>();
+    /** Partner changes that arrived while my push of the same object was in flight. */
+    private deferred = new Map<string, RemoteEntity>();
+    private leaderSeen = 0;
+    private leaderTimer = 0;
+    private heartbeat = 0;
     private persistChain: Promise<unknown> = Promise.resolve();
     private uploaded = new Set<string>();
     private stop: (() => void)[] = [];
@@ -199,7 +208,7 @@ class Session {
         this.stop.push(onProjectChange((prev, next, source) => this.onLocal(prev, next, source)));
         setBriefingSender((state) => {
             if (this.leading && !this.closed) {
-                this.transport.broadcast({ type: 'briefing', from: this.clientId, phaseIndex: state.phaseIndex, camera: state.camera });
+                this.transport.broadcast({ type: 'briefing', from: this.clientId, name: displayName(), leading: true, phaseIndex: state.phaseIndex, camera: state.camera });
             }
         }, () => ({ phaseIndex: useUi.getState().phaseIndex, camera: mapRef.current ? currentCamera(mapRef.current) : null }));
         const onOnline = () => void (this.subscribed ? this.catchUp() : this.connect());
@@ -265,7 +274,7 @@ class Session {
 
     track() {
         if (!this.closed) {
-            this.transport.track({ clientId: this.clientId, name: displayName(), role: this.role, color: colorFor(this.clientId), leading: this.leading });
+            this.transport.track({ clientId: this.clientId, name: displayName(), role: this.role, color: colorFor(this.clientId) });
         }
     }
 
@@ -274,20 +283,52 @@ class Session {
             return;
         }
         // Roles in the list come from the membership, not from what a client claims (transport).
-        const leader = people.find((p) => p.leading && (p.role === 'owner' || p.role === 'admin'));
-        const before = useLive.getState().leaderId;
-        useLive.setState({ presence: people, leaderId: leader?.clientId ?? null, following: leader ? useLive.getState().following : false });
-        if (leader && leader.clientId !== before && leader.clientId !== this.clientId) {
-            toast(t('briefing.leaderStarted', { name: leader.name }), {
-                action: {
-                    label: t('briefing.follow'),
-                    run: () => {
-                        useLive.setState({ following: true });
-                        void import('../../features/workspace/modes').then(({ setMode }) => setMode('briefing'));
-                    },
-                },
-            });
+        // Who leads a briefing comes only from admin broadcasts (onBriefing), never from presence.
+        useLive.setState({ presence: people });
+    }
+
+    /** Leading: announce now and every few seconds, so late joiners learn who leads. */
+    setLeading(on: boolean) {
+        this.leading = on;
+        window.clearInterval(this.heartbeat);
+        this.heartbeat = 0;
+        if (on) {
+            this.heartbeat = window.setInterval(() => broadcastNow(), LEADER_HEARTBEAT_MS);
+        } else if (!this.closed) {
+            this.transport.broadcast({ type: 'briefing', from: this.clientId, name: displayName(), leading: false, phaseIndex: 0, camera: null });
         }
+    }
+
+    private setLeader(id: string | null, name: string | null) {
+        const live = useLive.getState();
+        window.clearTimeout(this.leaderTimer);
+        this.timers.delete(this.leaderTimer);
+        if (!id) {
+            if (live.leaderId && live.leaderId !== this.clientId) {
+                useLive.setState({ leaderId: null, leaderName: null, following: false });
+            }
+            return;
+        }
+        this.leaderSeen = Date.now();
+        // A leader that went silent (closed the app, lost signal) stops counting as leading.
+        this.leaderTimer = this.later(() => {
+            if (useLive.getState().leaderId === id && Date.now() - this.leaderSeen >= LEADER_TIMEOUT_MS) {
+                this.setLeader(null, null);
+            }
+        }, LEADER_TIMEOUT_MS);
+        if (live.leaderId === id) {
+            return;
+        }
+        useLive.setState({ leaderId: id, leaderName: name, following: false });
+        toast(t('briefing.leaderStarted', { name: name ?? '?' }), {
+            action: {
+                label: t('briefing.follow'),
+                run: () => {
+                    useLive.setState({ following: true });
+                    void import('../../features/workspace/modes').then(({ setMode }) => setMode('briefing'));
+                },
+            },
+        });
     }
 
     /** Pull everything since the last contiguous sequence, then send what waited offline. */
@@ -303,9 +344,15 @@ class Session {
             for (const entity of entities) {
                 this.onRemote(entity);
             }
+            // A pull returns the newest state of every object changed after lastSeq, so it covers
+            // everything up to its highest seq even though overwritten seqs never come back.
+            this.advanceTo(Math.max(this.lastSeq, ...entities.map((entity) => entity.seq)));
             useLive.setState({ status: 'online' });
-            this.retry = 0;
             await this.flush();
+            if (this.pending.size === 0) {
+                // Back off again only once something actually got through.
+                this.retry = 0;
+            }
             void this.ensureAssets();
         } catch (error) {
             console.warn('live: catch-up failed', error);
@@ -434,13 +481,16 @@ class Session {
                 this.saveVersions();
                 useLive.setState({ queued: this.pending.size });
                 this.retry = 0;
-                this.isolate = false;
+                this.replayDeferred();
             }
+            // Isolation (one change per request) ends once the bad change was found or all went out.
+            this.isolate = false;
         } catch (error) {
             this.inflight.clear();
             if (this.closed) {
                 return;
             }
+            this.replayDeferred();
             const message = error instanceof Error ? error.message : String(error);
             console.warn('live: push failed', message);
             if (message === 'forbidden') {
@@ -452,6 +502,7 @@ class Session {
                     this.later(() => void this.flush(), 0);
                 } else if (batch[0]) {
                     this.quarantine(batch[0]);
+                    this.isolate = false;
                     this.later(() => void this.flush(), 0);
                 }
             } else {
@@ -580,6 +631,35 @@ class Session {
         }
     }
 
+    /** Everything up to `seq` is known (after a complete pull). */
+    private advanceTo(seq: number) {
+        if (seq > this.lastSeq) {
+            this.lastSeq = seq;
+        }
+        for (const seen of this.seenAbove) {
+            if (seen <= this.lastSeq) {
+                this.seenAbove.delete(seen);
+            }
+        }
+        while (this.seenAbove.has(this.lastSeq + 1)) {
+            this.seenAbove.delete(this.lastSeq + 1);
+            this.lastSeq += 1;
+        }
+        this.saveVersions();
+    }
+
+    /** Partner changes held back during a push: apply them now through the normal path. */
+    private replayDeferred() {
+        if (this.deferred.size === 0) {
+            return;
+        }
+        const held = [...this.deferred.values()];
+        this.deferred.clear();
+        for (const entity of held) {
+            this.onRemote(entity);
+        }
+    }
+
     /** Track the contiguous sequence; a gap (missed realtime event) is filled by a catch-up. */
     private markSeq(seq: number) {
         if (seq <= this.lastSeq) {
@@ -611,13 +691,34 @@ class Session {
         if (entity.version <= (this.versions.get(key) ?? 0)) {
             return;
         }
-        // Own echo, or a local edit still waiting: the server decides that one (version check).
-        if (entity.clientId === this.clientId || this.pending.has(key) || this.inflight.has(key)) {
+        if (entity.clientId === this.clientId) {
+            // My own write. If its acknowledgement got lost and I edited again since, that edit
+            // builds on this write: rebase it so the retry doesn't clash with myself.
+            const row = this.pending.get(key);
+            if (row && !this.inflight.has(key) && entity.version > row.base) {
+                row.base = entity.version;
+                row.prev = entity.data;
+                this.persist(row);
+            }
             this.versions.set(key, entity.version);
+            this.saveVersions();
+            return;
+        }
+        if (this.inflight.has(key)) {
+            // Hold it until my push returns, then apply or let the version check catch the clash.
+            const held = this.deferred.get(key);
+            if (!held || held.version < entity.version) {
+                this.deferred.set(key, entity);
+            }
+            return;
+        }
+        if (this.pending.has(key)) {
+            // My waiting edit is based on an older version: its push meets this one as a conflict.
             return;
         }
         if (!this.applyRemote([entity])) {
-            // Not applied here (invalid for this device): keep the old version so it is retried, not assumed.
+            // Invalid for this device: not applied and its version not recorded. A later change of
+            // the same object (or reopening the plan) brings it again.
             return;
         }
         this.versions.set(key, entity.version);
@@ -658,8 +759,19 @@ class Session {
     }
 
     private onBriefing(message: BriefingMessage) {
+        // Only owners and admins can send on the channel (realtime policy / loopback check).
+        if (this.closed || typeof message.from !== 'string' || message.from === this.clientId) {
+            return;
+        }
+        if (message.leading === false) {
+            if (useLive.getState().leaderId === message.from) {
+                this.setLeader(null, null);
+            }
+            return;
+        }
+        this.setLeader(message.from, typeof message.name === 'string' ? message.name.slice(0, 40) : null);
         const live = useLive.getState();
-        if (this.closed || !live.following || message.from !== live.leaderId || !Number.isInteger(message.phaseIndex) || message.phaseIndex < 0) {
+        if (!live.following || message.from !== live.leaderId || !Number.isInteger(message.phaseIndex) || message.phaseIndex < 0) {
             return;
         }
         const camera = message.camera;
@@ -680,6 +792,7 @@ class Session {
 
     async close() {
         this.closed = true;
+        window.clearInterval(this.heartbeat);
         stopCameraShare?.();
         stopCameraShare = null;
         this.stop.forEach((fn) => fn());
@@ -830,9 +943,8 @@ export function setLeading(on: boolean) {
     if (!session || session.role === 'viewer') {
         return;
     }
-    session.leading = on;
-    session.track();
-    useLive.setState({ leaderId: on ? session.clientId : null, following: false });
+    session.setLeading(on);
+    useLive.setState({ leaderId: on ? session.clientId : null, leaderName: on ? displayName() : null, following: false });
     stopCameraShare?.();
     stopCameraShare = null;
     const map = mapRef.current;
@@ -840,14 +952,14 @@ export function setLeading(on: boolean) {
         let timer = 0;
         const share = () => {
             window.clearTimeout(timer);
-            timer = window.setTimeout(() => void import('./briefingSync').then(({ broadcastBriefing }) => broadcastBriefing()), 250);
+            timer = window.setTimeout(() => broadcastNow(), 250);
         };
         map.on('moveend', share);
         stopCameraShare = () => {
             window.clearTimeout(timer);
             map.off('moveend', share);
         };
-        void import('./briefingSync').then(({ broadcastBriefing }) => broadcastBriefing());
+        broadcastNow();
     }
 }
 

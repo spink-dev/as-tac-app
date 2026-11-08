@@ -49,7 +49,7 @@ create table public.live_invites (
 );
 create index live_invites_plan on public.live_invites(plan_id);
 
--- Removed members can't come back with an old or shared code (until the owner invites them again).
+-- Removed members can't come back with an old or shared code until the owner lifts the ban (`live_unban`).
 create table public.live_bans (
     plan_id uuid not null references public.live_plans(id) on delete cascade,
     user_id uuid not null references auth.users(id) on delete cascade,
@@ -209,7 +209,8 @@ begin
 end;
 $$;
 
--- Redeeming never lowers an existing role and never grants owner.
+-- Redeeming only adds new members; it never changes an existing member's role (only `live_set_role`
+-- does), so a demoted admin can't promote themselves again with a still-valid admin code.
 create function public.live_redeem_invite(p_code text, p_display text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_inv public.live_invites; v_role text; v_creator text; v_plan public.live_plans;
@@ -233,9 +234,6 @@ begin
     if v_role is null then
         insert into public.live_members (plan_id, user_id, role, display_name) values (v_inv.plan_id, auth.uid(), v_inv.role, left(coalesce(p_display, ''), 40));
         v_role := v_inv.role;
-    elsif v_role = 'viewer' and v_inv.role = 'admin' then
-        update public.live_members set role = 'admin' where plan_id = v_inv.plan_id and user_id = auth.uid();
-        v_role := 'admin';
     end if;
     select * into v_plan from public.live_plans where id = v_inv.plan_id;
     return jsonb_build_object('planId', v_plan.id, 'name', v_plan.name, 'areaId', v_plan.area_id, 'role', v_role);
@@ -303,8 +301,9 @@ begin
     end if;
     select display_name into v_name from public.live_members where plan_id = p_plan and user_id = auth.uid();
     insert into public.live_chat (plan_id, user_id, display_name, body) values (p_plan, auth.uid(), coalesce(v_name, ''), left(btrim(p_body), 1000)) returning id into v_id;
-    -- Keep the last 1000 messages per plan.
-    delete from public.live_chat where plan_id = p_plan and id <= v_id - 1000;
+    -- Keep the last 1000 messages of this plan (ids are global, so count within the plan).
+    delete from public.live_chat where plan_id = p_plan and id < (
+        select min(id) from (select id from public.live_chat where plan_id = p_plan order by id desc limit 1000) as kept);
     return v_id;
 end;
 $$;
@@ -316,6 +315,14 @@ begin
     v_role := public.live_require(p_plan, array['owner', 'admin']);
     delete from public.live_invites where plan_id = p_plan and code = upper(btrim(p_code))
         and (v_role = 'owner' or created_by = auth.uid());
+end;
+$$;
+
+create function public.live_unban(p_plan uuid, p_user uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+    perform public.live_require(p_plan, array['owner']);
+    delete from public.live_bans where plan_id = p_plan and user_id = p_user;
 end;
 $$;
 
@@ -344,11 +351,11 @@ revoke all on function public.live_role(uuid), public.live_require(uuid, text[])
     public.live_push(uuid, jsonb, text), public.live_create_invite(uuid, text), public.live_redeem_invite(text, text),
     public.live_set_display(uuid, text), public.live_set_role(uuid, uuid, text), public.live_remove_member(uuid, uuid),
     public.live_delete_plan(uuid), public.live_chat_send(uuid, text), public.live_topic_role(text), public.live_path_role(text),
-    public.live_revoke_invite(uuid, text) from public, anon;
+    public.live_revoke_invite(uuid, text), public.live_unban(uuid, uuid) from public, anon;
 grant execute on function public.live_create_plan(text, text, text), public.live_push(uuid, jsonb, text), public.live_create_invite(uuid, text),
     public.live_redeem_invite(text, text), public.live_set_display(uuid, text), public.live_set_role(uuid, uuid, text),
     public.live_remove_member(uuid, uuid), public.live_delete_plan(uuid), public.live_chat_send(uuid, text), public.live_role(uuid),
-    public.live_topic_role(text), public.live_path_role(text), public.live_revoke_invite(uuid, text) to authenticated;
+    public.live_topic_role(text), public.live_path_role(text), public.live_revoke_invite(uuid, text), public.live_unban(uuid, uuid) to authenticated;
 
 -- Supabase-only parts (skipped where the schemas don't exist, e.g. in the PGlite test).
 do $$

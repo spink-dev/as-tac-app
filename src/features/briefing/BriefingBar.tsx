@@ -31,7 +31,7 @@ export function BriefingBar() {
     const liveRole = useLive((state) => state.role);
     const leaderId = useLive((state) => state.leaderId);
     const following = useLive((state) => state.following);
-    const leader = useLive((state) => state.presence.find((p) => p.clientId === state.leaderId));
+    const leaderName = useLive((state) => state.leaderName);
     if (mode !== 'briefing') {
         return null;
     }
@@ -102,7 +102,7 @@ export function BriefingBar() {
                 ) : null}
                 {liveStatus === 'online' && leaderId && leaderId !== myClientId() ? (
                     <Button variant={following ? 'primary' : 'secondary'} aria-pressed={following} onClick={() => setFollowing(!following)} data-testid="follow">
-                        <Radio size={18} /> {following && leader ? t('briefing.following', { name: leader.name }) : t('briefing.follow')}
+                        <Radio size={18} /> {following && leaderName ? t('briefing.following', { name: leaderName }) : t('briefing.follow')}
                     </Button>
                 ) : null}
                 <Button variant="ghost" onClick={() => {

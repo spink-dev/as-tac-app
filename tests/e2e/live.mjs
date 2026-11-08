@@ -94,6 +94,45 @@ const vc = await counts(viewer);
 const oc = await counts(owner);
 check('viewer-locked', vc.elements === 2 && oc.elements === 2 && vc.readOnly === 1);
 
+// Admin away (library) while the owner edits twice: overwritten seqs must not stall catch-up.
+const readSeqs = (page) => page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('as-tac-v2');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+    const links = await new Promise((resolve) => {
+        const request = db.transaction('liveLinks').objectStore('liveLinks').getAll();
+        request.onsuccess = () => resolve(request.result);
+    });
+    db.close();
+    const link = links[0];
+    const server = JSON.parse(localStorage.getItem(`as-tac-loopback:plan:${link.remoteId}`) ?? '{}');
+    return { local: link.lastSeq, server: server.seq };
+});
+await admin.goto(base);
+await admin.getByTestId('open-plan').first().waitFor();
+await owner.keyboard.press('m');
+await owner.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.3);
+await settle(400);
+await owner.keyboard.press('m');
+await owner.mouse.click(box.x + box.width * 0.45, box.y + box.height * 0.35);
+await settle(800);
+await admin.getByTestId('open-plan').first().click();
+await admin.waitForSelector('.maplibregl-canvas');
+await settle(3500);
+const seqs = await readSeqs(admin);
+check('admin-caught-up', (await counts(admin)).elements === 4);
+check('seq-advanced', seqs.local === seqs.server);
+await settle(2500);
+check('seq-stable', (await readSeqs(admin)).local === seqs.server);
+// Undo the extra markers so the rest of the scenario keeps its counts.
+await owner.keyboard.press('Escape');
+await owner.keyboard.press('Control+z');
+await owner.keyboard.press('Control+z');
+await settle(1200);
+check('admin-sees-undo', (await counts(admin)).elements === 2);
+
 // Admin chat reaches the owner, never the viewer.
 await panel(admin, 'Live');
 await admin.getByPlaceholder('Nachricht an Admins').fill('Zug 2 bereit');
@@ -124,6 +163,11 @@ await owner.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 await owner.mouse.wheel(0, -400);
 await settle(1500);
 await viewer.screenshot({ path: `${out}/live-follow.png` });
+check('viewer-following', (await viewer.getByTestId('follow').getAttribute('aria-pressed')) === 'true');
+// Leadership is announced by the leader's broadcast; ending it reaches the followers.
+await owner.getByTestId('lead').click();
+await settle(1200);
+check('leader-stopped', (await viewer.getByTestId('follow').count()) === 0);
 
 await browser.close();
 console.log(JSON.stringify(results, null, 1));

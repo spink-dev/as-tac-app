@@ -85,6 +85,8 @@ function Invite() {
     const [role, setRole] = useState<'viewer' | 'admin'>('viewer');
     const [code, setCode] = useState<string | null>(null);
     const streamer = useUi((state) => state.streamer);
+    // Only the owner hands out admin rights (enforced by the server as well).
+    const owner = useLive((state) => state.role) === 'owner';
     const link = code ? `${appBaseUrl()}${JOIN_PREFIX}${code}` : null;
     if (streamer !== 'off') {
         // An invite code on a stream would let any viewer join the plan.
@@ -98,10 +100,12 @@ function Invite() {
     return (
         <section className="section">
             <div className="section__title">{t('live.invite')}</div>
-            <Segmented block value={role} onChange={(value) => {
-                setRole(value);
-                setCode(null);
-            }} options={[{ value: 'viewer', label: t('live.inviteViewer') }, { value: 'admin', label: t('live.inviteAdmin') }]} />
+            {owner ? (
+                <Segmented block value={role} onChange={(value) => {
+                    setRole(value);
+                    setCode(null);
+                }} options={[{ value: 'viewer', label: t('live.inviteViewer') }, { value: 'admin', label: t('live.inviteAdmin') }]} />
+            ) : null}
             {code && link ? (
                 <div className="invite">
                     <QrSvg text={link} label={t('live.inviteCode')} />
@@ -112,7 +116,7 @@ function Invite() {
             ) : (
                 <Button onClick={async () => {
                     try {
-                        setCode(await createInvite(role));
+                        setCode(await createInvite(owner ? role : 'viewer'));
                     } catch {
                         toast(t('live.failed'), { tone: 'danger' });
                     }
@@ -165,6 +169,7 @@ export function LivePanel() {
     const presence = useLive((state) => state.presence);
     const queued = useLive((state) => state.queued);
     const conflicts = useLive((state) => state.conflicts);
+    const leaderId = useLive((state) => state.leaderId);
     const project = useProject((state) => state.project);
     const [confirmStop, setConfirmStop] = useState(false);
     if (!project) {
@@ -220,7 +225,7 @@ export function LivePanel() {
                         <li key={person.clientId} className="person">
                             <span className="face" style={{ background: person.color }} aria-hidden>{person.name.slice(0, 1).toUpperCase()}</span>
                             <span className="person__name">{person.name}{person.clientId === me ? ` (${t('live.you')})` : ''}</span>
-                            {person.leading ? <span className="badge badge--ok">{t('live.leads')}</span> : null}
+                            {person.clientId === leaderId ? <span className="badge badge--ok">{t('live.leads')}</span> : null}
                             <span className="badge">{t(`live.role.${person.role}`)}</span>
                         </li>
                     ))}
