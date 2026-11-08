@@ -244,3 +244,14 @@ export function currentProject(): Project {
 export function mutate(label: string, recipe: (draft: Draft<Project>) => void, options?: MutateOptions): boolean {
     return useProject.getState().mutate(label, recipe, options);
 }
+
+// Test hook for the browser suites: entity counts only, never content.
+if (typeof window !== 'undefined') {
+    (window as unknown as { __asTacCounts: () => Record<string, number> }).__asTacCounts = (): Record<string, number> => {
+        const project = useProject.getState().project;
+        if (!project) {
+            return {};
+        }
+        return { elements: project.elements.length, drawings: project.drawings.length, tracks: project.tracks.length, phases: project.phases.length };
+    };
+}

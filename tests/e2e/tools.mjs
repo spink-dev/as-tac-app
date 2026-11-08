@@ -49,10 +49,11 @@ await page.keyboard.press('Enter');
 // Polygon zone
 await page.keyboard.press('z');
 await page.keyboard.press('2');
+// Kept clear of the right-hand HUD (locate/compass sit there since the field packet).
+await click(0.52, 0.25);
 await click(0.62, 0.25);
-await click(0.72, 0.25);
-await click(0.72, 0.38);
-await click(0.62, 0.25);
+await click(0.62, 0.38);
+await click(0.52, 0.25);
 // Circle zone
 await page.keyboard.press('z');
 await page.keyboard.press('Tab');

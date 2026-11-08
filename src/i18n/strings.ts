@@ -275,6 +275,13 @@ export const S = {
     'phases.start': ['Briefing starten', 'Start briefing'],
     'phases.time': ['Zeit', 'Time'],
     'phases.newName': ['Phase {n}', 'Phase {n}'],
+    'phases.noView': ['ohne Ausschnitt', 'no view'],
+    'phases.show': ['Ausschnitt zeigen', 'Show view'],
+    'phases.from': ['von', 'from'],
+    'phases.to': ['bis', 'to'],
+    'phases.notesHint': ['Wird im Briefing unter dem Phasentitel angezeigt.', 'Shown under the phase title during the briefing.'],
+    'phases.limit': ['Höchstens {n} Phasen pro Plan.', 'At most {n} phases per plan.'],
+    'phases.assignHint': ['Welche Objekte eine Phase zeigt, legst du im Inspektor unter «Phasen» fest.', 'Choose which objects a phase shows in the inspector under “Phases”.'],
 
     'briefing.phase': ['Phase {i} von {n}', 'Phase {i} of {n}'],
     'briefing.noPhases': ['Ohne Phasen: gesamter Plan', 'No phases: whole plan'],

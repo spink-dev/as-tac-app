@@ -30,8 +30,15 @@ export function saveFile(blob: Blob, filename: string): void {
     setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
-/** Open the system file picker. The input is attached while open: detached inputs are ignored by some browsers. */
+let abandon: (() => void) | null = null;
+
+/**
+ * Open the system file picker. The input is attached while open: detached inputs are ignored
+ * by some browsers. Where the picker has no `cancel` event, a cancelled pick stays pending
+ * until the next pick, which settles it (no late `change` is ever dropped).
+ */
 export function pickFile(accept: string): Promise<File | null> {
+    abandon?.();
     return new Promise((resolve) => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -45,20 +52,18 @@ export function pickFile(accept: string): Promise<File | null> {
                 return;
             }
             settled = true;
-            window.removeEventListener('focus', onFocus);
+            if (abandon === cancel) {
+                abandon = null;
+            }
             input.remove();
             resolve(file);
         };
-        // Browsers without the `cancel` event: the window regains focus when the picker closes;
-        // give `change` a moment to arrive, then treat it as cancelled.
-        const onFocus = () => {
-            window.setTimeout(() => done(input.files?.[0] ?? null), 1500);
-        };
+        const cancel = () => done(null);
+        abandon = cancel;
         input.addEventListener('change', () => done(input.files?.[0] ?? null), { once: true });
-        input.addEventListener('cancel', () => done(null), { once: true });
+        input.addEventListener('cancel', cancel, { once: true });
         document.body.append(input);
         input.click();
-        window.setTimeout(() => window.addEventListener('focus', onFocus, { once: true }), 0);
     });
 }
 

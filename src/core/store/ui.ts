@@ -118,7 +118,8 @@ export const useUi = create<UiState>((set, get) => ({
             return;
         }
         set({ selection: ids });
-        if (ids.length > 0 && get().mode !== 'briefing') {
+        // Plan mode opens the inspector; the field panel shows the selection itself (map stays free).
+        if (ids.length > 0 && get().mode === 'plan') {
             set({ panel: 'inspector', sheet: get().sheet === 'closed' ? 'peek' : get().sheet });
         }
     },

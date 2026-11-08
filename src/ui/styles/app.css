@@ -1531,3 +1531,292 @@ input.layer-row__name:focus {
     align-items: center;
     gap: var(--sp-2);
 }
+
+/* ---------- Briefing bar ---------- */
+.briefingbar {
+    width: min(560px, calc(100vw - 16px));
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    animation: menu-in var(--dur-2) var(--ease-out);
+}
+
+.briefingbar__main {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.briefingbar__title {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.briefingbar__index {
+    color: var(--ink-3);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+
+.briefingbar__name {
+    font-size: var(--fs-xl);
+    font-weight: 720;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+}
+
+/* Progress: one segment per phase, the current one filled. */
+.briefingbar__steps {
+    display: flex;
+    gap: 4px;
+}
+
+.briefingbar__step {
+    flex: 1;
+    height: 20px;
+    padding: 8px 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.briefingbar__step::before {
+    content: '';
+    display: block;
+    height: 4px;
+    border-radius: var(--r-pill);
+    background: var(--line);
+    transition: background-color var(--dur-2) var(--ease-out);
+}
+
+.briefingbar__step[aria-current='step']::before {
+    background: var(--accent);
+}
+
+.briefingbar__notes {
+    border-top: 1px solid var(--line);
+    padding-top: var(--sp-2);
+}
+
+.briefingbar__text {
+    margin: var(--sp-1) 0 0;
+    max-height: 22vh;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-size: var(--fs-md);
+    line-height: 1.5;
+    max-width: 65ch;
+}
+
+.briefingbar__tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+}
+
+.briefingbar__tools .swatches {
+    gap: 4px;
+}
+
+/* ---------- Field panel ---------- */
+.fieldpanel {
+    width: min(480px, calc(100vw - 16px));
+    padding: var(--sp-2) var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.fieldpanel__row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+}
+
+.fieldpanel__pos {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.fieldpanel__coord {
+    font-size: var(--fs-lg);
+    font-weight: 650;
+    letter-spacing: 0.01em;
+}
+
+.fieldpanel__meta {
+    color: var(--ink-3);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+
+.fieldpanel__meta.is-stale {
+    color: var(--warn);
+}
+
+.fieldpanel__locate {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: var(--tap);
+    padding: 0 var(--sp-3);
+    border: 1px dashed var(--line-strong, var(--line));
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--ink);
+    font-weight: 650;
+    font-size: var(--fs-base);
+}
+
+.fieldpanel__hint {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-xs);
+}
+
+.navcard {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2);
+    border-radius: var(--r-md);
+    background: var(--accent-weak);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+.navcard__arrow {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    color: var(--accent);
+    transition: transform var(--dur-2) var(--ease-out);
+}
+
+.navcard__main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.navcard__title {
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.navcard__value {
+    font-size: var(--fs-xl);
+    font-weight: 750;
+}
+
+.navcard__meta {
+    color: var(--warn);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+
+.icon-btn.is-stale {
+    color: var(--warn);
+}
+
+/* ---------- Phases ---------- */
+.phase-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.phase-row {
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+}
+
+.phase-row__head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding-left: var(--sp-2);
+    padding-right: var(--sp-1);
+}
+
+.phase-row__index {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    font-size: var(--fs-sm);
+    font-weight: 750;
+}
+
+.phase-row__toggle {
+    flex: 1;
+    min-width: 0;
+}
+
+.phase-row__body {
+    padding: var(--sp-3);
+    border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .briefingbar,
+    .navcard__arrow,
+    .briefingbar__step::before {
+        animation: none;
+        transition: none;
+    }
+}
+
+.fieldpanel__target {
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--line);
+}
+
+.fieldpanel__targetname {
+    flex: 1;
+    min-width: 0;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    .fieldpanel__coord {
+        font-size: var(--fs-base);
+        white-space: nowrap;
+    }
+
+    .briefingbar__name {
+        font-size: var(--fs-lg);
+    }
+
+    .ws[data-mode='field'] .ws-bottom,
+    .ws[data-mode='briefing'] .ws-bottom {
+        bottom: calc(var(--safe-bottom) + 64px);
+    }
+}
+
+.icon-btn.is-recording {
+    color: var(--danger);
+}

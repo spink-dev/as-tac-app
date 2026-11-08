@@ -50,7 +50,12 @@ export async function addImageMap(file: File, view: ViewHint): Promise<string | 
         id: uid('img'), name: (known?.name ?? file.name.replace(/\.[^.]+$/, '')).slice(0, 160) || 'Bildkarte', asset: asset.hash, mime: mime as ImageOverlay['mime'],
         width: prepared.width, height: prepared.height, corners, opacity: known ? 0.85 : 0.75, visible: true, controlPoints, fit, knownId: known?.id,
     };
-    if (!validCorners(corners) || !mutate(t('maps.addImage'), (draft) => {
+    if (!validCorners(corners)) {
+        // E.g. zoomed out to the whole world: the rough placement would not fit on the map.
+        toast(t('align.outOfRange'), { tone: 'warn' });
+        return null;
+    }
+    if (!mutate(t('maps.addImage'), (draft) => {
         draft.images.push(image);
     })) {
         return null;

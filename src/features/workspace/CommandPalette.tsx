@@ -96,6 +96,8 @@ export function CommandPalette() {
     return (
         <div className="palette-backdrop" onPointerDown={(event) => {
             if (event.target === event.currentTarget) {
+                // Cancel the follow-up mousedown so focus stays where it is restored to.
+                event.preventDefault();
                 close();
             }
         }}>

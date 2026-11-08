@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { LngLat } from '../../core/model/schema';
-import { mapRef } from '../../map/MapView';
-import { mutate } from '../../core/store/project';
+import { mapRef, whenMapReady } from '../../map/MapView';
+import type { MaplibreMap } from '../../map/engine';
+import { mutate, useProject } from '../../core/store/project';
 import { uid, nowIso } from '../../core/model/factory';
 import { toast } from '../../core/store/ui';
 import { t } from '../../i18n';
@@ -49,14 +50,15 @@ function onPosition(position: GeolocationPosition) {
         at: position.timestamp || Date.now(),
     };
     const state = useGps.getState();
-    const recording = state.recording;
-    if (recording && fix.accuracy <= 50) {
+    let recording = state.recording;
+    // Only reasonably accurate fixes, thinned by distance, and never beyond the schema cap.
+    if (recording && fix.accuracy <= 50 && recording.points.length < 50000) {
         const last = recording.points[recording.points.length - 1];
         if (!last || distanceM(last.p, fix.p) >= Math.max(3, fix.accuracy / 3)) {
-            recording.points = [...recording.points, { p: fix.p, t: new Date(fix.at).toISOString(), acc: Math.round(fix.accuracy) }];
+            recording = { ...recording, points: [...recording.points, { p: fix.p, t: new Date(fix.at).toISOString(), acc: Math.round(fix.accuracy) }] };
         }
     }
-    useGps.setState({ fix, error: null, recording: recording ? { ...recording } : null });
+    useGps.setState({ fix, error: null, recording });
     if (state.follow) {
         mapRef.current?.easeTo({ center: fix.p, duration: 400 });
     }
@@ -128,8 +130,10 @@ export function stopRecording(save: boolean): boolean {
         draft.tracks.push({ id: uid('trk'), name: new Date(recording.startedAt).toLocaleString(), startedAt: recording.startedAt, endedAt: nowIso(), points: recording.points.slice(0, 50000) });
     });
     if (!saved) {
-        // Read-only copy or viewer: keep the recording so it can be exported instead of losing it.
-        toast(t('save.readOnlyCopy'), { tone: 'warn' });
+        // Read-only copy or viewer (or the track limit): keep the recording instead of losing it.
+        if (useProject.getState().readOnly) {
+            toast(t('save.readOnlyCopy'), { tone: 'warn' });
+        }
         return false;
     }
     useGps.setState({ recording: null });
@@ -157,10 +161,15 @@ export function installGpsLifecycle(): () => void {
             useGps.setState({ follow: false });
         }
     };
-    const map = mapRef.current;
-    map?.on('dragstart', stopFollow);
+    // Panning by hand ends "follow"; attach once the map exists.
+    let map: MaplibreMap | null = null;
+    const stopReady = whenMapReady((ready) => {
+        map = ready;
+        ready.on('dragstart', stopFollow);
+    });
     return () => {
         document.removeEventListener('visibilitychange', onVisibility);
+        stopReady();
         map?.off('dragstart', stopFollow);
         stopGps();
         useGps.setState({ recording: null, fix: null });

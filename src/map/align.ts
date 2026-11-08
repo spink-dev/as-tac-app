@@ -81,7 +81,8 @@ export function cancelAlign(): boolean {
     if (abortActiveDrag()) {
         return true;
     }
-    if (!useUi.getState().imageEditId) {
+    // Hidden alignment (Streamer Safe, viewer) leaves Escape to its normal meaning.
+    if (!useUi.getState().imageEditId || !alignActive()) {
         return false;
     }
     if (useAlign.getState().pendingPx) {
@@ -206,7 +207,13 @@ export function installAlign(map: MlMap): () => void {
         }
         suppress = performance.now();
         // Manual placement replaces any control-point fit.
-        setImagePlacement(imageId, preview, { controlPoints: undefined, fit: { method: 'manual' } }, useAlign.getState().moveBound, `align-drag:${imageId}:${suppress}`);
+        if (!setImagePlacement(imageId, preview, { controlPoints: undefined, fit: { method: 'manual' } }, useAlign.getState().moveBound, `align-drag:${imageId}:${suppress}`)) {
+            // Refused (bound objects would leave the world, image locked meanwhile, read-only): snap back.
+            const image = useProject.getState().project?.images.find((i) => i.id === imageId);
+            if (image) {
+                previewImageCorners(map, image, null);
+            }
+        }
     };
 
     const onClick = (event: MapMouseEvent) => {

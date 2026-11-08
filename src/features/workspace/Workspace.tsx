@@ -8,13 +8,17 @@ import { useShortcuts } from './useShortcuts';
 import { PanelHost } from '../panels/Panel';
 import { CommandPalette } from './CommandPalette';
 import { AlignBar } from '../maps/AlignBar';
+import { BriefingBar } from '../briefing/BriefingBar';
+import { FieldPanel, useFieldLayers } from '../field/FieldHud';
 import '../maps/MapsPanel';
+import '../briefing/PhasesPanel';
 
 export function Workspace() {
     const mode = useUi((state) => state.mode);
     const streamer = useUi((state) => state.streamer);
     const appearance = usePrefs((state) => state.appearance);
     useShortcuts();
+    useFieldLayers();
     return (
         <div className="ws" data-mode={mode} data-streamer={streamer} data-appearance-map={appearance}>
             <MapView />
@@ -23,6 +27,8 @@ export function Workspace() {
             <ToolRail />
             <div className="ws-bottom">
                 <AlignBar />
+                <BriefingBar />
+                <FieldPanel />
                 <DraftBar />
                 <HintBar />
                 <ContextBar />

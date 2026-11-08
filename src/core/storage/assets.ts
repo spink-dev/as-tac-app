@@ -89,7 +89,28 @@ export function imageDimensions(b: Uint8Array): { width: number; height: number 
         return { width: ((b[16] << 24) >>> 0) + (b[17] << 16) + (b[18] << 8) + b[19], height: ((b[20] << 24) >>> 0) + (b[21] << 16) + (b[22] << 8) + b[23] };
     }
     if (b.length >= 10 && ascii(0, 4) === 'GIF8') {
-        return { width: u16le(6), height: u16le(8) };
+        // Browsers size the canvas to the larger of the screen and the first frame descriptor.
+        let width = u16le(6);
+        let height = u16le(8);
+        let i = 13 + ((b[10] & 0x80) ? 3 * (2 << (b[10] & 0x07)) : 0);
+        while (i < b.length) {
+            if (b[i] === 0x2c && i + 9 < b.length) {
+                width = Math.max(width, u16le(i + 1) + u16le(i + 5));
+                height = Math.max(height, u16le(i + 3) + u16le(i + 7));
+                break;
+            }
+            if (b[i] === 0x21 && i + 2 < b.length) {
+                // Extension block: skip its sub-blocks.
+                i += 2;
+                while (i < b.length && b[i] !== 0) {
+                    i += b[i] + 1;
+                }
+                i += 1;
+                continue;
+            }
+            break;
+        }
+        return { width, height };
     }
     if (b.length >= 30 && ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') {
         const chunk = ascii(12, 4);
