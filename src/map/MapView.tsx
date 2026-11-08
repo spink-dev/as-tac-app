@@ -24,6 +24,13 @@ export const mapRef: { current: MlMap | null } = { current: null };
 /** True once plan sources and layers exist. `isStyleLoaded()` is false while big sources parse. */
 let planReady = false;
 
+let viewSaveGuard: (() => boolean) | null = null;
+
+/** Lets a feature veto remembering the camera (e.g. while it follows the own GPS position). */
+export function setViewSaveGuard(guard: (() => boolean) | null) {
+    viewSaveGuard = guard;
+}
+
 export function isPlanReady(): boolean {
     return planReady && mapRef.current !== null;
 }
@@ -232,7 +239,7 @@ export function MapView() {
             renderGrid();
             const current = useProject.getState().project;
             window.clearTimeout(saveTimer);
-            if (current) {
+            if (current && (viewSaveGuard?.() ?? true)) {
                 saveTimer = window.setTimeout(() => void kvSet(`view:${current.id}`, currentCamera(map)), 400);
             }
         });
@@ -302,4 +309,12 @@ export function MapView() {
     }, []);
 
     return <div ref={container} className="map" data-testid="map" />;
+}
+
+// Test hook for the browser suites: the current camera only.
+if (typeof window !== 'undefined') {
+    (window as unknown as { __asTacCamera: () => { center: [number, number]; bearing: number } | null }).__asTacCamera = () => {
+        const map = mapRef.current;
+        return map ? { center: [map.getCenter().lng, map.getCenter().lat], bearing: map.getBearing() } : null;
+    };
 }

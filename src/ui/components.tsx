@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import gsap from 'gsap';
 import Lenis from 'lenis';
@@ -47,6 +47,44 @@ export function Segmented<T extends string>({ value, options, onChange, block, l
                 </button>
             ))}
         </div>
+    );
+}
+
+/**
+ * Text input for a required name: can be cleared and retyped (a local draft), commits every
+ * non-blank change live, and falls back to the stored name when left blank.
+ */
+export function NameInput({ value, onCommit, className = 'input', ...rest }: { value: string; onCommit: (value: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+    const [draft, setDraft] = useState(value);
+    const editing = useRef(false);
+    useEffect(() => {
+        if (!editing.current) {
+            setDraft(value);
+        }
+    }, [value]);
+    return (
+        <input
+            {...rest}
+            className={className}
+            value={draft}
+            onFocus={(event) => {
+                editing.current = true;
+                rest.onFocus?.(event);
+            }}
+            onChange={(event) => {
+                setDraft(event.target.value);
+                if (event.target.value.trim()) {
+                    onCommit(event.target.value);
+                }
+            }}
+            onBlur={(event) => {
+                editing.current = false;
+                if (!draft.trim()) {
+                    setDraft(value);
+                }
+                rest.onBlur?.(event);
+            }}
+        />
     );
 }
 

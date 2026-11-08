@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Camera, ChevronDown, Crosshair, Plus, Presentation,
 import { useT } from '../../i18n';
 import { useProject, mutate } from '../../core/store/project';
 import { useUi, toast } from '../../core/store/ui';
-import { Button, Empty, Field, IconButton } from '../../ui/components';
+import { Button, Empty, Field, IconButton, NameInput } from '../../ui/components';
 import { canEdit, toastUndoable } from '../../core/actions';
 import { uid } from '../../core/model/factory';
 import { LIMITS, MAX, type Phase, type Project } from '../../core/model/schema';
@@ -58,6 +58,8 @@ function PhaseRow({ phase, index, project }: { phase: Phase; index: number; proj
     const remove = () => {
         const ok = mutate(t('common.delete'), (draft) => {
             draft.phases = draft.phases.filter((p) => p.id !== phase.id);
+            // Kept briefing ink that belonged only to this phase goes with it (it could never show again).
+            draft.drawings = draft.drawings.filter((stroke) => !(stroke.briefingOnly && stroke.phaseIds?.length === 1 && stroke.phaseIds[0] === phase.id));
             for (const item of [...draft.elements, ...draft.drawings]) {
                 const next = withoutPhase(item.phaseIds, phase.id);
                 if (next !== item.phaseIds) {
@@ -98,7 +100,7 @@ function PhaseRow({ phase, index, project }: { phase: Phase; index: number; proj
             {open ? (
                 <fieldset className="plain stack phase-row__body" disabled={!editable}>
                     <Field label={t('common.name')}>
-                        <input className="input" maxLength={MAX.phaseName} value={phase.name} onChange={(event) => patch({ name: event.target.value || '–' }, 'name')} />
+                        <NameInput maxLength={MAX.phaseName} value={phase.name} onCommit={(name) => patch({ name }, 'name')} />
                     </Field>
                     <div className="field-row">
                         <Field label={`${t('phases.time')} (${t('phases.from')})`}>

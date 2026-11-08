@@ -9,6 +9,7 @@ import { toMgrs } from '../../core/geo/mgrs';
 import { formatLngLat } from '../../core/geo/geo';
 import type { LngLat } from '../../core/model/schema';
 import { FieldHudButtons } from '../field/FieldHud';
+import { useCompass } from '../field/compass';
 
 /** Compass rose that also resets the map to north-up. */
 export function NorthButton() {
@@ -20,7 +21,11 @@ export function NorthButton() {
         update();
     }), []);
     return (
-        <IconButton label={t('field.northUp')} tipPos="left" onClick={() => mapRef.current?.easeTo({ bearing: 0, duration: 300 })}>
+        <IconButton label={t('field.northUp')} tipPos="left" onClick={() => {
+            // North-up wins over heading-up (the compass keeps showing the heading arrow).
+            useCompass.setState({ headingUp: false });
+            mapRef.current?.easeTo({ bearing: 0, duration: 300 });
+        }}>
             <span className="north" style={{ transform: `rotate(${-bearing}deg)` }}>
                 <Navigation2 size={20} strokeWidth={1.75} />
                 <span className="north__n">N</span>

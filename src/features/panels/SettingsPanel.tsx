@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import { useProject, mutate } from '../../core/store/project';
 import { usePrefs } from '../../core/store/prefs';
 import { useUi } from '../../core/store/ui';
-import { Button, Field, Segmented, Switch } from '../../ui/components';
+import { Button, Field, NameInput, Segmented, Switch } from '../../ui/components';
 import { showDialog } from '../../core/store/dialogs';
 import { canEdit, toastStreamer } from '../../core/actions';
 import { MAX } from '../../core/model/schema';
@@ -27,8 +27,8 @@ export function SettingsPanel() {
                 <div className="section__title">{t('settings.plan')}</div>
                 <fieldset className="plain stack" disabled={!canEdit()}>
                     <Field label={t('settings.name')}>
-                        <input className="input" maxLength={MAX.projectName} value={project.name} onChange={(event) => mutate(t('common.rename'), (draft) => {
-                            draft.name = event.target.value || '–';
+                        <NameInput maxLength={MAX.projectName} value={project.name} onCommit={(name) => mutate(t('common.rename'), (draft) => {
+                            draft.name = name;
                         }, { key: 'project-name' })} />
                     </Field>
                     <Switch checked={project.settings.returnToSelect} onChange={(v) => setting('returnToSelect', v)}>{t('settings.returnToSelect')}</Switch>

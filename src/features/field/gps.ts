@@ -1,16 +1,19 @@
 import { create } from 'zustand';
 import type { LngLat } from '../../core/model/schema';
-import { mapRef, whenMapReady } from '../../map/MapView';
+import { mapRef, setViewSaveGuard, whenMapReady } from '../../map/MapView';
 import type { MaplibreMap } from '../../map/engine';
 import { mutate, useProject } from '../../core/store/project';
 import { uid, nowIso } from '../../core/model/factory';
-import { toast } from '../../core/store/ui';
+import { toast, useUi } from '../../core/store/ui';
+import { onBeforeClose } from '../../core/store/route';
 import { t } from '../../i18n';
 import { distanceM } from '../../core/geo/geo';
+import { useCompass } from './compass';
 
 /**
  * Own position, device-local only. Nothing here is written to the plan or sent to peers
- * unless the user explicitly saves a recorded path.
+ * unless the user explicitly saves a recorded path. While Streamer Safe or a briefing is
+ * on, the position is hidden everywhere — including the camera (no follow, no locate).
  */
 export interface Fix {
     p: LngLat;
@@ -26,19 +29,44 @@ interface GpsState {
     fix: Fix | null;
     error: 'denied' | 'unavailable' | 'timeout' | null;
     recording: { startedAt: string; points: { p: LngLat; t: string; acc: number }[] } | null;
+    /** Set when saving the recording was refused (read-only, limits); offers "discard". */
+    saveFailed: boolean;
     now: number;
 }
 
-export const useGps = create<GpsState>(() => ({ active: false, follow: false, fix: null, error: null, recording: null, now: Date.now() }));
+export const useGps = create<GpsState>(() => ({ active: false, follow: false, fix: null, error: null, recording: null, saveFailed: false, now: Date.now() }));
 
 let watchId: number | null = null;
 let resumeOnVisible = false;
 let ticker = 0;
 
 export const STALE_MS = 30000;
+const MAX_TRACK_POINTS = 50000;
 
 export function isStale(fix: Fix | null, now = Date.now()): boolean {
     return !fix || now - fix.at > STALE_MS;
+}
+
+/** A fix that may be shown as "here": GPS on and fresh. */
+export function liveFix(state = useGps.getState()): Fix | null {
+    return state.active && state.fix && !isStale(state.fix, Math.max(state.now, Date.now())) ? state.fix : null;
+}
+
+/** Streamer Safe and briefings hide the own position (shared screens). */
+export function positionHidden(): boolean {
+    const ui = useUi.getState();
+    return ui.streamer !== 'off' || ui.mode === 'briefing';
+}
+
+function followCamera(fix: Fix) {
+    const map = mapRef.current;
+    if (!map || positionHidden()) {
+        return;
+    }
+    const compass = useCompass.getState();
+    // Heading-up and follow in one camera move, so neither cancels the other.
+    const bearing = compass.headingUp && compass.heading !== null ? compass.heading : map.getBearing();
+    map.easeTo({ center: fix.p, bearing, duration: 400 });
 }
 
 function onPosition(position: GeolocationPosition) {
@@ -52,15 +80,15 @@ function onPosition(position: GeolocationPosition) {
     const state = useGps.getState();
     let recording = state.recording;
     // Only reasonably accurate fixes, thinned by distance, and never beyond the schema cap.
-    if (recording && fix.accuracy <= 50 && recording.points.length < 50000) {
+    if (recording && fix.accuracy <= 50 && recording.points.length < MAX_TRACK_POINTS) {
         const last = recording.points[recording.points.length - 1];
         if (!last || distanceM(last.p, fix.p) >= Math.max(3, fix.accuracy / 3)) {
             recording = { ...recording, points: [...recording.points, { p: fix.p, t: new Date(fix.at).toISOString(), acc: Math.round(fix.accuracy) }] };
         }
     }
-    useGps.setState({ fix, error: null, recording });
+    useGps.setState({ fix, error: null, recording, now: Date.now() });
     if (state.follow) {
-        mapRef.current?.easeTo({ center: fix.p, duration: 400 });
+        followCamera(fix);
     }
 }
 
@@ -83,65 +111,77 @@ export function startGps(follow = true) {
     }
     window.clearInterval(ticker);
     ticker = window.setInterval(() => useGps.setState({ now: Date.now() }), 5000);
-    useGps.setState({ active: true, follow });
+    useGps.setState({ active: true, follow: follow && !positionHidden() });
 }
 
+/** GPS off: the last fix is dropped, so nothing keeps presenting it as current. */
 export function stopGps() {
     if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
     }
     window.clearInterval(ticker);
-    useGps.setState({ active: false, follow: false });
+    useGps.setState({ active: false, follow: false, fix: null, now: Date.now() });
 }
 
 /** First press starts GPS and follows; later presses toggle following. GPS stops only explicitly. */
 export function locateOnce() {
+    if (positionHidden()) {
+        toast(t('field.hiddenNow'), { tone: 'warn' });
+        return;
+    }
     const state = useGps.getState();
     if (!state.active) {
         startGps(true);
-        if (state.fix) {
-            mapRef.current?.easeTo({ center: state.fix.p, zoom: Math.max(mapRef.current.getZoom(), 16), duration: 500 });
-        }
         return;
     }
     const follow = !state.follow;
     useGps.setState({ follow });
-    if (follow && state.fix) {
-        mapRef.current?.easeTo({ center: state.fix.p, duration: 400 });
+    const fix = liveFix();
+    if (follow && fix) {
+        followCamera(fix);
     }
 }
 
 export function startRecording() {
     startGps(useGps.getState().follow);
-    useGps.setState({ recording: { startedAt: nowIso(), points: [] } });
+    useGps.setState({ recording: { startedAt: nowIso(), points: [] }, saveFailed: false });
 }
 
+/** Save (or discard) the recording. Returns true when a track was stored. */
 export function stopRecording(save: boolean): boolean {
     const recording = useGps.getState().recording;
     if (!recording) {
         return false;
     }
-    if (!save || recording.points.length < 2) {
-        useGps.setState({ recording: null });
+    if (!save) {
+        useGps.setState({ recording: null, saveFailed: false });
         return false;
     }
+    if (recording.points.length < 2) {
+        useGps.setState({ recording: null, saveFailed: false });
+        toast(t('field.trackTooShort'));
+        return false;
+    }
+    // Own tracks are local records, not plan edits: no undo step (an undo would delete the path).
     const saved = mutate(t('field.track'), (draft) => {
-        draft.tracks.push({ id: uid('trk'), name: new Date(recording.startedAt).toLocaleString(), startedAt: recording.startedAt, endedAt: nowIso(), points: recording.points.slice(0, 50000) });
-    });
+        draft.tracks.push({ id: uid('trk'), name: new Date(recording.startedAt).toLocaleString(), startedAt: recording.startedAt, endedAt: nowIso(), points: recording.points.slice(0, MAX_TRACK_POINTS) });
+    }, { noHistory: true });
     if (!saved) {
-        // Read-only copy or viewer (or the track limit): keep the recording instead of losing it.
-        if (useProject.getState().readOnly) {
-            toast(t('save.readOnlyCopy'), { tone: 'warn' });
-        }
+        useGps.setState({ saveFailed: true });
+        toast(useProject.getState().readOnly ? t('save.readOnlyCopy') : t('field.trackSaveFailed'), { tone: 'warn' });
         return false;
     }
-    useGps.setState({ recording: null });
+    useGps.setState({ recording: null, saveFailed: false });
     toast(t('field.trackSaved', { n: recording.points.length }), { tone: 'ok' });
     return true;
 }
 
-/** Pause GPS while the app is hidden (battery, privacy) and resume only if it was on. */
+/**
+ * GPS pauses while the app is hidden (battery, privacy) and resumes only if it was on.
+ * Entering Streamer Safe or a briefing stops following and heading-up. A running recording
+ * is saved before the plan closes.
+ */
 export function installGpsLifecycle(): () => void {
     const onVisibility = () => {
         if (document.hidden) {
@@ -161,17 +201,40 @@ export function installGpsLifecycle(): () => void {
             useGps.setState({ follow: false });
         }
     };
-    // Panning by hand ends "follow"; attach once the map exists.
+    const stopHeadingUp = (event: { originalEvent?: unknown }) => {
+        // Only a rotation by the user ends heading-up, not our own camera moves.
+        if (event.originalEvent && useCompass.getState().headingUp) {
+            useCompass.setState({ headingUp: false });
+        }
+    };
     let map: MaplibreMap | null = null;
     const stopReady = whenMapReady((ready) => {
         map = ready;
         ready.on('dragstart', stopFollow);
+        ready.on('rotatestart', stopHeadingUp);
+    });
+    const unsubUi = useUi.subscribe((state, prev) => {
+        if ((state.streamer !== prev.streamer || state.mode !== prev.mode) && positionHidden()) {
+            useGps.setState({ follow: false });
+            useCompass.setState({ headingUp: false });
+        }
+    });
+    // Never remember a camera that is just the own position (rule 5).
+    setViewSaveGuard(() => !useGps.getState().follow);
+    const stopBeforeClose = onBeforeClose(() => {
+        if (useGps.getState().recording) {
+            stopRecording(true);
+        }
     });
     return () => {
         document.removeEventListener('visibilitychange', onVisibility);
         stopReady();
+        unsubUi();
+        stopBeforeClose();
+        setViewSaveGuard(null);
         map?.off('dragstart', stopFollow);
+        map?.off('rotatestart', stopHeadingUp);
         stopGps();
-        useGps.setState({ recording: null, fix: null });
+        useGps.setState({ recording: null, fix: null, saveFailed: false });
     };
 }

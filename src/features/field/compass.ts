@@ -21,6 +21,9 @@ type PermissionApi = { requestPermission?: () => Promise<'granted' | 'denied'> }
 
 let listening: { type: string; fn: (event: Event) => void } | null = null;
 let smoothed: number | null = null;
+/** Bumped by every start/stop, so a start that resolves after a stop never attaches a listener. */
+let generation = 0;
+let probe = 0;
 
 function screenAngle(): number {
     const angle = screen.orientation?.angle ?? (window as unknown as { orientation?: number }).orientation ?? 0;
@@ -53,12 +56,17 @@ const onAbsolute = (event: Event) => {
     }
 };
 
-/** Must be called from a user gesture (iOS permission prompt). */
-export async function startCompass(): Promise<boolean> {
+/**
+ * Must be called from a user gesture (iOS permission prompt). Resolves false when the sensor
+ * is missing or not allowed; `onSilent` runs if no north-referenced reading arrives in 3 s
+ * (desktop without sensors, or a browser that only offers relative orientation).
+ */
+export async function startCompass(onSilent?: () => void): Promise<boolean> {
     if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) {
         useCompass.setState({ permission: 'unsupported' });
         return false;
     }
+    const token = ++generation;
     const api = DeviceOrientationEvent as unknown as PermissionApi;
     if (typeof api.requestPermission === 'function') {
         const result = await api.requestPermission().catch(() => 'denied' as const);
@@ -67,19 +75,37 @@ export async function startCompass(): Promise<boolean> {
             return false;
         }
     }
-    stopCompass();
+    if (token !== generation) {
+        // Stopped (workspace closed) while the permission prompt was open.
+        return false;
+    }
+    detach();
     smoothed = null;
     const absolute = 'ondeviceorientationabsolute' in window;
     listening = absolute ? { type: 'deviceorientationabsolute', fn: onAbsolute } : { type: 'deviceorientation', fn: onIos };
     window.addEventListener(listening.type, listening.fn);
-    useCompass.setState({ active: true, permission: 'granted' });
+    useCompass.setState({ active: true, permission: 'granted', heading: null });
+    window.clearTimeout(probe);
+    probe = window.setTimeout(() => {
+        if (token === generation && useCompass.getState().heading === null) {
+            stopCompass();
+            useCompass.setState({ permission: 'unsupported' });
+            onSilent?.();
+        }
+    }, 3000);
     return true;
 }
 
-export function stopCompass() {
+function detach() {
     if (listening) {
         window.removeEventListener(listening.type, listening.fn);
         listening = null;
     }
+}
+
+export function stopCompass() {
+    generation += 1;
+    window.clearTimeout(probe);
+    detach();
     useCompass.setState({ active: false, heading: null, headingUp: false });
 }

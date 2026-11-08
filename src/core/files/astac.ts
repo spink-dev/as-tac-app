@@ -51,7 +51,12 @@ export function assetRefs(project: Project): string[] {
 
 const encoder = new TextEncoder();
 
-export async function exportAstac(project: Project, options: { includeArea: boolean }): Promise<Blob> {
+/**
+ * Own recorded paths stay on the device unless explicitly included (they are where the
+ * user walked); everything else of the plan is exported.
+ */
+export async function exportAstac(source: Project, options: { includeArea: boolean; includeTracks?: boolean }): Promise<Blob> {
+    const project = options.includeTracks ? source : { ...source, tracks: [] };
     const parsed = ProjectSchema.safeParse(project);
     if (!parsed.success) {
         throw new Error('project-invalid');

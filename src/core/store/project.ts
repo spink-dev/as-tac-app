@@ -25,6 +25,8 @@ export interface MutateOptions {
     /** Consecutive edits with the same key within 800 ms merge into one undo step. */
     key?: string;
     remote?: boolean;
+    /** Local record that is not a plan edit (own track): saved, but not an undo step. */
+    noHistory?: boolean;
 }
 
 interface ProjectState {
@@ -176,12 +178,12 @@ export const useProject = create<ProjectState>((set, get) => ({
             rejectListeners.forEach((listener) => listener(label, problem));
             return false;
         }
-        if (options.remote) {
+        if (options.remote || options.noHistory) {
             // A peer change ends any coalescing window: merging across it would let undo revert the peer.
             const top = past[past.length - 1];
             const barrier = top?.key ? [...past.slice(0, -1), { ...top, key: undefined }] : past;
             set({ project: changed, past: barrier, revision: get().revision + 1 });
-            emit(project, changed, 'remote');
+            emit(project, changed, options.remote ? 'remote' : 'local');
             return true;
         }
         const next = produce(changed, (draft) => {

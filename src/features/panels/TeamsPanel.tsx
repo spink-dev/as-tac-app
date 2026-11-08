@@ -3,7 +3,7 @@ import { ChevronDown, Download, ImagePlus, MapPin, Plus, Trash2, Upload } from '
 import { useT } from '../../i18n';
 import { useProject, mutate } from '../../core/store/project';
 import { useUi, toast } from '../../core/store/ui';
-import { Button, Empty, Field, IconButton, Segmented, Swatches, Switch } from '../../ui/components';
+import { Button, Empty, Field, IconButton, NameInput, Segmented, Swatches, Switch } from '../../ui/components';
 import { createTeam, uid, TEAM_COLORS } from '../../core/model/factory';
 import { canEdit, addElement, toastUndoable } from '../../core/actions';
 import { LIMITS, MAX, TeamSchema, type Team } from '../../core/model/schema';
@@ -136,7 +136,7 @@ function TeamEditor({ team }: { team: Team }) {
         <fieldset className="plain stack" disabled={!editable}>
             <div className="field-row">
                 <Field label={t('common.name')}>
-                    <input className="input" maxLength={MAX.name} value={team.name} onChange={(event) => patch({ name: event.target.value || '–' }, 'name')} />
+                    <NameInput maxLength={MAX.name} value={team.name} onCommit={(name) => patch({ name }, 'name')} />
                 </Field>
                 <Field label={t('teams.callsign')}>
                     <input className="input" maxLength={MAX.callsign} value={team.callsign ?? ''} onChange={(event) => patch({ callsign: event.target.value || undefined }, 'callsign')} />

@@ -25,6 +25,7 @@ export function BriefingBar() {
     const phases = useProject((state) => state.project?.phases ?? []);
     const keep = useProject((state) => state.project?.settings.keepBriefingInk ?? false);
     const drawings = useProject((state) => state.project?.drawings);
+    const readOnly = useProject((state) => state.readOnly);
     const [notesOpen, setNotesOpen] = useState(true);
     const liveStatus = useLive((state) => state.status);
     const liveRole = useLive((state) => state.role);
@@ -36,7 +37,13 @@ export function BriefingBar() {
     }
     const count = phases.length;
     const current = count > 0 ? phases[Math.min(index, count - 1)] : null;
-    const persistedInk = keep && drawings ? drawings.filter((s) => s.briefingOnly && visibleInPhase(s.phaseIds, current?.id ?? null)) : [];
+    // Same rule as the eraser: only kept ink this device may change (not read-only, layer usable).
+    const layers = useProject.getState().project?.layers ?? [];
+    const usable = (layerId: string | undefined) => {
+        const layer = layers.find((l) => l.id === (layerId ?? layers[0]?.id));
+        return !layer || (layer.visible && !layer.locked);
+    };
+    const persistedInk = keep && !readOnly && drawings ? drawings.filter((s) => s.briefingOnly && visibleInPhase(s.phaseIds, current?.id ?? null) && usable(s.layerId)) : [];
     const inkCount = sessionInk + persistedInk.length;
     const pen = tool === 'draw';
     const clearInk = () => {

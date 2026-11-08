@@ -84,6 +84,69 @@ async function run(name, viewport) {
     check(`${name}:briefing-ended`, (await page.locator('.ws').getAttribute('data-mode')) === 'plan');
     await context.close();
 }
+/** Privacy and compass behaviour on desktop with simulated sensors (no real device). */
+async function privacy() {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', geolocation: { latitude: 52.3832, longitude: 11.8187, accuracy: 8 }, permissions: ['geolocation', 'accelerometer', 'gyroscope', 'magnetometer'] });
+    const page = await context.newPage();
+    page.on('pageerror', (error) => errors.push(`privacy: ${error.message}`));
+    await page.goto(base);
+    await page.getByTestId('new-plan').click();
+    await page.getByRole('radio', { name: 'Mission 24' }).click();
+    await page.getByTestId('create-plan').click();
+    await page.waitForSelector('.maplibregl-canvas');
+    await page.waitForTimeout(1500);
+    const camera = () => page.evaluate(() => window.__asTacCamera());
+    const near = (c, lng, lat) => Math.abs(c.center[0] - lng) < 0.0005 && Math.abs(c.center[1] - lat) < 0.0005;
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' })));
+    await page.getByTestId('locate').click();
+    await page.waitForTimeout(1500);
+    await context.setGeolocation({ latitude: 52.3850, longitude: 11.8220, accuracy: 8 });
+    await page.waitForTimeout(2500);
+    check('follow-works', near(await camera(), 11.8220, 52.3850));
+    // Streamer Safe: the camera must not follow the device any more.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', shiftKey: true })));
+    await page.waitForTimeout(300);
+    await context.setGeolocation({ latitude: 52.3870, longitude: 11.8260, accuracy: 8 });
+    await page.waitForTimeout(2500);
+    check('streamer-no-follow', near(await camera(), 11.8220, 52.3850));
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'G', shiftKey: true })));
+    await page.waitForTimeout(800);
+    check('streamer-no-locate', near(await camera(), 11.8220, 52.3850));
+    check('streamer-gps-hidden', (await page.getByTestId('locate').count()) === 0);
+    // Streamer off again; GPS off drops the fix.
+    for (let i = 0; i < 2; i++) {
+        await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', shiftKey: true })));
+        await page.waitForTimeout(200);
+    }
+    await page.getByTestId('gps-off').click();
+    await page.waitForTimeout(300);
+    check('gps-off-clears', (await page.locator('.fieldpanel__coord').count()) === 0);
+    // Compass: simulated absolute orientation (alpha 90 → heading 270).
+    await page.evaluate(() => {
+        window.__compassTimer = setInterval(() => {
+            const event = new Event('deviceorientationabsolute');
+            Object.assign(event, { absolute: true, alpha: 90, beta: 0, gamma: 0 });
+            window.dispatchEvent(event);
+        }, 50);
+    });
+    const compass = page.getByRole('button', { name: 'Kompass einschalten' });
+    if (await compass.count()) {
+        await compass.click();
+        await page.waitForTimeout(500);
+        await page.getByRole('button', { name: 'Blickrichtung oben' }).click();
+        await page.waitForTimeout(1500);
+        const bearing = (await camera()).bearing;
+        check('heading-up', Math.abs(((bearing - 270 + 540) % 360) - 180) < 3);
+        await page.getByRole('button', { name: 'Norden oben' }).first().click();
+        await page.waitForTimeout(1200);
+        check('north-wins', Math.abs((await camera()).bearing) < 1);
+    } else {
+        check('compass-button', false);
+    }
+    await context.close();
+}
+
+await privacy();
 await run('desktop', { width: 1440, height: 900 });
 await run('phone', { width: 390, height: 844 });
 await browser.close();

@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Circle, Compass, Crosshair, Info, LocateFixed, LocateOff, Navigation2, X } from 'lucide-react';
 import { t as translate, useT } from '../../i18n';
-import { useUi } from '../../core/store/ui';
+import { toast, useUi } from '../../core/store/ui';
 import { useProject } from '../../core/store/project';
 import { usePrefs } from '../../core/store/prefs';
 import { ICON, IconButton, Button } from '../../ui/components';
-import { isStale, locateOnce, startRecording, stopGps, stopRecording, useGps, installGpsLifecycle } from './gps';
+import { isStale, liveFix, locateOnce, positionHidden, startRecording, stopGps, stopRecording, useGps, installGpsLifecycle } from './gps';
 import { startCompass, stopCompass, useCompass } from './compass';
 import { mapRef, whenMapReady } from '../../map/MapView';
 import { setSourceData } from '../../map/planLayers';
@@ -17,77 +17,142 @@ import { typeLabel } from '../../core/actions';
 import type { LngLat } from '../../core/model/schema';
 import { hasArea } from '../../core/areas/store';
 
-/** Map-side rendering of own position, heading, navigation line and own tracks. */
+/**
+ * Map-side rendering of own position, heading, navigation line and own tracks. Split by cost:
+ * compass readings only touch the heading arrow and bearing; saved tracks are rebuilt only
+ * when they change, not on every GPS fix.
+ */
 export function useFieldLayers() {
     useEffect(() => {
         let areaBounds: [number, number, number, number] | null = null;
         let warnedOutside = false;
-        const render = () => {
+        let savedTracks: GeoJSON.Feature[] = [];
+        let savedFor: unknown = null;
+        let lastBearingAt = 0;
+        const hiddenNow = () => positionHidden();
+
+        const renderPosition = () => {
             const map = mapRef.current;
             if (!map) {
                 return;
             }
             const gps = useGps.getState();
-            const compass = useCompass.getState();
             const ui = useUi.getState();
-            const project = useProject.getState().project;
-            // Own position, tracks and navigation stay off shared screens: Streamer Safe and briefings.
-            const hidden = ui.streamer !== 'off' || ui.mode === 'briefing';
-            if (hidden || !gps.active || !gps.fix) {
+            const fix = gps.active ? gps.fix : null;
+            if (hiddenNow() || !fix) {
                 setSourceData(map, 'gps', EMPTY_FC);
             } else {
-                const stale = isStale(gps.fix, gps.now) ? 1 : 0;
-                // Compass when available; GPS course only while actually moving.
-                const heading = compass.heading ?? ((gps.fix.speed ?? 0) > 0.7 ? gps.fix.heading : null);
+                const stale = isStale(fix, Math.max(gps.now, Date.now())) ? 1 : 0;
                 const features: GeoJSON.Feature[] = [
-                    { type: 'Feature', properties: { role: 'accuracy', stale }, geometry: { type: 'Polygon', coordinates: [circlePolygon(gps.fix.p, Math.max(3, gps.fix.accuracy), 48)] } },
-                    { type: 'Feature', properties: { role: 'dot', stale }, geometry: { type: 'Point', coordinates: gps.fix.p } },
+                    { type: 'Feature', properties: { role: 'accuracy', stale }, geometry: { type: 'Polygon', coordinates: [circlePolygon(fix.p, Math.max(3, fix.accuracy), 48)] } },
+                    { type: 'Feature', properties: { role: 'dot', stale }, geometry: { type: 'Point', coordinates: fix.p } },
                 ];
-                if (heading !== null && heading !== undefined) {
-                    features.push({ type: 'Feature', properties: { role: 'heading', rot: heading - 90 }, geometry: { type: 'Point', coordinates: gps.fix.p } });
+                const heading = currentHeading();
+                if (heading !== null) {
+                    features.push({ type: 'Feature', properties: { role: 'heading', rot: heading - 90 }, geometry: { type: 'Point', coordinates: fix.p } });
                 }
                 setSourceData(map, 'gps', { type: 'FeatureCollection', features });
             }
-            const target = project?.elements.find((e) => e.id === ui.navTargetId);
-            const from = gps.fix?.p;
-            setSourceData(map, 'nav', !hidden && ui.mode === 'field' && target && from ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [from, elementAnchor(target)] } }] } : EMPTY_FC);
-            const tracks: GeoJSON.Feature[] = [];
-            if (!hidden) {
-                for (const track of project?.tracks ?? []) {
-                    tracks.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: track.points.map((p) => p.p) } });
-                }
-                if (gps.recording && gps.recording.points.length > 1) {
-                    tracks.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: gps.recording.points.map((p) => p.p) } });
-                }
-            }
-            setSourceData(map, 'tracks', { type: 'FeatureCollection', features: tracks });
-            if (gps.fix && areaBounds && !warnedOutside) {
+            const project = useProject.getState().project;
+            const target = ui.navTargetId ? project?.elements.find((e) => e.id === ui.navTargetId) : undefined;
+            const from = liveFix(gps)?.p;
+            setSourceData(map, 'nav', !hiddenNow() && ui.mode === 'field' && target && from ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [from, elementAnchor(target)] } }] } : EMPTY_FC);
+            if (fix && areaBounds && !warnedOutside && !hiddenNow()) {
                 const [w, s, e, n] = areaBounds;
-                if (!pointInPolygon(gps.fix.p, [[w, s], [e, s], [e, n], [w, n]])) {
+                if (!pointInPolygon(fix.p, [[w, s], [e, s], [e, n], [w, n]])) {
                     warnedOutside = true;
                     useUi.getState().toast(translate('field.outside'), { tone: 'warn' });
                 }
             }
-            if (compass.headingUp && compass.heading !== null && Math.abs(((map.getBearing() - compass.heading + 540) % 360) - 180) > 0.5) {
-                map.setBearing(compass.heading);
+        };
+
+        const renderTracks = () => {
+            const map = mapRef.current;
+            if (!map) {
+                return;
+            }
+            const project = useProject.getState().project;
+            const recording = useGps.getState().recording;
+            if (hiddenNow()) {
+                setSourceData(map, 'tracks', EMPTY_FC);
+                return;
+            }
+            if (savedFor !== project?.tracks) {
+                savedFor = project?.tracks;
+                savedTracks = (project?.tracks ?? []).map((track) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: track.points.map((p) => p.p) } }));
+            }
+            const features = recording && recording.points.length > 1
+                ? [...savedTracks, { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: recording.points.map((p) => p.p) } } as GeoJSON.Feature]
+                : savedTracks;
+            setSourceData(map, 'tracks', { type: 'FeatureCollection', features });
+        };
+
+        /** Compass update: heading arrow, and the map bearing in heading-up (throttled, never mid-move). */
+        const renderHeading = () => {
+            const map = mapRef.current;
+            const compass = useCompass.getState();
+            if (!map) {
+                return;
+            }
+            renderPosition();
+            if (!compass.headingUp || compass.heading === null || hiddenNow() || useGps.getState().follow || map.isMoving()) {
+                return;
+            }
+            const now = performance.now();
+            const delta = Math.abs(((map.getBearing() - compass.heading + 540) % 360) - 180);
+            if (delta > 2 && now - lastBearingAt > 120) {
+                lastBearingAt = now;
+                map.easeTo({ bearing: compass.heading, duration: 100 });
             }
         };
-        const areaId = useProject.getState().project?.areaId;
-        if (areaId) {
-            void hasArea(areaId).then((meta) => {
-                areaBounds = meta?.bounds ?? null;
-            });
-        }
-        const stopReady = whenMapReady(() => render());
-        const unsub = [useGps.subscribe(render), useCompass.subscribe(render), useUi.subscribe((s, p) => {
-            if (s.navTargetId !== p.navTargetId || s.streamer !== p.streamer || s.mode !== p.mode) {
-                render();
+
+        const loadBounds = (areaId: string | null | undefined) => {
+            areaBounds = null;
+            warnedOutside = false;
+            if (areaId) {
+                void hasArea(areaId).then((meta) => {
+                    areaBounds = meta?.bounds ?? null;
+                });
             }
-        }), useProject.subscribe((s, p) => {
-            if (s.project?.tracks !== p.project?.tracks) {
-                render();
-            }
-        })];
+        };
+        loadBounds(useProject.getState().project?.areaId);
+        const renderAll = () => {
+            renderPosition();
+            renderTracks();
+        };
+        const stopReady = whenMapReady(() => renderAll());
+        const unsub = [
+            useGps.subscribe((state, prev) => {
+                renderPosition();
+                if (state.recording !== prev.recording) {
+                    renderTracks();
+                }
+            }),
+            useCompass.subscribe((state, prev) => {
+                if (state.heading !== prev.heading || state.headingUp !== prev.headingUp) {
+                    renderHeading();
+                }
+            }),
+            useUi.subscribe((state, prev) => {
+                if (state.navTargetId !== prev.navTargetId || state.streamer !== prev.streamer || state.mode !== prev.mode) {
+                    renderAll();
+                }
+            }),
+            useProject.subscribe((state, prev) => {
+                if (state.project?.tracks !== prev.project?.tracks) {
+                    renderTracks();
+                }
+                if (state.project?.areaId !== prev.project?.areaId) {
+                    loadBounds(state.project?.areaId);
+                }
+            }),
+            // Areas installed while the plan is open (e.g. downloaded later) count too.
+            useGps.subscribe((state, prev) => {
+                if (state.active && !prev.active && !areaBounds) {
+                    loadBounds(useProject.getState().project?.areaId);
+                }
+            }),
+        ];
         const stopLifecycle = installGpsLifecycle();
         return () => {
             stopReady();
@@ -96,6 +161,21 @@ export function useFieldLayers() {
             stopCompass();
         };
     }, []);
+}
+
+/** Compass when it gives a north-referenced heading; GPS course only while actually moving. */
+function currentHeading(): number | null {
+    const compass = useCompass.getState().heading;
+    if (compass !== null) {
+        return compass;
+    }
+    const fix = liveFix();
+    return fix && (fix.speed ?? 0) > 0.7 && fix.heading !== null ? fix.heading : null;
+}
+
+/** Normalise an angle to −180…180 so rotations take the short way round. */
+function signed(angle: number): number {
+    return ((angle % 360) + 540) % 360 - 180;
 }
 
 /** Right-hand HUD buttons: locate/follow and compass. */
@@ -124,22 +204,29 @@ export function FieldHudButtons() {
                 {active ? <LocateFixed {...ICON} /> : <Crosshair {...ICON} />}
             </IconButton>
             {active ? (
-                <IconButton label={t('common.close')} onClick={() => stopGps()}><LocateOff {...ICON} /></IconButton>
+                <IconButton label={recording ? t('field.gpsOffRecording') : t('field.gpsOff')} disabled={recording} onClick={() => stopGps()} data-testid="gps-off"><LocateOff {...ICON} /></IconButton>
             ) : null}
-            <IconButton label={compassActive ? (headingUp ? t('field.northUp') : t('field.headingUp')) : t('field.compass')} pressed={headingUp} onClick={async () => {
-                if (!compassActive) {
-                    const ok = await startCompass();
-                    if (!ok) {
-                        useUi.getState().toast(t('field.compassUnreliable'), { tone: 'warn' });
+            <IconButton
+                label={!compassActive ? t('field.compassOn') : headingUp ? t('field.compassOff') : t('field.headingUp')}
+                pressed={compassActive}
+                className={headingUp ? 'is-heading-up' : ''}
+                onClick={async () => {
+                    // Cycle: off → compass (heading arrow) → heading-up → off.
+                    if (!compassActive) {
+                        const ok = await startCompass(() => toast(t('field.compassDenied'), { tone: 'warn' }));
+                        if (!ok) {
+                            toast(t('field.compassDenied'), { tone: 'warn' });
+                        }
+                        return;
                     }
-                    return;
-                }
-                const next = !useCompass.getState().headingUp;
-                useCompass.setState({ headingUp: next });
-                if (!next) {
+                    if (!useCompass.getState().headingUp) {
+                        useCompass.setState({ headingUp: true });
+                        return;
+                    }
+                    stopCompass();
                     mapRef.current?.easeTo({ bearing: 0, duration: 300 });
-                }
-            }}>
+                }}
+            >
                 <Compass {...ICON} />
             </IconButton>
         </div>
@@ -152,25 +239,41 @@ function NavCard({ from }: { from: LngLat | null }) {
     const target = useProject((state) => state.project?.elements.find((e) => e.id === id));
     const heading = useCompass((state) => state.heading);
     const unit = usePrefs((state) => state.bearingUnit);
+    const gpsOn = useGps((state) => state.active);
+    // Without a live fix the card measures from the map centre; follow map moves then.
+    const [view, setView] = useState<{ center: LngLat; bearing: number } | null>(null);
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !id) {
+            return;
+        }
+        const update = () => setView({ center: [map.getCenter().lng, map.getCenter().lat], bearing: map.getBearing() });
+        update();
+        map.on('move', update);
+        return () => {
+            map.off('move', update);
+        };
+    }, [id]);
     if (!id || !target) {
         return null;
     }
     const to = elementAnchor(target);
-    const origin = from ?? (mapRef.current ? [mapRef.current.getCenter().lng, mapRef.current.getCenter().lat] as LngLat : null);
+    const origin = from ?? view?.center ?? null;
     if (!origin) {
         return null;
     }
     const bearing = bearingDeg(origin, to);
-    const relative = heading === null ? null : bearing - heading;
+    // Arrow relative to where the phone points (compass) or to screen-up (map bearing).
+    const reference = heading ?? view?.bearing ?? 0;
     return (
         <div className="navcard">
-            <span className="navcard__arrow" style={{ transform: `rotate(${relative ?? bearing}deg)` }} aria-hidden>
+            <span className="navcard__arrow" style={{ transform: `rotate(${signed(bearing - reference)}deg)` }} aria-hidden>
                 <Navigation2 size={28} strokeWidth={2} fill="currentColor" />
             </span>
             <div className="navcard__main">
                 <span className="navcard__title">{t('field.navTo', { name: target.label || typeLabel(target) })}</span>
                 <span className="navcard__value num">{formatDistance(distanceM(origin, to))} · {unit === 'mil' ? formatMils(bearing) : formatBearing(bearing)}</span>
-                {!from ? <span className="navcard__meta">{t('field.noFix')}</span> : null}
+                {!from ? <span className="navcard__meta">{gpsOn ? t('field.noFix') : t('field.mapCenter')}</span> : null}
             </div>
             <IconButton label={t('field.navStop')} onClick={() => useUi.getState().set({ navTargetId: null })}><X {...ICON} /></IconButton>
         </div>
@@ -208,11 +311,11 @@ export function FieldPanel() {
     if (mode !== 'field' || streamer !== 'off') {
         return null;
     }
-    const stale = isStale(gps.fix, gps.now);
-    const age = gps.fix ? Math.round((gps.now - gps.fix.at) / 1000) : 0;
+    const stale = isStale(gps.fix, Math.max(gps.now, Date.now()));
+    const age = gps.fix ? Math.round((Math.max(gps.now, Date.now()) - gps.fix.at) / 1000) : 0;
     return (
         <div className="fieldpanel hud" data-testid="fieldpanel">
-            <NavCard from={gps.fix && !stale ? gps.fix.p : null} />
+            <NavCard from={liveFix(gps)?.p ?? null} />
             <SelectedTarget />
             <div className="fieldpanel__row">
                 {gps.active && gps.fix ? (
@@ -228,7 +331,10 @@ export function FieldPanel() {
                     </button>
                 )}
                 {gps.recording ? (
-                    <Button variant="danger" onClick={() => stopRecording(true)}><Circle size={14} fill="currentColor" /> {t('field.trackStop')} <span className="num">{gps.recording.points.length}</span></Button>
+                    <>
+                        <Button variant="danger" onClick={() => stopRecording(true)}><Circle size={14} fill="currentColor" /> {t('field.trackStop')} <span className="num">{gps.recording.points.length}</span></Button>
+                        {gps.saveFailed ? <Button variant="ghost" onClick={() => stopRecording(false)}>{t('field.trackDiscard')}</Button> : null}
+                    </>
                 ) : (
                     <Button onClick={() => startRecording()} disabled={Boolean(readOnly)} title={t('field.trackPrivacy')}><Circle size={14} /> {t('field.track')}</Button>
                 )}

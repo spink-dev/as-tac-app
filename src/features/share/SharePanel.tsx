@@ -45,6 +45,7 @@ export function SharePanel() {
     const project = useProject((state) => state.project);
     const [area, setArea] = useState<AreaMeta | null>(null);
     const [includeArea, setIncludeArea] = useState(true);
+    const [includeTracks, setIncludeTracks] = useState(false);
     const [busy, setBusy] = useState(false);
     const [showQr, setShowQr] = useState(false);
     const areaId = project?.areaId ?? null;
@@ -62,7 +63,7 @@ export function SharePanel() {
     const build = async () => {
         // Write pending edits first so the file matches what is on screen.
         await flushNow();
-        return exportAstac(project, { includeArea: includeArea && Boolean(area) });
+        return exportAstac(project, { includeArea: includeArea && Boolean(area), includeTracks });
     };
     const run = async (mode: 'share' | 'download') => {
         setBusy(true);
@@ -94,6 +95,12 @@ export function SharePanel() {
                 {area ? (
                     <Switch checked={includeArea} onChange={setIncludeArea}>{t('share.includeArea', { size: formatBytes(area.byteSize) })}</Switch>
                 ) : <p className="field__hint">{t('share.noArea')}</p>}
+                {project.tracks.length > 0 ? (
+                    <>
+                        <Switch checked={includeTracks} onChange={setIncludeTracks}>{t('field.includeTracks', { n: project.tracks.length })}</Switch>
+                        <p className="field__hint">{t('field.trackPrivacy')}</p>
+                    </>
+                ) : null}
                 <div className="row-gap">
                     {canShareFiles ? <Button variant="primary" disabled={busy} onClick={() => void run('share')} data-testid="share-send"><Send size={18} /> {t('share.send')}</Button> : null}
                     <Button variant={canShareFiles ? 'secondary' : 'primary'} disabled={busy} onClick={() => void run('download')} data-testid="share-download"><Download size={18} /> {t('share.download')}</Button>

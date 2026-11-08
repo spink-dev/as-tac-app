@@ -29,7 +29,24 @@ export async function createAndOpen(project: Project): Promise<void> {
     showProject(project);
 }
 
+const beforeClose = new Set<() => void>();
+
+/** Run something (e.g. save a running path recording) before the open plan closes. */
+export function onBeforeClose(fn: () => void): () => void {
+    beforeClose.add(fn);
+    return () => {
+        beforeClose.delete(fn);
+    };
+}
+
 export async function closeProject(force = false): Promise<boolean> {
+    for (const fn of beforeClose) {
+        try {
+            fn();
+        } catch (error) {
+            console.warn('before-close handler failed', error);
+        }
+    }
     const saved = await flushNow();
     if (!saved && !force) {
         // Keep the workspace open: closing would drop edits that only live in memory.

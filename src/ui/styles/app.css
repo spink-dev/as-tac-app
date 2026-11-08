@@ -1997,3 +1997,21 @@ input.layer-row__name:focus {
     text-transform: uppercase;
     text-align: center;
 }
+
+/* Rule 11 for the briefing and field controls on touch screens. */
+@media (pointer: coarse) {
+    .briefingbar__step {
+        min-height: var(--tap);
+        padding: 22px 0;
+    }
+
+    .disclosure,
+    .swatch {
+        min-height: var(--tap);
+        min-width: var(--tap);
+    }
+}
+
+.icon-btn.is-heading-up {
+    color: var(--accent);
+}

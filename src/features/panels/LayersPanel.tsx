@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'l
 import { useT } from '../../i18n';
 import { useProject, mutate } from '../../core/store/project';
 import { useUi, toast } from '../../core/store/ui';
-import { Button, ICON, IconButton, Segmented, Switch } from '../../ui/components';
+import { Button, ICON, IconButton, NameInput, Segmented, Switch } from '../../ui/components';
 import { createLayer } from '../../core/model/factory';
 import { activeLayerId, canEdit, toastUndoable } from '../../core/actions';
 import { LIMITS, MAX } from '../../core/model/schema';
@@ -65,7 +65,7 @@ export function LayersPanel() {
                                     {layer.visible ? <Eye size={18} /> : <EyeOff size={18} />}
                                 </IconButton>
                                 {editable ? (
-                                    <input className="layer-row__name input" aria-label={t('common.name')} maxLength={MAX.name} value={layer.name} onChange={(event) => patchLayer(layer.id, { name: event.target.value || '–' }, t('common.rename'), `layer-name:${layer.id}`)} />
+                                    <NameInput className="layer-row__name input" aria-label={t('common.name')} maxLength={MAX.name} value={layer.name} onCommit={(name) => patchLayer(layer.id, { name }, t('common.rename'), `layer-name:${layer.id}`)} />
                                 ) : <span className="layer-row__name">{layer.name}</span>}
                                 <span className="badge num">{counts.get(layer.id) ?? 0}</span>
                                 {editable ? (
