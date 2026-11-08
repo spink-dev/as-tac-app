@@ -69,3 +69,29 @@ revises all five safe-area contours and the event perimeter. Image/logos are not
 bundled. The measured 4.41 m control residual is not boundary accuracy; contours
 are approximate, sometimes obscured by symbols, and require on-site verification.
 See `docs/reviews/2026-10-01-fieldmaps.md` for coverage and unresolved HQ boundaries.
+
+## AS-TAC 1.0 (2026-11)
+
+Neuentwicklung; Code eigens geschrieben. Übernommen bzw. neu verwendet:
+
+| Quelle | Verwendung | Lizenz |
+| --- | --- | --- |
+| FieldMaps `2998bb6d7413a3e036412fa37443e8eead1238f3` (Daten aus 0.6, `src/data/mahlwinkel-fieldmaps.json`) | Eventvorlagen `src/core/templates/mahlwinkel.ts`; POIs, Spielfelder, Zonen, HQs, Linien. `[lat,lng]` → `[lng,lat]` | Erlaubnis des Autors (siehe oben) |
+| as-tac r2 Dark-Emergency-Korrektur (`src/data/dark-emergency-correction.json`) | Vorlage «Dark Emergency»; Safe-Zone-Ecken als Passpunkte | eigenes Projekt |
+| TacMap 0.12 (`spink-dev/tacmap`, `77474d8`) | Funktionsumfang, Tastenkürzel-Hierarchie, `.tacmap`-Format für den Import. Kein Code kopiert. | eigenes Projekt |
+| Noto Sans (GoNotoKurrent) Glyphen aus `smp-noto-glyphs` 2.0.0 → `public/glyphs/Noto Sans Regular/` | Offline-Kartenbeschriftung | SIL OFL 1.1 (Schrift), MIT (Paket) |
+| MapLibre GL JS 6 | Kartendarstellung | BSD-3-Clause |
+| React, Zustand, Immer, Dexie, Zod, fflate, osmtogeojson, lucide-react, uqr | App-Grundlage | MIT / Apache-2.0 / ISC |
+| GSAP 3.15 | Sheet- und Zustandsanimationen | GreenSock Standard «no charge» Lizenz |
+| Lenis 1.3 | Sanftes Scrollen (nur Rad/Trackpad) | MIT |
+| Supabase JS | optionale Live-Zusammenarbeit | MIT |
+
+### Bekannte Eventkarten (nicht ausgeliefert)
+
+`src/core/templates/knownImages.ts` enthält nur SHA-256, Bildgrösse und Passpunkte der Bildkarten «Mahlwinkel – Dark Emergency 2026» (Airsoft Helden) und «Mahlwinkel – Mission 24H 2026». Die Bilder selbst sind **nicht** im Repository. Importiert ein Nutzer seine eigene Kopie (z. B. aus einem TacMap-Projekt), wird sie automatisch georeferenziert. Passpunkte: Ecken der r2-Safe-Zonen (DE) bzw. Windturbinenfundamente und HQ-Positionen (M24H), affin ausgeglichen; RMS 2,6 m bzw. 4,8 m. Keine Vermessungszusage.
+
+### Online-Dienste (nur auf ausdrücklichen Nutzerwunsch)
+
+- Overpass API (`overpass-api.de`, Ausweich: `overpass.private.coffee`) für Gebietsdownloads; OSM-Daten ODbL 1.0, Attribution in Karte und Paket.
+- Nominatim (`nominatim.openstreetmap.org`) für die Ortssuche, gemäss Nutzungsrichtlinie nur auf Absenden, ≤ 1 Anfrage/s.
+- OSM-Standardkacheln (`tile.openstreetmap.org`) ausschliesslich als Orientierungshintergrund im Download-Dialog, ohne Vorabladen oder Offline-Speicherung.

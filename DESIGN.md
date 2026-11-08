@@ -1,35 +1,38 @@
-# AS-TAC Kartenarbeitsplatz
+# AS-TAC Kartenarbeitsplatz (1.0)
 
-Produktkontext: [PRODUCT.md](PRODUCT.md). Funktionale Karte für Gelände, Planung und Briefing. Desktop mit Navigationsleiste und Seitenpanel; Mobilgerät mit fünf unteren Tabs und schliessbarem Sheet. Karte, Massstab und OSM-Quelle bleiben der Bezugspunkt.
+Produktkontext: [PRODUCT.md](PRODUCT.md). Register: Produkt. Die Karte ist immer die Bühne; Bedienung schwebt in kompakten HUD-Gruppen darüber und verschwindet, wo sie nicht gebraucht wird.
 
-## Visuelle Regeln
+## Szene
 
-Eigenes geometrisches AS-TAC-Zeichen aus zwei gerichteten A-Segmenten; Wortmarke als exportierbare Vektoren unter `public/brand/`, App-Icon in SVG/192/512 px. Einheitliche 24-px-Konturicons, Systemschrift und keine externen Fonts. Graphit, sachliche Flächen und Signalorange; kompakte 4-px-Radien statt dekorativer Karten. Abstände in 4-/8-px-Schritten, Bedienelemente mindestens 48 px hoch. Tastaturfokus und Safe Areas bleiben sichtbar.
+Eine Gruppenführerin steht im Kiefernwald von Mahlwinkel, Telefon in der behandschuhten Hand, und schaut zwischen zwei Sprüngen auf die Karte – mal in praller Sonne, mal in der Dämmerung, nachts nur mit Rotlicht. Am Vorabend hat ein Organisator am Laptop im hellen Raum dieselbe Karte geplant und per Beamer gebrieft. Daraus folgen: drei Darstellungen, grosse Ziele, kurze Wege, keine Dekoration.
 
-### Darstellung
+## Identität
 
-| Modus | Fläche | Text | Akzent |
-| --- | --- | --- | --- |
-| Tag | `#f4f5f6` | `#23272c` | `#ac3c0e` |
-| Dunkel | `#171a1e` | `#e0e4e8` | `#ef8c62` |
-| Rotlicht | `#100505` | `#df7366` | `#e47a6a` |
+AS-TAC-Zeichen (zwei gerichtete A-Segmente) und Signalorange bleiben. Graphit-Flächen, kompakte Radien (4 px Bedienelemente, 6 px HUD, 10 px Dialoge), Systemschrift für die Oberfläche, `ui-monospace` nur für Koordinaten. Icons: lucide mit 1,75 px Strich. Farb-Tokens in OKLCH: `src/ui/styles/tokens.css`.
 
-Der Schalter steht immer rechts oben, unabhängig von offenem Panel, Zeichenmodus oder lokalem/Online-Projekt. Die ausdrückliche Wahl wird als `as-tac.appearance` lokal gespeichert. Ohne Wahl gilt beim Start die Systemeinstellung hell/dunkel. Inline-Initialisierung vor React verhindert einen hellen App-Start bei gespeichertem Nachtmodus; bei gesperrtem Local Storage funktioniert die Wahl für die aktuelle Sitzung.
+| Modus | Fläche | Text | Akzent | Zweck |
+| --- | --- | --- | --- | --- |
+| Tag | `oklch(0.955 0.004 250)` | `oklch(0.255 0.012 250)` | `oklch(0.53 0.155 40)` | Sonne, Planung |
+| Dunkel | `oklch(0.205 0.008 250)` | `oklch(0.915 0.006 250)` | `oklch(0.74 0.13 48)` | Dämmerung |
+| Rotlicht | `oklch(0.13 0.025 25)` | `oklch(0.67 0.15 28)` | `oklch(0.7 0.16 30)` | Nacht, Dunkeladaption |
 
-Eigene Basiskartenpaletten werden ohne Neuerzeugung der Karte gewechselt: Ausschnitt, laufende Zeichnung und Objektattribute bleiben erhalten. Rotlicht transformiert auch nachträglich geladene Plan-/Teamfarben, GPS, Briefing-Markierungen, Labels und MapLibre-Bedienelemente in Rot. Die gespeicherten Farben bleiben unverändert. Farben allein dürfen daher im Rotmodus keine Teams unterscheiden: Teamkürzel/Objektbeschriftungen bleiben verfügbar. Keine Farbüberblendung beim Wechsel.
+Rotlicht färbt Oberfläche und – abschaltbar – die Karte über einen SVG-Farbfilter. Zustände bleiben im Rotlicht zusätzlich textlich unterscheidbar (Teamkürzel, Status in Labels). Der Wechsel erfolgt ohne Neuaufbau der Karte; Ausschnitt, Entwurf und Auswahl bleiben erhalten.
 
-Rotlicht steuert die App-Farben, **nicht die physische Displayhelligkeit**. Gerätehelligkeit zusätzlich senken. Systemdialoge, Tastatur, Browseroberfläche und der statische PWA-Startbildschirm liegen ausserhalb der App-Farbsteuerung; der Manifest-Startbildschirm ist deshalb dauerhaft dunkel. Keine Unsichtbarkeits- oder Nachtsichtgarantie. OLED/LCD, reale Helligkeit und Lesbarkeit müssen auf iPhone 16 Pro / Galaxy A24 im Feld geprüft werden.
+## Layout
 
-## Zustände und Ebenen
+- **Desktop:** Topbar (links Zurück + Planname + Speicherstatus, Mitte Modi Planen/Feld/Briefing, rechts Live, Undo/Redo, Suche ⌘K, Darstellung), Werkzeugschiene links, Kartenkontrollen rechts, Kontextleiste unten Mitte, Panel rechts (Details, Ebenen, Teams, Phasen, Karten, Teilen, Live, Einstellungen, Protokoll).
+- **Telefon:** Modi als volle Zeile unter dem Titel, Werkzeug-Dock unten (fünf Werkzeuge + Mehr + Panels), Panels als ziehbares Bottom-Sheet mit drei Rastpunkten. Querformat kompakt (nur Icons).
+- **Feld:** Werkzeuge verschwinden, grosse GPS-, Kompass- und Navigationsanzeige, Zielstatus mit einem Tipp.
+- **Briefing:** Phasenleiste unten mit Vor/Zurück, temporärer Stift, Präsentation leiten/folgen.
 
-Basiskarte → Flächen → Linien/Punkte → Kartenbeschriftungen → Werkzeuge → Aufgabenpanel → Navigation. Flächen nutzen 18 % der Objekt-/Ebenendeckkraft, damit Gelände lesbar bleibt. Innerhalb des Geometrietyps folgt die Darstellung der gespeicherten Ebenenreihenfolge. Gebäudepunkte bleiben vor Flächen sichtbar. Event-Beschriftungen werden bei Kollision ausgedünnt; ausgewähltes Objekt hat Vorrang.
+## Bewegung
 
-Orientierung schreibt keine Planinhalte. Planung aktiviert bewusst den Editor. Zeichnen schliesst das Aufgabenpanel; Auswahl bzw. fertiges Objekt öffnet die Details. Unübernommene Objektattribute sperren Tabwechsel, bis sie übernommen oder verworfen werden. Briefing sperrt konkurrierende Zeichen-/Projektwechsel bis zum Beenden. Sichtbarkeit und Deckkraft in der Orientierung sind lokale Ansichtsoptionen; Planungsdeckkraft wird gespeichert.
+150–250 ms, ease-out (`cubic-bezier(0.23, 1, 0.32, 1)`), Drawer `cubic-bezier(0.32, 0.72, 0, 1)`. Bewegung zeigt Zustand: Sheet-Rasten (GSAP), Toasts, Menüs, Zählwerte beim Download (CountUp). Lenis nur für Rad/Trackpad auf langen Listen, nie auf Touch. `prefers-reduced-motion` schaltet alles auf sofort.
 
-## Datenproduktion
+## Kartenebenen
 
-Kartenstudio unter Projekt: eigene Eventkopien vorbereiten; Gelände-ID, Event-ID, Ausgabe und Quellen erfassen. Veröffentlichungen erfordern serverseitige Root-Freigabe, keine umschaltbare Browserrolle. Bestehende Ausgaben sind unveränderlich. Download immer als neue schreibgeschützte Kopie, Bearbeitung als explizite weitere Kopie.
+Grundkarte → Bildkarten → MGRS-Gitter → Zonen (18 % Füllung, Schraffur für Safe/Gefahr, Kreuzschraffur für Sperrzonen) → Pfade → Routen (mit Pfeilen, Abschnittspeilung) → Zeichnungen → Markierungen → Beschriftungen → GPS → Entwurf → Bearbeitungsgriffe. Symbole werden zur Laufzeit auf Canvas gezeichnet (NATO-ähnliche Rahmen: Rechteck eigene, Raute Feind). Beschriftungen nutzen lokal ausgelieferte Noto-Sans-Glyphen – offline, ohne Fontserver.
 
-## Kartenzeichen und grosse Gebiete
+## Zugänglichkeit
 
-HQ-Flaggen, Safe-/Zivilzonen-Schilde und Gefahrendreiecke werden über alle Eventvorlagen gleich dargestellt. Ausgeblendeter Text lässt ein gewähltes Icon sichtbar. Gebäudezeichen ab Zoom 15, Text ab Zoom 16; Basiskarten-POIs bleiben optional. Wege gestrichelt und zoomabhängig, Gebäude erst ab Zoom 13. Basiskartenlabels entstehen nur im sichtbaren Ausschnitt (maximal 180 Kandidaten), Strassentext folgt der Strassenlinie. Die Gebietswahl ohne Projekt ist eine lokale Ansichtseinstellung und bleibt beim Neustart erhalten.
+Touch-Ziele 48 px (grobe Zeiger), 36 px mit Maus. Sichtbarer Fokus in Akzentfarbe, Dialoge mit Namen, Live-Regionen für Speicher- und Hinweiszeilen, Sprache des Dokuments folgt der App-Sprache. Kontraste ≥ 4,5:1 für Text in allen drei Modi.
