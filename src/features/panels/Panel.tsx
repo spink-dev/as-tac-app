@@ -136,6 +136,7 @@ export function PanelHost() {
                         return;
                     }
                     event.preventDefault();
+                    event.stopPropagation();
                     const target = defs[(next + defs.length) % defs.length];
                     useUi.getState().set({ panel: target.id });
                     requestAnimationFrame(() => document.getElementById(`tab-${target.id}`)?.focus());

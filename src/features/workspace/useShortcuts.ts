@@ -26,13 +26,20 @@ function onControl(target: EventTarget | null): boolean {
     return Boolean(element?.closest?.('button, a[href], [role="menuitem"], [role="option"], [role="tab"], summary'));
 }
 
+/** Arrow keys inside panels, tabs or dialogs scroll or navigate there; they never nudge the plan. */
+function inPanel(target: EventTarget | null): boolean {
+    const element = target as HTMLElement | null;
+    return Boolean(element?.closest?.('.panel, [role="tablist"], [role="tabpanel"], [role="dialog"], .palette'));
+}
+
 /** Global keyboard handling for the workspace. Keys come from the registry only. */
 export function useShortcuts() {
     useEffect(() => {
         let layer: ToolId | 'unit' | null = null;
         let layerTimer = 0;
         const onKey = (event: KeyboardEvent) => {
-            if (typing(event.target) || event.repeat && !event.key.startsWith('Arrow')) {
+            // A component that handled the key (tabs, palette) has the last word.
+            if (event.defaultPrevented || typing(event.target) || (event.repeat && !event.key.startsWith('Arrow'))) {
                 return;
             }
             const combo = eventCombo(event);
@@ -58,7 +65,7 @@ export function useShortcuts() {
                 event.preventDefault();
                 return;
             }
-            if (ui.selection.length > 0 && ui.mode === 'plan' && event.key.startsWith('Arrow') && !ui.draft) {
+            if (ui.selection.length > 0 && ui.mode === 'plan' && event.key.startsWith('Arrow') && !ui.draft && !inPanel(event.target)) {
                 const map = mapRef.current;
                 if (map) {
                     const step = event.shiftKey ? 10 : 1;

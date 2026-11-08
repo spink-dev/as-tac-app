@@ -110,7 +110,6 @@ export function CommandPalette() {
                     <Search size={18} />
                     <input
                         ref={input}
-                        autoFocus
                         value={query}
                         placeholder={t('palette.placeholder')}
                         aria-label={t('palette.placeholder')}

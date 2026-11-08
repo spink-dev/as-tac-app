@@ -90,6 +90,8 @@ async function write(): Promise<boolean> {
         const issue = valid.error.issues[0];
         console.error('refusing to store invalid project', valid.error.issues.slice(0, 5));
         useSaveState.setState({ state: 'error', error: `invalid: ${issue?.path.join('.') ?? ''}` });
+        // Keep it pending so a later close keeps reporting the failure instead of dropping edits.
+        pending = pending ?? project;
         return false;
     }
     try {
