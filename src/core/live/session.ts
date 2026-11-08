@@ -1043,6 +1043,10 @@ class Session {
                             this.forget(current);
                         }
                         this.applyRemote([{ collection: conflict.collection, entityId: conflict.entityId, data: conflict.data }]);
+                        if (conflict.collection === 'order' && Array.isArray(conflict.data)) {
+                            // My reorder lost: the server's order is the one to remember.
+                            this.lastOrder.set(conflict.entityId, conflict.data as string[]);
+                        }
                         this.surface({ collection: conflict.collection, entityId: conflict.entityId, mine });
                     }
                 }
