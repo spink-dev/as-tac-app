@@ -20,6 +20,7 @@ export function JoinDialog() {
     const displayName = usePrefs((state) => state.displayName);
     const [code, setCode] = useState('');
     const [busy, setBusy] = useState(false);
+    const [loaded, setLoaded] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     useEffect(() => {
         if (open) {
@@ -38,7 +39,9 @@ export function JoinDialog() {
             if (backend === 'supabase' && !(await currentUser())) {
                 await signInDevice();
             }
-            const { project, info, alreadyMember } = await joinLive(normalized, backend);
+            // Visible from the first byte: on a slow link the download can take a while.
+            setLoaded(0);
+            const { project, info, alreadyMember } = await joinLive(normalized, backend, setLoaded);
             if (useRoute.getState().route.name === 'workspace' && !(await closeProject())) {
                 return;
             }
@@ -51,6 +54,7 @@ export function JoinDialog() {
             setError(err instanceof Error && err.message === 'invite' ? t('live.codeInvalid') : t('live.failed'));
         } finally {
             setBusy(false);
+            setLoaded(null);
         }
     };
 
@@ -77,6 +81,7 @@ export function JoinDialog() {
                     <input className="input" maxLength={40} value={displayName} placeholder={t('live.anonymous')} onChange={(event) => usePrefs.getState().set({ displayName: event.target.value })} />
                 </Field>
                 {backend === 'loopback' ? <p className="field__hint">{t('live.notConfigured')}</p> : null}
+                {busy && loaded !== null ? <p className="field__hint" role="status" data-testid="join-progress">{t('live.joinProgress', { n: loaded })}</p> : null}
                 {error ? <p className="notice notice--danger" role="alert">{error}</p> : null}
                 <p className="field__hint">{t('live.gpsNever')}</p>
             </form>

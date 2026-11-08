@@ -1,6 +1,6 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import type { ChatMessage, LiveRole, Presence } from './state';
-import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PushOp, PushResult, RemoteCollection, RemoteEntity, TransportHandlers } from './types';
+import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PullOptions, PushOp, PushResult, RemoteCollection, RemoteEntity, TransportHandlers } from './types';
 
 /**
  * Supabase backend. Only the public URL and the publishable key reach the browser (build-time
@@ -148,29 +148,28 @@ class SupabaseTransport implements LiveTransport {
 
     constructor(readonly planId: string) {}
 
-    async pull(since: number): Promise<RemoteEntity[]> {
+    async pull(since: number, options: PullOptions): Promise<RemoteEntity[]> {
         const sb = await supabaseClient();
-        const out: RemoteEntity[] = [];
-        // PostgREST caps rows per request: page by sequence.
-        let cursor = since;
-        while (true) {
-            const { data, error } = await sb.from('live_entities').select('collection, entity_id, data, version, seq, client_id')
-                .eq('plan_id', this.planId).gt('seq', cursor).order('seq', { ascending: true }).limit(1000);
-            if (error) {
-                throw rpcError(error);
-            }
-            const rows = (data ?? []).map((row) => toEntity(row as Record<string, unknown>)).filter((row): row is RemoteEntity => row !== null);
-            out.push(...rows);
-            if ((data ?? []).length < 1000) {
-                return out;
-            }
-            cursor = Number((data ?? [])[(data ?? []).length - 1].seq);
+        let query = sb.from('live_entities').select('collection, entity_id, data, version, seq, client_id')
+            .eq('plan_id', this.planId).gt('seq', since);
+        if (options.exclude && /^[A-Za-z0-9_-]+$/.test(options.exclude)) {
+            query = query.or(`client_id.is.null,client_id.neq.${options.exclude}`);
         }
+        let ordered = query.order('seq', { ascending: true }).limit(options.limit);
+        if (options.signal) {
+            ordered = ordered.abortSignal(options.signal);
+        }
+        const { data, error } = await ordered;
+        if (error) {
+            throw rpcError(error);
+        }
+        return (data ?? []).map((row) => toEntity(row as Record<string, unknown>)).filter((row): row is RemoteEntity => row !== null);
     }
 
-    async push(ops: PushOp[], clientId: string): Promise<PushResult> {
+    async push(ops: PushOp[], clientId: string, signal?: AbortSignal): Promise<PushResult> {
         const sb = await supabaseClient();
-        const { data, error } = await sb.rpc('live_push', { p_plan: this.planId, p_ops: ops, p_client: clientId });
+        const call = sb.rpc('live_push', { p_plan: this.planId, p_ops: ops, p_client: clientId });
+        const { data, error } = await (signal ? call.abortSignal(signal) : call);
         if (error) {
             throw rpcError(error);
         }
@@ -214,9 +213,13 @@ class SupabaseTransport implements LiveTransport {
         };
         channel
             .on('postgres_changes', { event: '*', schema: 'public', table: 'live_entities', filter: `plan_id=eq.${this.planId}` }, (payload) => {
-                const entity = toEntity((payload.new ?? {}) as Record<string, unknown>);
+                const row = (payload.new ?? {}) as Record<string, unknown>;
+                const entity = toEntity(row);
                 if (entity) {
                     handlers.entity(entity);
+                } else if ('seq' in row || 'entity_id' in row) {
+                    // Realtime leaves out large columns: the content comes with a pull instead.
+                    handlers.stale();
                 }
             })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_chat', filter: `plan_id=eq.${this.planId}` }, (payload) => {

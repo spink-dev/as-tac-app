@@ -65,6 +65,8 @@ export interface OutboxRow {
     order: number;
     clientId: string;
     createdAt: string;
+    /** Data sent in requests whose reply never came (it may have landed). */
+    unacked?: unknown[];
 }
 
 export interface KvRow {

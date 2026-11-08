@@ -14,7 +14,7 @@ import { broadcastBriefing, setBriefingSender } from './briefingSync';
 import { currentCamera, mapRef, renderPlan } from '../../map/MapView';
 import { LoopbackBackend } from './loopback';
 import { SupabaseBackend, supabaseConfigured } from './supabase';
-import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PushOp, RemoteCollection, RemoteEntity } from './types';
+import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PushOp, PushResult, RemoteCollection, RemoteEntity } from './types';
 
 /**
  * Live sync engine. Local edits become entity operations in a persistent outbox, each carrying
@@ -34,6 +34,26 @@ export interface LiveConflict {
 
 const PRESENCE_COLORS = ['#e8402a', '#2f9fe0', '#3bb273', '#f2c230', '#b5487f', '#1f9aa6', '#d08a1e', '#7a4cc2'];
 const BATCH = 400;
+/*
+ * Weak mobile links: requests are small and resumable. Pushes start at 64 KB and grow while
+ * they go through quickly; a timeout or drop shrinks them. Catch-up pulls come in pages whose
+ * size adapts the same way, and each page is applied and remembered before the next one, so a
+ * dropped connection continues where it stopped instead of starting over.
+ */
+const BUDGET_MIN = 8 * 1024;
+const BUDGET_START = 64 * 1024;
+const BUDGET_MAX = 1_500_000;
+const PAGE_MIN = 25;
+const PAGE_START = 200;
+const PAGE_MAX = 1000;
+/** Edits within this window go out together (typing, dragging). */
+const FLUSH_DELAY_MS = 250;
+/** Without realtime (websocket blocked or dropping), changes are fetched this often over HTTP. */
+const POLL_MS = 20000;
+/** With realtime up, a rare missed message is still picked up within this time. */
+const SAFETY_POLL_MS = 60000;
+/** Every request gets a deadline: base time plus a floor of about 2 KB/s for its size. */
+const deadline = (bytes: number) => 15000 + bytes / 2;
 /** A leader re-announces itself this often; silence for the timeout ends its leadership. */
 const LEADER_HEARTBEAT_MS = 5000;
 const LEADER_TIMEOUT_MS = 15000;
@@ -134,6 +154,80 @@ function same(a: unknown, b: unknown): boolean {
     return a === b || stable(a ?? null) === stable(b ?? null);
 }
 
+/**
+ * Coordinates and other fractions travel with 7 decimals (about 1 cm): map clicks produce 15+
+ * digits that only cost bytes. Applied to data and to the base it was edited from, so the
+ * version checks compare like with like.
+ */
+export function wire(value: unknown): unknown {
+    if (typeof value === 'number') {
+        return Number.isInteger(value) || !Number.isFinite(value) ? value : Math.round(value * 1e7) / 1e7;
+    }
+    if (Array.isArray(value)) {
+        return value.map(wire);
+    }
+    if (value && typeof value === 'object') {
+        const out: Record<string, unknown> = {};
+        for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+            out[key] = wire(item);
+        }
+        return out;
+    }
+    return value;
+}
+
+/** Run a request with a deadline; running out of time counts as network trouble. */
+async function withDeadline<T>(run: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    try {
+        return await run(controller.signal);
+    } catch (error) {
+        throw controller.signal.aborted ? new Error('timeout') : error;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+/**
+ * Download a whole live plan page by page (join, role change). Pages shrink and are retried on
+ * a weak connection instead of failing the whole download; the newest version per object wins.
+ */
+export async function pullAll(transport: LiveTransport, onProgress?: (count: number) => void): Promise<RemoteEntity[]> {
+    const latest = new Map<string, RemoteEntity>();
+    let since = 0;
+    let limit = PAGE_START;
+    let failures = 0;
+    while (true) {
+        const started = Date.now();
+        let page: RemoteEntity[];
+        try {
+            page = await withDeadline((signal) => transport.pull(since, { limit, signal }), deadline(limit * 600));
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '';
+            if (failures >= 5 || permanentError(error) || ['forbidden', 'unauthenticated'].includes(message)) {
+                throw error;
+            }
+            failures += 1;
+            limit = Math.max(PAGE_MIN, Math.floor(limit / 2));
+            await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** failures));
+            continue;
+        }
+        failures = 0;
+        for (const entity of page) {
+            latest.set(keyOf(entity.collection, entity.entityId), entity);
+        }
+        onProgress?.(latest.size);
+        if (page.length < limit) {
+            return [...latest.values()];
+        }
+        since = Math.max(since, ...page.map((entity) => entity.seq));
+        if (Date.now() - started < 2000) {
+            limit = Math.min(PAGE_MAX, limit * 2);
+        }
+    }
+}
+
 /** Errors that will fail again unchanged (constraint, validation, oversize) — unlike network trouble. */
 function permanentError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
@@ -141,7 +235,6 @@ function permanentError(error: unknown): boolean {
 }
 
 const versionsKey = (projectId: string) => `live:v:${projectId}`;
-const MAX_BATCH_BYTES = 1_500_000;
 
 class Session {
     readonly clientId = uid('c');
@@ -152,7 +245,17 @@ class Session {
     leading = false;
     private closed = false;
     private subscribed = false;
+    /** Realtime channel currently delivering (vs. HTTP only). */
+    private realtime = false;
+    /** The last request to the server got through. */
+    private httpOk = false;
     private flushing = false;
+    private flushTimer = 0;
+    private pulling = false;
+    private pullAgain = false;
+    private pollTimer = 0;
+    private budget = BUDGET_START;
+    private pageSize = PAGE_START;
     private isolate = false;
     private retry = 0;
     private order = 0;
@@ -236,6 +339,14 @@ class Session {
         const onOnline = () => void (this.subscribed ? this.catchUp() : this.connect());
         window.addEventListener('online', onOnline);
         this.stop.push(() => window.removeEventListener('online', onOnline));
+        // Back from the background (phone locked, app switched): the link may have died meanwhile.
+        const onVisible = () => {
+            if (!document.hidden) {
+                void this.catchUp();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        this.stop.push(() => document.removeEventListener('visibilitychange', onVisible));
         void this.connect();
     }
 
@@ -259,26 +370,37 @@ class Session {
                             useLive.setState({ chat: [...chat.slice(-199), message], unread: open ? 0 : unread + 1 });
                         }
                     },
+                    stale: () => {
+                        // A change was announced without its content (too large for realtime): fetch it.
+                        if (!this.closed) {
+                            this.later(() => void this.catchUp(), 300);
+                        }
+                    },
                     status: (online) => {
                         if (this.closed) {
                             return;
                         }
-                        useLive.setState({ status: online ? 'online' : 'offline' });
-                        if (online) {
-                            void this.catchUp();
-                        }
+                        this.realtime = online;
+                        this.showStatus();
+                        // Back online: fetch what was missed. Dropped: keep fetching over HTTP.
+                        void this.catchUp();
                     },
                 }),
-                new Promise((_, reject) => window.setTimeout(() => reject(new Error('timeout')), 15000)),
+                new Promise((_, reject) => window.setTimeout(() => reject(new Error('timeout')), 30000)),
             ]);
         } catch (error) {
             console.warn('live: connect failed', error);
             if (!this.closed) {
-                useLive.setState({ status: 'offline' });
-                this.scheduleRetry(() => this.connect());
+                this.realtime = false;
+                this.showStatus();
+                this.connectRetry = Math.min(this.connectRetry + 1, 6);
+                this.later(() => void this.connect(), 1000 * 2 ** this.connectRetry);
+                // Realtime may be blocked (proxy, flaky websocket) while plain HTTP works.
+                void this.catchUp();
             }
             return;
         }
+        this.connectRetry = 0;
         if (this.closed) {
             return;
         }
@@ -287,6 +409,19 @@ class Session {
         if (this.role !== 'viewer') {
             void this.transport.chatHistory().then((chat) => !this.closed && useLive.setState({ chat })).catch(() => undefined);
         }
+    }
+
+    private connectRetry = 0;
+
+    /** online = realtime + HTTP; limited = HTTP only (polling); offline = nothing gets through. */
+    private showStatus() {
+        if (!this.closed) {
+            useLive.setState({ status: this.httpOk ? (this.realtime ? 'online' : 'limited') : this.subscribed || this.retry > 0 ? 'offline' : 'connecting' });
+        }
+    }
+
+    private timed<T>(run: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
+        return withDeadline(run, ms);
     }
 
     private scheduleRetry(fn: () => void) {
@@ -362,35 +497,74 @@ class Session {
         });
     }
 
-    /** Pull everything since the last contiguous sequence, then send what waited offline. */
+    /**
+     * Fetch everything since the last known sequence, page by page, then send what waited.
+     * Each page is applied and its position remembered before the next one is requested.
+     */
     async catchUp() {
         if (this.closed) {
             return;
         }
+        if (this.pulling) {
+            this.pullAgain = true;
+            return;
+        }
+        this.pulling = true;
+        window.clearTimeout(this.pollTimer);
+        this.timers.delete(this.pollTimer);
+        let received = 0;
         try {
-            const entities = await this.transport.pull(this.lastSeq);
+            do {
+                this.pullAgain = false;
+                while (!this.closed) {
+                    const limit = this.pageSize;
+                    const started = Date.now();
+                    // Own writes of this session are already here: never download them again.
+                    const page = await this.timed((signal) => this.transport.pull(this.lastSeq, { limit, signal, exclude: this.clientId }), deadline(limit * 600));
+                    if (this.closed) {
+                        return;
+                    }
+                    this.httpOk = true;
+                    for (const entity of page) {
+                        this.onRemote(entity);
+                    }
+                    if (page.length > 0) {
+                        // A page holds every change up to its highest seq (ordered, then limited).
+                        this.advanceTo(Math.max(...page.map((entity) => entity.seq)));
+                        received += page.length;
+                        useLive.setState({ receiving: received });
+                    }
+                    if (Date.now() - started < 2000) {
+                        this.pageSize = Math.min(PAGE_MAX, this.pageSize * 2);
+                    }
+                    if (page.length < limit) {
+                        break;
+                    }
+                }
+            } while (this.pullAgain && !this.closed);
             if (this.closed) {
                 return;
             }
-            for (const entity of entities) {
-                this.onRemote(entity);
-            }
-            // A pull returns the newest state of every object changed after lastSeq, so it covers
-            // everything up to its highest seq even though overwritten seqs never come back.
-            this.advanceTo(Math.max(this.lastSeq, ...entities.map((entity) => entity.seq)));
-            useLive.setState({ status: 'online' });
+            useLive.setState({ receiving: null });
+            this.showStatus();
             await this.flush();
             if (this.pending.size === 0) {
                 // Back off again only once something actually got through.
                 this.retry = 0;
             }
             void this.ensureAssets();
+            this.pollTimer = this.later(() => void this.catchUp(), this.realtime ? SAFETY_POLL_MS : POLL_MS);
         } catch (error) {
             console.warn('live: catch-up failed', error);
             if (!this.closed) {
-                useLive.setState({ status: 'offline' });
-                this.scheduleRetry(() => this.catchUp());
+                this.httpOk = false;
+                this.pageSize = Math.max(PAGE_MIN, Math.floor(this.pageSize / 2));
+                useLive.setState({ receiving: null });
+                this.showStatus();
+                this.scheduleRetry(() => void this.catchUp());
             }
+        } finally {
+            this.pulling = false;
         }
     }
 
@@ -411,17 +585,28 @@ class Session {
             const key = keyOf(op.collection, op.entityId);
             const existing = this.pending.get(key);
             // Repeated edits of one entity before sending collapse into one op with the original base.
+            const data = wire(op.data);
             const row: OutboxRow = existing
-                ? { ...existing, data: op.data, createdAt: now }
+                ? { ...existing, data, createdAt: now }
                 : {
                     id: `${this.link.projectId}|${key}`, projectId: this.link.projectId, collection: op.collection, entityId: op.entityId,
-                    data: op.data, prev: op.prev ?? null, base: this.versions.get(key) ?? 0, order: ++this.order, clientId: this.clientId, createdAt: now,
+                    data, prev: wire(op.prev ?? null), base: this.versions.get(key) ?? 0, order: ++this.order, clientId: this.clientId, createdAt: now,
                 };
             this.pending.set(key, row);
             this.persist(row);
         }
         useLive.setState({ queued: this.pending.size });
-        void this.flush();
+        this.scheduleFlush();
+    }
+
+    /** Coalesce bursts (typing, dragging) into one request. */
+    private scheduleFlush() {
+        if (!this.flushTimer) {
+            this.flushTimer = this.later(() => {
+                this.flushTimer = 0;
+                void this.flush();
+            }, FLUSH_DELAY_MS);
+        }
     }
 
     private persist(row: OutboxRow) {
@@ -454,7 +639,7 @@ class Session {
         let bytes = 0;
         for (const row of rows) {
             const size = JSON.stringify(row.data ?? null).length;
-            if (batch.length > 0 && (batch.length >= BATCH || bytes + size > MAX_BATCH_BYTES)) {
+            if (batch.length > 0 && (batch.length >= BATCH || bytes + size > this.budget)) {
                 break;
             }
             batch.push(row);
@@ -464,7 +649,7 @@ class Session {
     }
 
     async flush(): Promise<void> {
-        if (this.flushing || this.closed || !this.subscribed || useLive.getState().status !== 'online') {
+        if (this.flushing || this.closed || !this.httpOk) {
             return;
         }
         this.flushing = true;
@@ -475,10 +660,33 @@ class Session {
                 await this.uploadAssets(batch);
                 const sent = new Map(batch.map((row) => [keyOf(row.collection, row.entityId), row]));
                 sent.forEach((row, key) => this.inflight.set(key, row));
-                const result = await this.transport.push(batch.map((row) => ({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: row.data, base: row.base })), this.clientId);
+                const ops = batch.map((row) => ({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: row.data, base: row.base }));
+                const bytes = JSON.stringify(ops).length;
+                const started = Date.now();
+                let result: PushResult;
+                try {
+                    result = await this.timed((signal) => this.transport.push(ops, this.clientId, signal), deadline(bytes));
+                } catch (error) {
+                    // The request may still have landed (only the reply got lost): remember what was
+                    // sent, so the retry recognises my own write instead of reporting a clash.
+                    if (!permanentError(error) && (error as Error)?.message !== 'forbidden') {
+                        for (const [key, row] of sent) {
+                            const current = this.pending.get(key);
+                            if (current) {
+                                current.unacked = [...(current.unacked ?? []).slice(-2), row.data];
+                                this.persist(current);
+                            }
+                        }
+                    }
+                    throw error;
+                }
                 this.inflight.clear();
                 if (this.closed) {
                     return;
+                }
+                this.httpOk = true;
+                if (Date.now() - started < 3000 && bytes >= this.budget / 2) {
+                    this.budget = Math.min(BUDGET_MAX, this.budget * 2);
                 }
                 for (const applied of result.applied) {
                     const key = keyOf(applied.collection, applied.entityId);
@@ -496,10 +704,13 @@ class Session {
                     if (same(conflict.data, row.data)) {
                         // My write had already landed (lost acknowledgement): nothing clashed.
                         this.settle(key, row, conflict.version);
-                    } else if (same(conflict.data, row.prev)) {
-                        // The server still holds exactly what I edited from; only my base was stale.
+                    } else if (same(conflict.data, row.prev) || (this.pending.get(key) ?? row).unacked?.some((data) => same(conflict.data, data))) {
+                        // The server holds what I edited from, or my own earlier write whose reply got
+                        // lost: only my base was stale.
                         const current = this.pending.get(key) ?? row;
                         current.base = conflict.version;
+                        current.prev = conflict.data;
+                        delete current.unacked;
                         this.persist(current);
                     } else {
                         // A real clash: the server value applies, mine is offered to the user.
@@ -541,8 +752,11 @@ class Session {
                     this.later(() => void this.flush(), 0);
                 }
             } else {
-                useLive.setState({ status: 'offline' });
-                this.scheduleRetry(() => this.catchUp());
+                // Timeout or dropped connection: smaller requests from now on, then try again.
+                this.budget = Math.max(BUDGET_MIN, Math.floor(this.budget / 4));
+                this.httpOk = false;
+                this.showStatus();
+                this.scheduleRetry(() => void this.catchUp());
             }
         } finally {
             this.flushing = false;
@@ -559,6 +773,7 @@ class Session {
             // Edited again while in flight: that edit builds on what was just accepted.
             current.base = version;
             current.prev = sent?.data ?? current.prev;
+            delete current.unacked;
             this.persist(current);
         }
     }
@@ -590,7 +805,7 @@ class Session {
             toast(t('live.nowViewer'), { tone: 'warn' });
         }
         try {
-            const all = await this.transport.pull(0);
+            const all = await pullAll(this.transport);
             const wanted = new Set(keys);
             for (const entity of all) {
                 const key = keyOf(entity.collection, entity.entityId);
@@ -942,7 +1157,7 @@ export async function goLive(kind: 'supabase' | 'loopback'): Promise<void> {
 }
 
 /** Join with an invite code: download the live plan, store it locally and open it. */
-export async function joinLive(code: string, kind: 'supabase' | 'loopback'): Promise<{ project: Project; info: JoinInfo; alreadyMember: boolean }> {
+export async function joinLive(code: string, kind: 'supabase' | 'loopback', onProgress?: (count: number) => void): Promise<{ project: Project; info: JoinInfo; alreadyMember: boolean }> {
     const backend = backendFor(kind);
     const userId = await backend.userId();
     if (!userId) {
@@ -958,12 +1173,18 @@ export async function joinLive(code: string, kind: 'supabase' | 'loopback'): Pro
             return { project: stored.data, info, alreadyMember: true };
         }
     }
-    const entities = await backend.open(info.planId).pull(0);
+    const transport = backend.open(info.planId);
+    let entities: RemoteEntity[];
+    try {
+        entities = await pullAll(transport, onProgress);
+    } finally {
+        transport.close();
+    }
     const project = projectFromEntities(entities, info);
     await saveProject(project);
     // The versions this copy is based on, so the first edit isn't mistaken for a clash.
     await kvSet(versionsKey(project.id), Object.fromEntries(entities.map((e) => [keyOf(e.collection, e.entityId), e.version])));
-    await db.liveLinks.put({ projectId: project.id, remoteId: info.planId, role: info.role, backend: kind, lastSeq: Math.max(0, ...entities.map((e) => e.seq)), name: info.name, userId });
+    await db.liveLinks.put({ projectId: project.id, remoteId: info.planId, role: info.role, backend: kind, lastSeq: entities.reduce((max, e) => Math.max(max, e.seq), 0), name: info.name, userId });
     return { project, info, alreadyMember: false };
 }
 

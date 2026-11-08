@@ -168,6 +168,7 @@ export function LivePanel() {
     const backend = useLive((state) => state.backend);
     const presence = useLive((state) => state.presence);
     const queued = useLive((state) => state.queued);
+    const receiving = useLive((state) => state.receiving);
     const conflicts = useLive((state) => state.conflicts);
     const leaderId = useLive((state) => state.leaderId);
     const project = useProject((state) => state.project);
@@ -196,7 +197,9 @@ export function LivePanel() {
         <div className="stack" data-testid="live-panel">
             <div className="live-status">
                 <span className={`live-dot live-dot--${status}`} aria-hidden />
-                <strong>{status === 'online' ? (queued > 0 ? t('live.connecting') : t('live.synced')) : status === 'connecting' ? t('live.connecting') : t('live.offlineQueued', { n: queued })}</strong>
+                <strong data-testid="live-status">{receiving !== null ? t('live.receiving', { n: receiving })
+                    : status === 'online' || status === 'limited' ? (queued > 0 ? t('live.sending', { n: queued }) : status === 'limited' ? t('live.limited') : t('live.synced'))
+                        : status === 'connecting' ? t('live.connecting') : t('live.offlineQueued', { n: queued })}</strong>
                 <span className="spacer" />
                 <span className="badge">{role ? t(`live.role.${role}`) : ''}</span>
                 {backend === 'loopback' ? <span className="badge badge--warn">{t('live.testMode')}</span> : null}

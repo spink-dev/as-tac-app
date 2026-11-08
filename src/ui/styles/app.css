@@ -581,6 +581,11 @@
     font-size: var(--fs-xs);
 }
 
+.live-badge--limited {
+    background: var(--accent-weak);
+    color: var(--ink-2);
+}
+
 .live-badge--offline,
 .live-badge--error,
 .live-badge--connecting {
@@ -1907,6 +1912,10 @@ input.layer-row__name:focus {
 
 .live-dot--online {
     background: var(--ok);
+}
+
+.live-dot--limited {
+    background: var(--accent);
 }
 
 .live-dot--offline,

@@ -9,13 +9,17 @@ export function LiveBadge() {
     const presence = useLive((state) => state.presence);
     const queued = useLive((state) => state.queued);
     const unread = useLive((state) => state.unread);
+    const receiving = useLive((state) => state.receiving);
     if (status === 'off') {
         return null;
     }
-    const label = status === 'online' ? t('live.present', { n: presence.length }) : status === 'connecting' ? t('live.connecting') : t('live.offlineQueued', { n: queued });
+    const label = receiving !== null ? t('live.receiving', { n: receiving })
+        : status === 'online' ? t('live.present', { n: presence.length })
+            : status === 'limited' ? (queued > 0 ? t('live.sending', { n: queued }) : t('live.limitedShort'))
+                : status === 'connecting' ? t('live.connecting') : t('live.offlineQueued', { n: queued });
     return (
         <button type="button" className={`live-badge live-badge--${status}`} onClick={() => useUi.getState().openPanel('live')} title={label}>
-            {status === 'online' ? <Radio size={16} strokeWidth={2} /> : <CloudOff size={16} strokeWidth={2} />}
+            {status === 'online' || status === 'limited' ? <Radio size={16} strokeWidth={2} /> : <CloudOff size={16} strokeWidth={2} />}
             <span className="live-badge__faces" aria-hidden>
                 {presence.slice(0, 3).map((person) => (
                     <span key={person.clientId} className="face" style={{ background: person.color }}>{person.name.slice(0, 1).toUpperCase()}</span>

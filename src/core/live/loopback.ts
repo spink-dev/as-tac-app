@@ -1,5 +1,5 @@
 import type { ChatMessage, LiveRole, Presence } from './state';
-import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PushOp, PushResult, RemoteEntity, TransportHandlers } from './types';
+import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PullOptions, PushOp, PushResult, RemoteEntity, TransportHandlers } from './types';
 import { getAsset } from '../storage/assets';
 
 /**
@@ -51,6 +51,49 @@ export function loopbackUserId(): string {
         return 'tab';
     }
 }
+
+/**
+ * Test hook: `window.__asTacNet = { latencyMs, kbps, failRate }` makes the test mode behave like
+ * a weak mobile link — every request waits for latency plus its size at that speed, and a share
+ * of them fail (before the server sees them, or after it applied them with the reply lost).
+ * Realtime messages are dropped at the same rate. Off unless a test sets it.
+ */
+interface NetSim {
+    latencyMs?: number;
+    kbps?: number;
+    failRate?: number;
+}
+
+function netSim(): NetSim | null {
+    return typeof window !== 'undefined' ? (window as Window & { __asTacNet?: NetSim }).__asTacNet ?? null : null;
+}
+
+/** Bytes and requests that crossed the simulated link (for tests to report). */
+function count(bytes: number, direction: 'up' | 'down') {
+    const stats = ((window as Window & { __asTacNetStats?: { up: number; down: number; requests: number } }).__asTacNetStats ??= { up: 0, down: 0, requests: 0 });
+    stats[direction] += bytes;
+    if (direction === 'up') {
+        stats.requests += 1;
+    }
+}
+
+async function travel(bytes: number, signal?: AbortSignal, direction: 'up' | 'down' = 'up'): Promise<void> {
+    const sim = netSim();
+    if (!sim) {
+        return;
+    }
+    count(bytes, direction);
+    const ms = (sim.latencyMs ?? 0) + (sim.kbps ? (bytes * 8) / sim.kbps : 0);
+    await new Promise<void>((resolve, reject) => {
+        const timer = window.setTimeout(resolve, ms);
+        signal?.addEventListener('abort', () => {
+            window.clearTimeout(timer);
+            reject(new DOMException('aborted', 'AbortError'));
+        }, { once: true });
+    });
+}
+
+const unlucky = () => Math.random() < (netSim()?.failRate ?? 0);
 
 async function locked<T>(name: string, fn: () => T | Promise<T>): Promise<T> {
     const locks = (navigator as Navigator & { locks?: LockManager }).locks;
@@ -232,18 +275,35 @@ class LoopbackTransport implements LiveTransport {
         this.channel = new BroadcastChannel(`${PREFIX}:${planId}`);
     }
 
-    async pull(since: number): Promise<RemoteEntity[]> {
+    async pull(since: number, options: PullOptions): Promise<RemoteEntity[]> {
+        await travel(200, options.signal);
+        if (unlucky()) {
+            throw new TypeError('Failed to fetch');
+        }
         if (!this.server.role(this.planId, this.user)) {
             throw new Error('forbidden');
         }
-        return this.server.entities(this.planId, since);
+        const page = this.server.entities(this.planId, since)
+            .filter((entity) => !options.exclude || entity.clientId !== options.exclude)
+            .slice(0, options.limit);
+        await travel(JSON.stringify(page).length, options.signal, 'down');
+        return page;
     }
 
-    async push(ops: PushOp[], clientId: string): Promise<PushResult> {
+    async push(ops: PushOp[], clientId: string, signal?: AbortSignal): Promise<PushResult> {
+        await travel(JSON.stringify(ops).length, signal);
+        if (unlucky()) {
+            throw new TypeError('Failed to fetch');
+        }
         const { result, changed } = await this.server.apply(this.planId, this.user, ops, clientId);
         for (const entity of changed) {
             this.post({ type: 'entity', entity });
         }
+        if (unlucky()) {
+            // Applied on the server, but the reply never arrives.
+            throw new TypeError('Failed to fetch');
+        }
+        await travel(JSON.stringify(result).length, signal, 'down');
         return result;
     }
 
@@ -295,7 +355,10 @@ class LoopbackTransport implements LiveTransport {
         }
         switch (message.type) {
             case 'entity':
-                this.handlers.entity(message.entity);
+                // A weak link loses realtime messages too; catch-up has to fill the gap.
+                if (!unlucky()) {
+                    this.handlers.entity(message.entity);
+                }
                 break;
             case 'presence': {
                 // Roles come from the membership list, never from what a peer claims.

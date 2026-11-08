@@ -38,8 +38,18 @@ export interface BriefingMessage {
     camera: { center: [number, number]; zoom: number; bearing: number } | null;
 }
 
+export interface PullOptions {
+    /** At most this many rows, ordered by seq (a page covers everything up to its last seq). */
+    limit: number;
+    signal?: AbortSignal;
+    /** Leave out rows written by this client (its own writes are already local). */
+    exclude?: string;
+}
+
 export interface TransportHandlers {
     entity: (entity: RemoteEntity) => void;
+    /** A change was announced without its content; fetch it with a pull. */
+    stale: () => void;
     presence: (people: Presence[]) => void;
     briefing: (message: BriefingMessage) => void;
     chat: (message: ChatMessage) => void;
@@ -60,8 +70,9 @@ export interface JoinInfo {
 export interface LiveTransport {
     readonly kind: 'supabase' | 'loopback';
     readonly planId: string;
-    pull(since: number): Promise<RemoteEntity[]>;
-    push(ops: PushOp[], clientId: string): Promise<PushResult>;
+    /** One page of entities changed after `since`. */
+    pull(since: number, options: PullOptions): Promise<RemoteEntity[]>;
+    push(ops: PushOp[], clientId: string, signal?: AbortSignal): Promise<PushResult>;
     subscribe(handlers: TransportHandlers): Promise<void>;
     track(me: Presence): void;
     broadcast(message: BriefingMessage): void;

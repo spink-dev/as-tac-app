@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { LiveConflict } from './session';
 
-export type LiveStatus = 'off' | 'connecting' | 'online' | 'offline' | 'error';
+/** `limited`: the server is reachable over HTTP but realtime isn't; changes are polled. */
+export type LiveStatus = 'off' | 'connecting' | 'online' | 'limited' | 'offline' | 'error';
 export type LiveRole = 'owner' | 'admin' | 'viewer';
 
 export interface Presence {
@@ -28,6 +29,8 @@ interface LiveState {
     remoteId: string | null;
     role: LiveRole | null;
     queued: number;
+    /** Objects received so far in a running catch-up, `null` when none runs. */
+    receiving: number | null;
     presence: Presence[];
     chat: ChatMessage[];
     unread: number;
@@ -49,11 +52,12 @@ export const useLive = create<LiveState>(() => ({
     unread: 0,
     leaderId: null,
     leaderName: null,
+    receiving: null,
     following: false,
     error: null,
     conflicts: [],
 }));
 
 export function resetLive() {
-    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, presence: [], chat: [], unread: 0, leaderId: null, leaderName: null, following: false, error: null, conflicts: [] });
+    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, receiving: null, presence: [], chat: [], unread: 0, leaderId: null, leaderName: null, following: false, error: null, conflicts: [] });
 }
