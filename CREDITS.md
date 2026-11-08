@@ -70,7 +70,7 @@ records an AS-TAC manual retrace of the retained organiser reference image
 revises all five safe-area contours and the event perimeter. Image/logos are not
 bundled. The measured 4.41 m control residual is not boundary accuracy; contours
 are approximate, sometimes obscured by symbols, and require on-site verification.
-See `docs/reviews/2026-10-01-fieldmaps.md` for coverage and unresolved HQ boundaries.
+See `docs/reviews/2026-10-01-fieldmaps.md` on `main` (as-tac 0.6; not carried into 1.0) for coverage and unresolved HQ boundaries.
 
 ## AS-TAC 1.0 (2026-11)
 
