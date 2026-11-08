@@ -251,7 +251,9 @@ describe('plans saved on this device', () => {
         const project = { ...sample(), id: 'prj_newer_format' };
         await saveProject(project);
         const newer = { ...project, formatVersion: FORMAT_VERSION + 1, futureField: true };
+        // A newer app writes the plan and its index row together, like this one.
         await db.projects.put({ id: project.id, data: newer as unknown as Project });
+        await db.projectIndex.update(project.id, { formatVersion: FORMAT_VERSION + 1 });
         await expect(loadProject(project.id)).rejects.toThrow('newer');
         await expect(saveProject({ ...project, name: 'Stale' })).rejects.toThrow('newer');
         expect((await db.projects.get(project.id))?.data).toEqual(newer);
@@ -262,6 +264,16 @@ describe('plans saved on this device', () => {
         await restoreDeleted(removed);
         expect((await db.projects.get(project.id))?.data).toEqual(newer);
         expect((await db.projectIndex.get(project.id))?.name).toBe(project.name);
+    });
+
+    it('keep the older original as a backup when a save replaces it', async () => {
+        const project = { ...sample(), id: 'prj_plain_save' };
+        await saveProject(project);
+        // This app pretends to be format 2: the next save replaces a format-1 record.
+        await saveProject({ ...project, name: 'Neu', formatVersion: 2 as 1 }, 2);
+        expect(((await db.backups.get(`${project.id}@1`))?.data as Project).name).toBe(project.name);
+        await saveProject({ ...project, name: 'Neuer', formatVersion: 2 as 1 }, 2);
+        expect(((await db.backups.get(`${project.id}@1`))?.data as Project).name).toBe(project.name);
     });
 
     it('that are damaged are refused', async () => {

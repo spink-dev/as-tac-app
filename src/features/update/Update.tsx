@@ -63,7 +63,7 @@ export function UpdateAction({ small }: { small?: boolean }) {
         const label = older ? t('update.switch') : status === 'available' && canDownload() ? t('update.download') : t('update.apply');
         return (
             <Button small={small} variant="primary" disabled={working} aria-busy={working} onClick={() => void applyUpdate()} data-testid="update-apply">
-                <ArrowUpCircle size={16} /> {working ? t(status === 'applying' ? 'update.applying' : 'update.downloadingGeneric') : label}
+                <ArrowUpCircle size={16} /> {working ? t('update.wait') : label}
             </Button>
         );
     }

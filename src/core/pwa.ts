@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { APP_VERSION, BUILD, compareVersions, isBuildInfo, sameBuild, type BuildInfo } from '../version';
-import { flushNow } from './storage/projects';
+import { flushNow, savedAs } from './storage/projects';
 import { db } from './storage/db';
 import { mayAutoDownload } from './net';
 import { toast, useUi, type Mode } from './store/ui';
@@ -215,13 +215,22 @@ function busy(): boolean {
  * where large downloads are allowed (data saver); a manual check always reports and downloads.
  * An older build on the server (rollback) is only reported.
  */
+let manualQueued: Promise<void> | null = null;
+
 export function checkForUpdate(manual = false): Promise<void> {
-    if (checking) {
-        // A manual check during a background one: report on the next round, as a manual check.
-        return manual ? checking.then(() => checkForUpdate(true)) : checking;
-    }
     if (manual && !busy()) {
         usePwa.setState({ status: navigator.onLine ? 'checking' : 'offline' });
+    }
+    if (checking) {
+        // A manual check during a background one: report on the next round, as a manual check (once).
+        if (!manual) {
+            return checking;
+        }
+        manualQueued ??= checking.then(() => {
+            manualQueued = null;
+            return checkForUpdate(true);
+        });
+        return manualQueued;
     }
     checking = runCheck(manual).finally(() => {
         checking = null;
@@ -277,6 +286,14 @@ function markReady() {
 function watchInstall(worker: ServiceWorker): Promise<boolean> {
     if (!busy()) {
         usePwa.setState({ status: 'downloading' });
+    }
+    if (!usePwa.getState().available) {
+        // Found by the browser itself: say which version is coming (also when it is an older one).
+        void serverBuild().then((remote) => {
+            if (remote && !sameBuild(remote, BUILD)) {
+                usePwa.setState({ available: remote, older: compareVersions(remote.version, APP_VERSION) < 0 });
+            }
+        });
     }
     return new Promise((resolve) => {
         const settle = () => {
@@ -377,10 +394,16 @@ async function finishReload() {
         return;
     }
     reloading = true;
-    for (const guard of guards) {
-        await Promise.resolve().then(guard).catch(() => null);
-    }
-    await flushNow().catch(() => false);
+    // Mode or privacy view may have changed by shortcut since the tap.
+    rememberResume();
+    const last = (async () => {
+        for (const guard of guards) {
+            await Promise.resolve().then(guard).catch(() => null);
+        }
+        await flushNow().catch(() => false);
+    })();
+    // A stalled write must not keep the "updating" screen up for ever.
+    await Promise.race([last, new Promise((resolve) => window.setTimeout(resolve, 5000))]);
     window.location.reload();
 }
 
@@ -430,7 +453,8 @@ function rememberResume() {
     const ui = useUi.getState();
     try {
         if (project) {
-            sessionStorage.setItem(RESUME_KEY, JSON.stringify({ projectId: project.id, mode: ui.mode, streamer: ui.streamer, at: Date.now() }));
+            // Where this window's edits are stored (a copy, if a newer app took the plan over).
+            sessionStorage.setItem(RESUME_KEY, JSON.stringify({ projectId: savedAs(project.id), mode: ui.mode, streamer: ui.streamer, at: Date.now() }));
         }
     } catch {
         // Without storage the app starts in the library after the update.

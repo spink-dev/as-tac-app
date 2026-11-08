@@ -1,7 +1,7 @@
 import { db, kvGet, kvSet, type LiveLinkRow, type OutboxRow } from '../storage/db';
 import { getAsset, isRenderableImage, putVerifiedAsset, safeMime, sha256Hex } from '../storage/assets';
 import { mayAutoDownload } from '../net';
-import { flushNow, saveProject } from '../storage/projects';
+import { flushNow, onSavedAsCopy, saveProject, savedAs } from '../storage/projects';
 import { mutate, onProjectChange, useProject } from '../store/project';
 import { applyOps, diffProjects, entityOf, metaOf, ORDER_ID, type DiffCollection, type EntityOp } from '../store/diff';
 import { FORMAT_VERSION, SYNCED_COLLECTIONS, ProjectSchema, type Project } from '../model/schema';
@@ -393,6 +393,14 @@ class Session {
         }
         useLive.setState({ queued: this.pending.size });
         this.stop.push(onProjectChange((prev, next, source) => this.onLocal(prev, next, source)));
+        // A newer app took this plan over on the device: this window's edits now go to a local copy,
+        // which is not the live plan. Stop syncing (the queue stays for the newer app to send).
+        this.stop.push(onSavedAsCopy((original) => {
+            if (original === this.link.projectId) {
+                toast(t('live.stoppedCopy'), { tone: 'warn' });
+                void disconnectLive();
+            }
+        }));
         // Before an update reloads the page: queued changes and the sync position are on disk.
         this.stop.push(onBeforeUpdate(async () => {
             await this.persistChain;
@@ -1599,6 +1607,10 @@ export async function goLive(kind: 'supabase' | 'loopback'): Promise<void> {
         return;
     }
     await flushNow();
+    if (savedAs(before.id) !== before.id) {
+        // Its saves go to a copy (a newer app took the original over): nothing to publish from here.
+        throw new Error('newer');
+    }
     const backend = backendFor(kind);
     const userId = await backend.userId();
     if (!userId) {

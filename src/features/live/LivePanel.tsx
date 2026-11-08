@@ -33,7 +33,7 @@ function NotLive() {
             await fn();
         } catch (error) {
             console.warn('live action failed', error);
-            toast(t('live.failed'), { tone: 'danger' });
+            toast(error instanceof Error && error.message === 'newer' ? t('library.errorNewer') : t('live.failed'), { tone: 'danger' });
         } finally {
             setBusy(false);
         }

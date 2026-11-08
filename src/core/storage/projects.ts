@@ -28,14 +28,31 @@ function indexRow(project: Project, live = false): ProjectIndexRow {
 
 /**
  * Store a plan. A stored record written by a newer app is never replaced: the save fails with
- * 'newer' (autosave then keeps this tab's edits as a copy, see `write`).
+ * 'newer' (autosave then keeps this tab's edits as a copy, see `write`). Replacing a record of an
+ * older format keeps that original as a backup first (also when no migration wrote one).
+ *
+ * The stored format is read from the small index row, which every writer (this and later versions)
+ * updates in the same transaction as the plan; index rows of 1.0.0-alpha.1 have none (= format 1).
+ * So an autosave does not read the whole stored plan back each time.
  */
-export async function saveProject(project: Project): Promise<void> {
+export async function saveProject(project: Project, current: number = FORMAT_VERSION): Promise<void> {
     const live = Boolean(await db.liveLinks.get(project.id));
-    await db.transaction('rw', db.projects, db.projectIndex, async () => {
-        const existing = await db.projects.get(project.id);
-        if (existing && versionOf(existing.data) > FORMAT_VERSION) {
+    await db.transaction('rw', db.projects, db.projectIndex, db.backups, async () => {
+        const index = await db.projectIndex.get(project.id);
+        const stored = index ? index.formatVersion ?? 1 : null;
+        if (stored !== null && stored > current) {
             throw new Error('newer');
+        }
+        if (stored !== null && stored < current) {
+            const existing = await db.projects.get(project.id);
+            const version = versionOf(existing?.data);
+            if (existing && version > current) {
+                throw new Error('newer');
+            }
+            const key = `${project.id}@${version}`;
+            if (existing && version < current && !(await db.backups.get(key))) {
+                await db.backups.put({ id: key, projectId: project.id, formatVersion: version, appVersion: APP_VERSION, createdAt: new Date().toISOString(), data: existing.data });
+            }
         }
         await db.projects.put({ id: project.id, data: project });
         await db.projectIndex.put(indexRow(project, live));
@@ -215,6 +232,22 @@ let pending: Project | null = null;
 /** Plans whose stored record a newer app took over while open here: this window saves to a copy (id). */
 const copies = new Map<string, string>();
 
+/** The id this window saves the plan under (a copy, when a newer app took the original over). */
+export function savedAs(id: string): string {
+    return copies.get(id) ?? id;
+}
+
+type CopyListener = (originalId: string, copyId: string) => void;
+const copyListeners = new Set<CopyListener>();
+
+/** A plan's saves were redirected to a copy (e.g. a live session must stop syncing the original). */
+export function onSavedAsCopy(listener: CopyListener): () => void {
+    copyListeners.add(listener);
+    return () => {
+        copyListeners.delete(listener);
+    };
+}
+
 function target(project: Project): Project {
     const copy = copies.get(project.id);
     return copy ? { ...project, id: copy, name: t('save.copyName', { name: project.name.slice(0, MAX.projectName - 20) }) } : project;
@@ -264,6 +297,7 @@ async function write(): Promise<boolean> {
                 const copy = target(project);
                 await saveProject(copy);
                 toast(t('save.keptAsCopy', { name: copy.name }), { tone: 'warn' });
+                copyListeners.forEach((listener) => listener(project.id, copy.id));
                 useSaveState.setState({ state: pending ? 'saving' : 'saved', error: undefined });
                 return true;
             } catch (copyError) {

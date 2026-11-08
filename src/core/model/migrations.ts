@@ -35,6 +35,8 @@ export const PROJECT_STEPS: Readonly<Record<number, ProjectStep>> = {};
 /**
  * Plan-level fields that live sessions send as the `meta` entity. Steps see them in exactly the shape
  * of store/diff.ts `metaOf` (`event: null` when there is none), in a plan as in a live session.
+ * When a format changes the meta fields, this list and `metaRecord` must describe the meta of the
+ * version each step starts from (make them depend on the step's version then).
  */
 const META_FIELDS = ['name', 'areaId', 'event', 'settings'] as const;
 
