@@ -72,41 +72,165 @@ export function secondsUntilNextDownload(): number {
 
 export type DownloadPhase = 'download' | 'convert' | 'verify';
 
-async function fetchOverpass(endpoint: string, query: string, signal: AbortSignal, onBytes: (bytes: number) => void): Promise<OverpassResponse> {
-    const response = await fetch(endpoint, {
-        method: 'POST',
-        body: new URLSearchParams({ data: query }),
-        signal,
+/**
+ * Areas are fetched in tiles of at most this size. On a weak mobile link a dropped connection
+ * then costs one tile, not the whole area; finished tiles are kept for the next attempt.
+ */
+export const TILE_KM2 = 4;
+const TILE_ATTEMPTS = 4;
+const TILE_PAUSE_MS = 1000;
+/** No byte for this long: the connection is dead, try again (mobile links stall silently). */
+const STALL_MS = 45000;
+const MAX_TOTAL_BYTES = 300 * 1024 * 1024;
+const CACHE_MS = 30 * 60 * 1000;
+
+/** Split `[west, south, east, north]` into a grid of tiles of at most `maxKm2` each. */
+export function tileBounds(bounds: Bounds, maxKm2 = TILE_KM2): Bounds[] {
+    const { width, height } = boundsSizeM(bounds);
+    const side = Math.sqrt(maxKm2) * 1000;
+    const nx = Math.max(1, Math.ceil(width / side));
+    const ny = Math.max(1, Math.ceil(height / side));
+    const [west, south, east, north] = bounds;
+    const tiles: Bounds[] = [];
+    for (let y = 0; y < ny; y++) {
+        for (let x = 0; x < nx; x++) {
+            tiles.push([
+                west + ((east - west) * x) / nx,
+                south + ((north - south) * y) / ny,
+                west + ((east - west) * (x + 1)) / nx,
+                south + ((north - south) * (y + 1)) / ny,
+            ]);
+        }
+    }
+    return tiles;
+}
+
+type OsmElement = { type: string; id: number; tags?: Record<string, string> };
+
+/**
+ * Join tile answers. Ways and relations crossing a tile border come with all their nodes in
+ * every tile that touches them (`>`), so each copy is complete; duplicates are dropped. A node
+ * seen bare (way member) in one tile and tagged (place, amenity) in another keeps its tags.
+ */
+export function mergeTiles(responses: OverpassResponse[]): OverpassResponse {
+    const byKey = new Map<string, OsmElement>();
+    let timestamp: string | undefined;
+    for (const response of responses) {
+        for (const raw of response.elements as OsmElement[]) {
+            const key = `${raw.type}/${raw.id}`;
+            const existing = byKey.get(key);
+            if (!existing || (!existing.tags && raw.tags)) {
+                byKey.set(key, raw);
+            }
+        }
+        const stamp = response.osm3s?.timestamp_osm_base;
+        if (stamp && (!timestamp || stamp < timestamp)) {
+            timestamp = stamp;
+        }
+    }
+    return { elements: [...byKey.values()], osm3s: timestamp ? { timestamp_osm_base: timestamp } : undefined };
+}
+
+/** Finished tiles by query, kept so a failed or cancelled download continues where it stopped. */
+const tileCache = new Map<string, { at: number; response: OverpassResponse; bytes: number }>();
+
+/** How many tiles of this area are already on the device (from an earlier, interrupted try). */
+export function cachedTiles(bounds: Bounds): number {
+    const now = Date.now();
+    return tileBounds(bounds).filter((tile) => (tileCache.get(overpassQuery(tile))?.at ?? 0) > now - CACHE_MS).length;
+}
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, ms);
+        signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(signal.reason ?? new DOMException('aborted', 'AbortError'));
+        }, { once: true });
     });
-    if (response.status === 429 || response.status === 504) {
-        throw new Error('rate-limit');
-    }
-    if (!response.ok || !response.body) {
-        throw new Error(`HTTP ${response.status}`);
-    }
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-            break;
+}
+
+async function fetchOverpass(endpoint: string, query: string, signal: AbortSignal, onBytes: (bytes: number) => void): Promise<{ response: OverpassResponse; bytes: number }> {
+    // Own controller: a stalled connection is cut and retried without cancelling the download.
+    const attempt = new AbortController();
+    const cancel = () => attempt.abort();
+    signal.addEventListener('abort', cancel, { once: true });
+    let stall = setTimeout(() => attempt.abort(), STALL_MS);
+    const alive = () => {
+        clearTimeout(stall);
+        stall = setTimeout(() => attempt.abort(), STALL_MS);
+    };
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            body: new URLSearchParams({ data: query }),
+            signal: attempt.signal,
+        });
+        if (response.status === 429 || response.status === 504) {
+            throw new Error('rate-limit');
         }
-        chunks.push(value);
-        total += value.length;
-        onBytes(total);
-        if (total > 300 * 1024 * 1024) {
-            await reader.cancel();
-            throw new Error('area-too-large');
+        if (!response.ok || !response.body) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        while (true) {
+            alive();
+            const { value, done } = await reader.read();
+            if (done) {
+                break;
+            }
+            chunks.push(value);
+            total += value.length;
+            onBytes(total);
+            if (total > MAX_TOTAL_BYTES) {
+                await reader.cancel();
+                throw new Error('area-too-large');
+            }
+        }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.length;
+        }
+        const parsed = JSON.parse(new TextDecoder().decode(bytes)) as OverpassResponse;
+        if (parsed.remark && /runtime error|timed out|out of memory/i.test(parsed.remark)) {
+            throw new Error('overpass-incomplete');
+        }
+        return { response: parsed, bytes: total };
+    } catch (error) {
+        if (!signal.aborted && attempt.signal.aborted) {
+            throw new Error('stalled');
+        }
+        throw error;
+    } finally {
+        clearTimeout(stall);
+        signal.removeEventListener('abort', cancel);
+    }
+}
+
+/** One tile: both servers, several rounds with growing pauses (longer when rate-limited). */
+async function fetchTile(query: string, signal: AbortSignal, onBytes: (bytes: number) => void): Promise<{ response: OverpassResponse; bytes: number }> {
+    let lastError: unknown = null;
+    for (let round = 0; round < TILE_ATTEMPTS; round++) {
+        for (const endpoint of OVERPASS_ENDPOINTS) {
+            try {
+                return await fetchOverpass(endpoint, query, signal, onBytes);
+            } catch (error) {
+                if (signal.aborted || (error instanceof Error && error.message === 'area-too-large')) {
+                    throw error;
+                }
+                lastError = error;
+            }
+        }
+        if (round < TILE_ATTEMPTS - 1) {
+            const limited = lastError instanceof Error && lastError.message === 'rate-limit';
+            await sleep(limited ? 15000 * (round + 1) : 2000 * 3 ** round, signal);
         }
     }
-    const bytes = new Uint8Array(total);
-    let offset = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.length;
-    }
-    return JSON.parse(new TextDecoder().decode(bytes)) as OverpassResponse;
+    throw lastError instanceof Error ? lastError : new Error('download');
 }
 
 export interface DownloadOptions {
@@ -114,7 +238,8 @@ export interface DownloadOptions {
     name: string;
     bounds: Bounds;
     signal: AbortSignal;
-    onProgress: (phase: DownloadPhase, bytes: number) => void;
+    /** `part`: tiles finished so far and in total. */
+    onProgress: (phase: DownloadPhase, bytes: number, part?: { done: number; total: number }) => void;
 }
 
 export async function downloadArea(options: DownloadOptions): Promise<AreaPackage> {
@@ -130,23 +255,36 @@ export async function downloadArea(options: DownloadOptions): Promise<AreaPackag
         throw new Error(`rate-limit:${wait}`);
     }
     lastRequest = Date.now();
-    const query = overpassQuery(options.bounds);
-    let raw: OverpassResponse | null = null;
-    let lastError: unknown = null;
-    for (const endpoint of OVERPASS_ENDPOINTS) {
-        try {
-            raw = await fetchOverpass(endpoint, query, options.signal, (bytes) => options.onProgress('download', bytes));
-            break;
-        } catch (error) {
-            if (options.signal.aborted) {
-                throw error;
-            }
-            lastError = error;
+    const tiles = tileBounds(options.bounds);
+    const responses: OverpassResponse[] = [];
+    let finishedBytes = 0;
+    const now = Date.now();
+    for (const [key, entry] of tileCache) {
+        if (entry.at < now - CACHE_MS) {
+            tileCache.delete(key);
         }
     }
-    if (!raw) {
-        throw lastError instanceof Error ? lastError : new Error('download');
+    for (const [index, tile] of tiles.entries()) {
+        options.signal.throwIfAborted();
+        const query = overpassQuery(tile);
+        let entry = tileCache.get(query);
+        if (!entry) {
+            if (index > 0) {
+                // Sequential and with a pause: the public Overpass servers are shared.
+                await sleep(TILE_PAUSE_MS, options.signal);
+            }
+            const fetched = await fetchTile(query, options.signal, (bytes) => options.onProgress('download', finishedBytes + bytes, { done: index, total: tiles.length }));
+            entry = { at: Date.now(), ...fetched };
+            tileCache.set(query, entry);
+        }
+        finishedBytes += entry.bytes;
+        if (finishedBytes > MAX_TOTAL_BYTES) {
+            throw new Error('area-too-large');
+        }
+        responses.push(entry.response);
+        options.onProgress('download', finishedBytes, { done: index + 1, total: tiles.length });
     }
+    const raw = tiles.length === 1 ? responses[0] : mergeTiles(responses);
     options.signal.throwIfAborted();
     options.onProgress('convert', 0);
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -154,7 +292,7 @@ export async function downloadArea(options: DownloadOptions): Promise<AreaPackag
     options.signal.throwIfAborted();
     options.onProgress('verify', 0);
     const text = JSON.stringify(data);
-    return {
+    const pkg: AreaPackage = {
         format: 'as-tac-map',
         formatVersion: 1,
         id: options.id,
@@ -170,6 +308,11 @@ export async function downloadArea(options: DownloadOptions): Promise<AreaPackag
         origin: 'download',
         data,
     };
+    // Done: the tiles of this area are no longer needed in memory.
+    for (const tile of tiles) {
+        tileCache.delete(overpassQuery(tile));
+    }
+    return pkg;
 }
 
 export function slugId(name: string): string {

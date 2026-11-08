@@ -6,7 +6,7 @@ import { usePrefs } from '../../core/store/prefs';
 import { useDialogs } from '../../core/store/dialogs';
 import { Button, CountUp, Dialog, Field, ICON } from '../../ui/components';
 import { MaplibreMap } from '../../map/engine';
-import { areaKm2, downloadArea, MAX_AREA_KM2, slugId, type DownloadPhase } from '../../core/areas/overpass';
+import { areaKm2, cachedTiles, downloadArea, MAX_AREA_KM2, slugId, tileBounds, type DownloadPhase } from '../../core/areas/overpass';
 import { searchPlaces, type PlaceResult } from '../../core/areas/search';
 import { saveArea } from '../../core/areas/store';
 import { boundsSizeM, formatDistance, type Bounds } from '../../core/geo/geo';
@@ -46,7 +46,7 @@ export function AreaDownloadDialog() {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<PlaceResult[] | null>(null);
     const [name, setName] = useState('');
-    const [busy, setBusy] = useState<{ phase: DownloadPhase; bytes: number } | null>(null);
+    const [busy, setBusy] = useState<{ phase: DownloadPhase; bytes: number; part?: { done: number; total: number } } | null>(null);
     const [online, setOnline] = useState(navigator.onLine);
     const abort = useRef<AbortController | null>(null);
     const searchAbort = useRef<AbortController | null>(null);
@@ -167,9 +167,9 @@ export function AreaDownloadDialog() {
                 name: areaName,
                 bounds,
                 signal: controller.signal,
-                onProgress: (phase, bytes) => {
+                onProgress: (phase, bytes, part) => {
                     if (!controller.signal.aborted) {
-                        setBusy({ phase, bytes });
+                        setBusy((current) => ({ phase, bytes, part: part ?? current?.part }));
                     }
                 },
             });
@@ -190,7 +190,9 @@ export function AreaDownloadDialog() {
                 return;
             }
             const message = error instanceof Error ? error.message : String(error);
-            toast(message.startsWith('rate-limit') ? t('area.rateLimit') : message === 'offline' ? t('area.needsNetwork') : t('area.failed', { reason: message }), { tone: 'danger' });
+            const kept = cachedTiles(bounds);
+            toast(message.startsWith('rate-limit') ? t('area.rateLimit') : message === 'offline' ? t('area.needsNetwork')
+                : kept > 0 ? t('area.failedPartial', { done: kept, total: tileBounds(bounds).length }) : t('area.failed', { reason: message }), { tone: 'danger' });
             setBusy(null);
         }
     }
@@ -258,7 +260,10 @@ export function AreaDownloadDialog() {
                 {busy ? (
                     <div className="area-dl__busy">
                         <strong>{busy.phase === 'download' ? t('area.downloading') : t('area.converting')}</strong>
-                        <span className="num"><CountUp value={busy.bytes} format={(n) => formatBytes(Math.round(n))} /></span>
+                        <span className="num">
+                            {busy.phase === 'download' && busy.part && busy.part.total > 1 ? `${t('area.part', { done: Math.min(busy.part.done + 1, busy.part.total), total: busy.part.total })} · ` : ''}
+                            <CountUp value={busy.bytes} format={(n) => formatBytes(Math.round(n))} />
+                        </span>
                         <div className="progress progress--indeterminate"><div className="progress__bar" /></div>
                         <Button small variant="ghost" onClick={() => {
                             abort.current?.abort();

@@ -96,17 +96,31 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
     if (!preset) {
         throw new Error('area-unknown');
     }
-    const manifestResponse = await fetch(`/maps/${id}.json`, { cache: 'no-cache' });
-    if (!manifestResponse.ok) {
-        throw new Error(`HTTP ${manifestResponse.status}`);
-    }
+    // A weak link may drop the request: try a few times before giving up.
+    const fetchRetry = async (url: string, init?: RequestInit) => {
+        let lastError: unknown = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const response = await fetch(url, init);
+                if (response.ok && response.body) {
+                    return response;
+                }
+                lastError = new Error(`HTTP ${response.status}`);
+                if (response.status < 500) {
+                    break;
+                }
+            } catch (error) {
+                lastError = error;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2000 * 3 ** attempt));
+        }
+        throw lastError instanceof Error ? lastError : new Error('download');
+    };
+    const manifestResponse = await fetchRetry(`/maps/${id}.json`, { cache: 'no-cache' });
     const manifest = await manifestResponse.json() as Omit<AreaPackage, 'data' | 'format' | 'formatVersion'>;
-    const response = await fetch(preset.file);
-    if (!response.ok || !response.body) {
-        throw new Error(`HTTP ${response.status}`);
-    }
+    const response = await fetchRetry(preset.file);
     const total = Number(response.headers.get('content-length')) || manifest.byteSize || preset.approxBytes;
-    const reader = response.body.getReader();
+    const reader = response.body!.getReader();
     const chunks: Uint8Array[] = [];
     let received = 0;
     while (true) {

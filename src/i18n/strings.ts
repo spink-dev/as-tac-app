@@ -104,6 +104,8 @@ export const S = {
     'area.download': ['Herunterladen', 'Download'],
     'area.downloading': ['Lädt aus OpenStreetMap …', 'Loading from OpenStreetMap …'],
     'area.converting': ['Wird aufbereitet …', 'Preparing …'],
+    'area.part': ['Teil {done} von {total}', 'Part {done} of {total}'],
+    'area.failedPartial': ['Download unterbrochen: {done} von {total} Teilen sind schon da. Nochmals tippen, um fortzusetzen.', 'Download interrupted: {done} of {total} parts are already here. Tap again to continue.'],
     'area.saved': ['«{name}» ist offline verfügbar', '“{name}” is available offline'],
     'area.failed': ['Download fehlgeschlagen: {reason}', 'Download failed: {reason}'],
     'area.rateLimit': ['Der OSM-Dienst ist ausgelastet. In einer Minute erneut versuchen.', 'The OSM service is busy. Try again in a minute.'],
