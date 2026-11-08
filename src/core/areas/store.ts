@@ -96,48 +96,58 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
     if (!preset) {
         throw new Error('area-unknown');
     }
-    // A weak link may drop the request: try a few times before giving up.
-    const fetchRetry = async (url: string, init?: RequestInit) => {
+    // A weak link may drop the request or the transfer midway: the whole file, a few tries.
+    // Offline there is nothing to wait for.
+    const getBytes = async (url: string, init?: RequestInit, report?: (received: number, total: number) => void): Promise<Uint8Array> => {
         let lastError: unknown = null;
         for (let attempt = 0; attempt < 3; attempt++) {
+            if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                throw new Error('offline');
+            }
             try {
                 const response = await fetch(url, init);
-                if (response.ok && response.body) {
-                    return response;
-                }
-                lastError = new Error(`HTTP ${response.status}`);
-                if (response.status < 500) {
-                    break;
+                if (!response.ok || !response.body) {
+                    void response.body?.cancel().catch(() => undefined);
+                    lastError = new Error(`HTTP ${response.status}`);
+                    if (response.status < 500) {
+                        break;
+                    }
+                } else {
+                    const total = Number(response.headers.get('content-length')) || 0;
+                    const reader = response.body.getReader();
+                    const chunks: Uint8Array[] = [];
+                    let received = 0;
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) {
+                            break;
+                        }
+                        chunks.push(value);
+                        received += value.length;
+                        report?.(received, total);
+                    }
+                    const bytes = new Uint8Array(received);
+                    let offset = 0;
+                    for (const chunk of chunks) {
+                        bytes.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+                    return bytes;
                 }
             } catch (error) {
                 lastError = error;
             }
-            await new Promise((resolve) => setTimeout(resolve, 2000 * 3 ** attempt));
+            if (attempt < 2) {
+                await new Promise((resolve) => setTimeout(resolve, 2000 * 3 ** attempt));
+            }
         }
         throw lastError instanceof Error ? lastError : new Error('download');
     };
-    const manifestResponse = await fetchRetry(`/maps/${id}.json`, { cache: 'no-cache' });
-    const manifest = await manifestResponse.json() as Omit<AreaPackage, 'data' | 'format' | 'formatVersion'>;
-    const response = await fetchRetry(preset.file);
-    const total = Number(response.headers.get('content-length')) || manifest.byteSize || preset.approxBytes;
-    const reader = response.body!.getReader();
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-            break;
-        }
-        chunks.push(value);
-        received += value.length;
+    const manifest = JSON.parse(new TextDecoder().decode(await getBytes(`/maps/${id}.json`, { cache: 'no-cache' }))) as Omit<AreaPackage, 'data' | 'format' | 'formatVersion'>;
+    const bytes = await getBytes(preset.file, undefined, (received, length) => {
+        const total = length || manifest.byteSize || preset.approxBytes;
         onProgress?.(total ? Math.min(1, received / total) : null, 'download');
-    }
-    const bytes = new Uint8Array(received);
-    let offset = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.length;
-    }
+    });
     onProgress?.(null, 'verify');
     const hash = await sha256Hex(bytes);
     if (hash !== manifest.sha256) {

@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Map as MlMap } from 'maplibre-gl';
 import { Search, WifiOff } from 'lucide-react';
-import { useT, formatBytes } from '../../i18n';
+import { useT, formatBytes, t as translate } from '../../i18n';
 import { usePrefs } from '../../core/store/prefs';
 import { useDialogs } from '../../core/store/dialogs';
 import { Button, CountUp, Dialog, Field, ICON } from '../../ui/components';
 import { MaplibreMap } from '../../map/engine';
-import { areaKm2, cachedTiles, downloadArea, MAX_AREA_KM2, slugId, tileBounds, type DownloadPhase } from '../../core/areas/overpass';
+import { areaKm2, cachedTiles, downloadArea, MAX_AREA_KM2, resumeBounds, slugId, tileBounds, type DownloadPhase } from '../../core/areas/overpass';
 import { searchPlaces, type PlaceResult } from '../../core/areas/search';
 import { saveArea } from '../../core/areas/store';
 import { boundsSizeM, formatDistance, type Bounds } from '../../core/geo/geo';
@@ -32,6 +32,22 @@ function onlineStyle() {
     };
 }
 
+/** What to tell the user after a failed download, and whether tapping again will help. */
+function areaErrorText(message: string, kept: number, total: number): string {
+    const wait = /^rate-limit:(\d+)$/.exec(message);
+    if (wait) {
+        return translate('area.rateLimitWait', { s: wait[1] });
+    }
+    if (message === 'offline') {
+        return translate('area.needsNetwork');
+    }
+    if (message === 'area-too-large' || message === 'area-too-many-features') {
+        return translate('area.tooDetailed');
+    }
+    const cause = message === 'rate-limit' ? translate('area.busy') : translate('area.unstable');
+    return kept > 0 ? `${cause} ${translate('area.failedPartial', { done: kept, total })}` : `${cause} ${translate('area.tryAgain')}`;
+}
+
 export function AreaDownloadDialog() {
     const t = useT();
     const locale = usePrefs((state) => state.locale);
@@ -46,6 +62,7 @@ export function AreaDownloadDialog() {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<PlaceResult[] | null>(null);
     const [name, setName] = useState('');
+    const [resumable, setResumable] = useState(0);
     const [busy, setBusy] = useState<{ phase: DownloadPhase; bytes: number; part?: { done: number; total: number } } | null>(null);
     const [online, setOnline] = useState(navigator.onLine);
     const abort = useRef<AbortController | null>(null);
@@ -191,9 +208,10 @@ export function AreaDownloadDialog() {
             }
             const message = error instanceof Error ? error.message : String(error);
             const kept = cachedTiles(bounds);
-            toast(message.startsWith('rate-limit') ? t('area.rateLimit') : message === 'offline' ? t('area.needsNetwork')
-                : kept > 0 ? t('area.failedPartial', { done: kept, total: tileBounds(bounds).length }) : t('area.failed', { reason: message }), { tone: 'danger' });
+            const total = tileBounds(resumeBounds(bounds)).length;
+            toast(areaErrorText(message, kept, total), { tone: 'danger' });
             setBusy(null);
+            setResumable(kept);
         }
     }
 
@@ -219,7 +237,7 @@ export function AreaDownloadDialog() {
                     <div className="spacer" />
                     <Button variant="ghost" onClick={hide}>{t('common.cancel')}</Button>
                     <Button variant="primary" disabled={!online || tooLarge || !bounds || busy !== null} onClick={() => void download()} data-testid="download-area">
-                        {t('area.download')}
+                        {bounds && resumable > 0 && cachedTiles(bounds) > 0 ? t('area.resume') : t('area.download')}
                     </Button>
                 </>
             )}
@@ -259,10 +277,10 @@ export function AreaDownloadDialog() {
                 <div ref={frame} className={`area-dl__frame ${tooLarge ? 'is-too-large' : ''}`} aria-hidden />
                 {busy ? (
                     <div className="area-dl__busy">
-                        <strong>{busy.phase === 'download' ? t('area.downloading') : t('area.converting')}</strong>
+                        <strong>{busy.phase === 'download' ? t('area.downloading') : busy.phase === 'wait' ? t('area.retryIn', { s: busy.bytes }) : t('area.converting')}</strong>
                         <span className="num">
                             {busy.phase === 'download' && busy.part && busy.part.total > 1 ? `${t('area.part', { done: Math.min(busy.part.done + 1, busy.part.total), total: busy.part.total })} · ` : ''}
-                            <CountUp value={busy.bytes} format={(n) => formatBytes(Math.round(n))} />
+                            {busy.phase === 'wait' ? null : <CountUp value={busy.bytes} format={(n) => formatBytes(Math.round(n))} />}
                         </span>
                         <div className="progress progress--indeterminate"><div className="progress__bar" /></div>
                         <Button small variant="ghost" onClick={() => {

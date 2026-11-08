@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { areaKm2, cachedTiles, downloadArea, mergeTiles, tileBounds } from '../../src/core/areas/overpass';
+import { areaKm2, cachedTiles, downloadArea, mergeTiles, secondsUntilNextDownload, tileBounds } from '../../src/core/areas/overpass';
 import type { Bounds } from '../../src/core/geo/geo';
 
 const AREA: Bounds = [11.80, 52.37, 11.83, 52.39];
@@ -71,8 +71,11 @@ describe('tiled area downloads', () => {
         failing = new Set(Array.from({ length: 8 }, (_, i) => total + i));
         const first = downloadArea({ id: 'a', name: 'A', bounds: AREA, signal: new AbortController().signal, onProgress: () => undefined });
         const failed = first.catch((error: Error) => error);
-        await vi.runAllTimersAsync();
-        expect(await failed).toBeInstanceOf(Error);
+        // (Not runAllTimers: that would also fire the 30-minute expiry of the kept tiles.)
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        const failure = await failed;
+        expect(failure).toBeInstanceOf(Error);
+        expect((failure as Error).message).toBe("Failed to fetch");
         expect(cachedTiles(AREA)).toBe(total - 1);
         // Next try (after the polite pause between downloads): only the missing tile is fetched.
         calls = [];
@@ -88,5 +91,33 @@ describe('tiled area downloads', () => {
         expect(names.filter((n) => n === 'Grenzweg')).toHaveLength(1);
         expect(pkg.data.features.filter((f) => f.properties?.highway === 'track')).toHaveLength(total);
         expect(cachedTiles(AREA)).toBe(0);
+    });
+
+    it('resumes when the frame moved slightly, and forgets kept tiles after 30 minutes', async () => {
+        vi.useFakeTimers();
+        // Past the polite pause after the previous test's download.
+        vi.setSystemTime(Date.now() + (secondsUntilNextDownload() + 1) * 1000);
+        const total = tileBounds(AREA).length;
+        failing = new Set(Array.from({ length: 6 }, (_, i) => total + i));
+        const failed = downloadArea({ id: 'b', name: 'B', bounds: AREA, signal: new AbortController().signal, onProgress: () => undefined }).catch((error: Error) => error);
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        expect(((await failed) as Error).message).toBe('Failed to fetch');
+        // The map moved by about 7 m: still the same area.
+        const nudged: Bounds = [AREA[0] + 0.0001, AREA[1], AREA[2] + 0.0001, AREA[3]];
+        expect(cachedTiles(nudged)).toBe(total - 1);
+        // A clearly different frame starts fresh.
+        expect(cachedTiles([11.90, 52.37, 11.93, 52.39])).toBe(0);
+        await vi.advanceTimersByTimeAsync(31 * 60_000);
+        expect(cachedTiles(AREA)).toBe(0);
+    });
+
+    it('does not retry an answer that would fail the same way', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(Date.now() + (secondsUntilNextDownload() + 1) * 1000);
+        vi.stubGlobal('fetch', vi.fn(async () => new Response('{"version":0.6}')));
+        const failed = downloadArea({ id: 'c', name: 'C', bounds: [11.80, 52.37, 11.81, 52.375], signal: new AbortController().signal, onProgress: () => undefined }).catch((error: Error) => error);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(((await failed) as Error).message).toBe('overpass-format');
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
     });
 });
