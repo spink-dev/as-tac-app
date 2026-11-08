@@ -17,6 +17,8 @@ Taktische Kartenplanung für Airsoft – auf echten OpenStreetMap-Karten, offlin
 - **Schwaches Mobilfunknetz:** Änderungen reisen in kleinen, sich anpassenden Paketen und gehen bei Funklöchern nicht verloren; ein Empfang setzt nach einem Funkloch dort fort, wo er abbrach. Ohne Echtzeit-Verbindung (blockierter Websocket) gleicht die App alle 20 s über normales HTTP ab. Bildkarten und Logos laufen im Hintergrund: Herunterladen in fortsetzbaren Stücken, Hochladen ab 6 MB fortsetzbar. Mit «Bildkarten von Partnern laden: Manuell» (Einstellungen) kommen sie erst auf Antippen; «Nur WLAN» erkennt WLAN nur auf Android und ChromeOS und gilt sonst wie «Manuell».
 - **Datenschutz:** Die eigene GPS-Position wird nie übertragen und nur auf ausdrücklichen Wunsch als Pfad gespeichert. «Streamer Safe» blendet Navigation, eigene Position, Planungs- und Freundinformationen aus.
 - **Darstellung:** Tag, Dunkel, Rotlicht; grosse Touch-Ziele; Telefon mit Bottom Sheet, Desktop mit Seitenpanel.
+- **Sprache:** Deutsch ist die erste Sprache, unabhängig von der Browsersprache. Englisch lässt sich auf der Startseite (Schaltfläche oben rechts), in den Einstellungen und in der Befehlssuche wählen; die Wahl gilt für dieses Gerät.
+- **Version und Updates:** Version und Build stehen auf der Startseite («Dieses Gerät») und in den Einstellungen. Die App fragt beim Start, stündlich und nach einem Funkloch den Server nach einer neuen Version (`/version.json`, wenige Bytes) und lädt sie im Hintergrund – im Datensparmodus erst auf Tippen. Eingespielt wird sie nur auf Tippen («Jetzt aktualisieren»): vorher wird alles gespeichert, eine laufende Pfadaufnahme blockiert; danach öffnet sich derselbe Plan im selben Modus. Andere offene Fenster werden zum Neuladen aufgefordert. «Neuerungen» zeigt die Kurzfassung dieser Liste.
 
 ## Starten
 
@@ -35,6 +37,8 @@ Browser-Prüfungen gegen die laufende Vorschau (Chromium via Playwright):
 npx playwright install chromium   # einmalig (Playwright ist Entwicklungsabhängigkeit)
 npm run e2e                       # alle Szenarien, Screenshots unter tests/e2e/screenshots
 ```
+
+Das Szenario `update` baut dafür selbst zwei Versionen und spielt ein echtes Update durch (eigener kleiner Server, unabhängig von der Vorschau).
 
 ## Live-Zusammenarbeit einrichten (optional)
 
@@ -75,7 +79,9 @@ docker build -t as-tac \
 docker run -p 8080:80 as-tac
 ```
 
-Die beiden Werte werden beim Build eingebunden; ohne sie läuft die App rein lokal. Nie einen `service_role`- oder `sb_secret`-Schlüssel verwenden.
+Die beiden Werte werden beim Build eingebunden; ohne sie läuft die App rein lokal. Nie einen `service_role`- oder `sb_secret`-Schlüssel verwenden. Mit `--build-arg BUILD_COMMIT=$(git rev-parse --short HEAD)` zeigt die App den Build an (der Build-Kontext enthält kein `.git`).
+
+**Neue Version ausliefern:** Version in `package.json` erhöhen, Eintrag in `CHANGELOG.md` und `src/core/releases.ts`, neu bauen und deployen. `index.html`, `sw.js` und `version.json` dürfen nicht lange zwischengespeichert werden (siehe `docker/nginx.conf`), sonst sehen Geräte das Update erst spät.
 
 ## Was geprüft ist – und was nicht
 

@@ -13,8 +13,8 @@ import { openProject } from '../../core/store/route';
 import { toast } from '../../core/store/ui';
 import { BUNDLED_AREAS, installBundled, listAreas, removeArea, areaUsage } from '../../core/areas/store';
 import type { AreaMeta } from '../../core/areas/types';
-import { APP_VERSION } from '../../version';
 import { usePwa } from '../../core/pwa';
+import { AppInfo, UpdateBanner } from '../update/Update';
 import { LegacyBanner } from './LegacyBanner';
 import { exportAreaFile } from '../../core/areas/files';
 import { saveFile } from '../../core/files/save';
@@ -131,12 +131,7 @@ export function Library() {
                     <AppearanceToggle />
                 </header>
 
-                {pwa.needRefresh ? (
-                    <div className="notice notice--warn lib__update">
-                        <span className="spacer">{t('library.updateReady')}</span>
-                        <Button small variant="primary" onClick={() => pwa.update()}>{t('library.applyUpdate')}</Button>
-                    </div>
-                ) : null}
+                <UpdateBanner />
 
                 <LegacyBanner onImported={() => void refresh()} />
 
@@ -276,9 +271,8 @@ export function Library() {
                                     )}
                                 </div>
                             ) : null}
+                            <AppInfo />
                             <div className="row-gap">
-                                <span className="muted">{t('library.version', { v: APP_VERSION })}</span>
-                                <div className="spacer" />
                                 <Button small variant="ghost" onClick={() => showDialog('credits')}>{t('library.credits')}</Button>
                             </div>
                         </section>

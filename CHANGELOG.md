@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-alpha.2 — 2026-11-08 (Branch `redesign/as-tac-2`)
+
+- **Sprache:** Deutsch ist die erste Sprache, auch in englischsprachigen Browsern. Englisch wählbar auf der Startseite, in den Einstellungen und in der Befehlssuche. Gespeicherte Einstellungen tragen jetzt eine Version (`as-tac.prefs`, `v: 2`); beim Wechsel von alpha.1 wird ein automatisch übernommenes Englisch (englischer Browser) auf Deutsch gesetzt, ein von Hand gewähltes Englisch bleibt. Restliche fest verdrahtete Beschriftungen übersetzt.
+- **Version und Updates:** Version, Commit und Build-Zeit in der App; `version.json` auf dem Server; Update-Suche beim Start, stündlich, nach Funklöchern und von Hand; Herunterladen im Hintergrund (Datensparmodus: erst auf Tippen); Einspielen nur auf Tippen, nach Speichern von Plan und Live-Warteschlange, blockiert während einer Pfadaufnahme; danach derselbe Plan im selben Modus; andere Fenster werden zum Neuladen aufgefordert; Hinweis «Aktualisiert auf Version …» mit «Neuerungen». Dateien einer veralteten Seite, die nach einem Update fehlen, führen zu einem gespeicherten Neuladen statt einer leeren Seite.
+
 ## 1.0.0-alpha.1 — 2026-11-08 (Branch `redesign/as-tac-2`)
 
 Neuentwicklung: as-tac 0.6 (echte OSM-Karten) und TacMap 0.12 (Bildkarten, Werkzeuge) in einer App.

@@ -64,8 +64,51 @@
     letter-spacing: 0.02em;
 }
 
-.lib__update {
+.update-banner {
     align-items: center;
+    gap: var(--sp-2);
+}
+
+.app-info__version {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-2);
+}
+
+.app-info p {
+    margin: 0;
+}
+
+.row-gap.wrap {
+    flex-wrap: wrap;
+}
+
+.release-notes {
+    margin: 0;
+    padding-inline-start: 1.2em;
+    display: grid;
+    gap: var(--sp-2);
+    line-height: 1.45;
+    max-width: 65ch;
+}
+
+/* Waiting update in the plan view: the icon carries a dot in the accent colour. */
+.icon-btn.update-dot {
+    position: relative;
+    color: var(--accent);
+}
+
+.icon-btn.update-dot::after {
+    content: '';
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--surface);
 }
 
 .lib__actions {

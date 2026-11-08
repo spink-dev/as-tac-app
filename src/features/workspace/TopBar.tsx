@@ -6,6 +6,7 @@ import { closeProject } from '../../core/store/route';
 import { useSaveState } from '../../core/storage/projects';
 import { ICON, IconButton } from '../../ui/components';
 import { AppearanceToggle } from '../../ui/Brand';
+import { UpdateButton } from '../update/Update';
 import { setMode } from './modes';
 import { LiveBadge } from '../live/LiveBadge';
 
@@ -70,6 +71,7 @@ export function TopBar() {
                     <span className="only-fine"><Command {...ICON} /></span>
                     <span className="only-coarse"><Search {...ICON} /></span>
                 </IconButton>
+                <UpdateButton />
                 <AppearanceToggle />
             </div>
         </header>

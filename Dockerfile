@@ -7,6 +7,9 @@ COPY . .
 ARG VITE_SUPABASE_URL=""
 ARG VITE_SUPABASE_PUBLISHABLE_KEY=""
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
+# Shown as the build in the app (the build context has no .git): --build-arg BUILD_COMMIT=$(git rev-parse --short HEAD)
+ARG BUILD_COMMIT=""
+ENV BUILD_COMMIT=$BUILD_COMMIT
 RUN npm run build
 
 FROM nginx:alpine

@@ -1,7 +1,7 @@
 // Runs every browser scenario against a running preview (npm run preview → :4000) and fails on any failed check.
 import { spawnSync } from 'node:child_process';
 
-const scenarios = ['smoke', 'tools', 'panels', 'images', 'field', 'share', 'live', 'live-weak', 'live-media'];
+const scenarios = ['smoke', 'tools', 'panels', 'images', 'field', 'share', 'live', 'live-weak', 'live-media', 'update'];
 let failed = 0;
 for (const name of scenarios) {
     const started = Date.now();

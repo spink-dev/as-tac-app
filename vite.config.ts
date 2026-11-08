@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -6,6 +7,41 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Large bundled OSM areas are installed into IndexedDB on demand instead of being precached.
 // Their manifests too: a precached manifest from an older deploy would not match fresh data.
 const ON_DEMAND = ['maps/zurich.geojson', 'maps/benglen.geojson', 'maps/zurich.json', 'maps/benglen.json'];
+
+/**
+ * Identity of this build: package version, commit and build time. `BUILD_COMMIT` comes from the
+ * Docker build (no .git there); `BUILD_VERSION` only exists for the update test (two builds).
+ */
+function commit(): string {
+    if (process.env.BUILD_COMMIT) {
+        return process.env.BUILD_COMMIT.slice(0, 12);
+    }
+    try {
+        return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    } catch {
+        return '';
+    }
+}
+const BUILD = {
+    version: process.env.BUILD_VERSION || (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version,
+    commit: commit(),
+    date: new Date().toISOString(),
+};
+
+/** `/version.json`: what the server has now. Never precached, so the app can compare against it. */
+const versionFile: Plugin = {
+    name: 'as-tac-version',
+    configureServer(server) {
+        server.middlewares.use('/version.json', (_req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'no-store');
+            res.end(JSON.stringify(BUILD));
+        });
+    },
+    generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify(BUILD) });
+    },
+};
 
 /** Ship CREDITS.md with the app (offline credits dialog links to it); served in dev too. */
 const shipCredits: Plugin = {
@@ -22,6 +58,7 @@ const shipCredits: Plugin = {
 };
 
 export default defineConfig({
+    define: { __BUILD__: JSON.stringify(BUILD) },
     server: { port: 9000, host: true },
     preview: { port: 4000, host: true },
     build: {
@@ -47,6 +84,7 @@ export default defineConfig({
     plugins: [
         react(),
         shipCredits,
+        versionFile,
         VitePWA({
             registerType: 'prompt',
             injectRegister: false,

@@ -7,6 +7,7 @@ import { Button, Field, NameInput, Segmented, Switch } from '../../ui/components
 import { showDialog } from '../../core/store/dialogs';
 import { canEdit, toastStreamer } from '../../core/actions';
 import { MAX } from '../../core/model/schema';
+import { AppInfo } from '../update/Update';
 
 export function SettingsPanel() {
     const t = useT();
@@ -72,6 +73,10 @@ export function SettingsPanel() {
                     <input className="input" value={prefs.displayName} maxLength={40} onChange={(event) => prefs.set({ displayName: event.target.value })} />
                 </Field>
                 <Button onClick={() => showDialog('shortcuts')}><Keyboard size={18} /> {t('settings.shortcuts')}</Button>
+            </section>
+            <section className="section">
+                <div className="section__title">{t('update.title')}</div>
+                <AppInfo />
             </section>
         </div>
     );

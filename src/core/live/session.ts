@@ -10,6 +10,7 @@ import { validEntity } from '../model/validate';
 import { usePrefs } from '../store/prefs';
 import { toast, useUi } from '../store/ui';
 import { t } from '../../i18n';
+import { onBeforeUpdate } from '../pwa';
 import { resetLive, useLive, type LiveRole, type Presence } from './state';
 import { broadcastBriefing, setBriefingSender } from './briefingSync';
 import { currentCamera, mapRef, renderPlan } from '../../map/MapView';
@@ -367,6 +368,12 @@ class Session {
         }
         useLive.setState({ queued: this.pending.size });
         this.stop.push(onProjectChange((prev, next, source) => this.onLocal(prev, next, source)));
+        // Before an update reloads the page: queued changes and the sync position are on disk.
+        this.stop.push(onBeforeUpdate(async () => {
+            await this.persistChain;
+            await this.writeVersions();
+            return null;
+        }));
         setBriefingSender((state) => {
             if (this.leading && !this.closed) {
                 this.transport.broadcast({ type: 'briefing', from: this.clientId, name: displayName(), leading: true, phaseIndex: state.phaseIndex, camera: state.camera });

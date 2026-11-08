@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type DialogName = 'newPlan' | 'areaDownload' | 'import' | 'join' | 'credits' | 'shortcuts' | 'placeImport' | 'share' | 'qrReceive' | 'onboarding';
+export type DialogName = 'newPlan' | 'areaDownload' | 'import' | 'join' | 'credits' | 'shortcuts' | 'placeImport' | 'share' | 'qrReceive' | 'onboarding' | 'whatsNew';
 
 interface DialogState {
     open: DialogName | null;

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Toasts } from './ui/components';
-import { useRoute } from './core/store/route';
+import { openProject, useRoute } from './core/store/route';
 import { Library } from './features/library/Library';
 import { NewPlanDialog } from './features/library/NewPlanDialog';
 import { AreaDownloadDialog } from './features/areas/AreaDownloadDialog';
@@ -11,12 +11,18 @@ import { CreditsDialog } from './features/library/CreditsDialog';
 import { showDialog } from './core/store/dialogs';
 import { decodePlanLink, JOIN_PREFIX, LINK_PREFIX } from './core/files/link';
 import { startAutosave } from './core/storage/projects';
-import { registerPwa } from './core/pwa';
+import { recoverFromStaleBuild, registerPwa, takeResume } from './core/pwa';
+import { WhatsNewDialog } from './features/update/Update';
 import { onMutationRejected } from './core/store/project';
-import { toast } from './core/store/ui';
+import { toast, useUi } from './core/store/ui';
 import { t } from './i18n';
 
-const Workspace = lazy(() => import('./features/workspace/Workspace').then((module) => ({ default: module.Workspace })));
+// A page from an older build may find its files gone after an update: reload into the current one.
+const Workspace = lazy(() => import('./features/workspace/Workspace').then((module) => ({ default: module.Workspace })).catch((error: unknown) => {
+    console.warn('workspace chunk failed to load', error);
+    void recoverFromStaleBuild();
+    return new Promise<never>(() => undefined);
+}));
 
 type LaunchParams = { files: { getFile: () => Promise<File> }[] };
 
@@ -80,6 +86,21 @@ async function receiveLink() {
     }
 }
 
+/** After reloading into a new version: reopen the plan that was open, in the same mode. */
+function resumeAfterUpdate() {
+    const resume = takeResume();
+    if (!resume) {
+        return;
+    }
+    void openProject(resume.projectId).then(() => {
+        if (resume.mode === 'field') {
+            useUi.getState().set({ mode: 'field', tool: 'select', panel: null, sheet: 'closed' });
+        } else if (resume.mode === 'briefing') {
+            useUi.getState().set({ mode: 'briefing', tool: 'select', phaseIndex: 0, selection: [], panel: null, sheet: 'closed' });
+        }
+    }).catch((error: unknown) => console.warn('could not reopen the plan after the update', error));
+}
+
 export function App() {
     const route = useRoute((state) => state.route);
 
@@ -95,6 +116,7 @@ export function App() {
         });
         void registerPwa();
         void receiveLaunch();
+        resumeAfterUpdate();
         return () => {
             stop();
             stopRejected();
@@ -116,6 +138,7 @@ export function App() {
             <ImportDialog />
             <JoinDialog />
             <CreditsDialog />
+            <WhatsNewDialog />
             <Toasts />
         </>
     );

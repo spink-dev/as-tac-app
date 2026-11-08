@@ -6,6 +6,7 @@ import { mutate, useProject } from '../../core/store/project';
 import { uid, nowIso } from '../../core/model/factory';
 import { toast, useUi } from '../../core/store/ui';
 import { onBeforeClose } from '../../core/store/route';
+import { onBeforeUpdate } from '../../core/pwa';
 import { formatDateTime, t } from '../../i18n';
 import { usePrefs } from '../../core/store/prefs';
 import { distanceM } from '../../core/geo/geo';
@@ -36,6 +37,9 @@ interface GpsState {
 }
 
 export const useGps = create<GpsState>(() => ({ active: false, follow: false, fix: null, error: null, recording: null, saveFailed: false, now: Date.now() }));
+
+// A recording exists only in memory until it is stopped: an update (reload) would lose it.
+onBeforeUpdate(() => (useGps.getState().recording ? t('update.blockedRecording') : null));
 
 let watchId: number | null = null;
 /** Last point the camera was centred on by follow: a view around it is the own position. */
