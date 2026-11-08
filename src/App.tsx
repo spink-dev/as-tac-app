@@ -1,14 +1,32 @@
+import { lazy, Suspense, useEffect } from 'react';
 import { Toasts } from './ui/components';
-import { useT } from './i18n';
+import { useRoute } from './core/store/route';
+import { Library } from './features/library/Library';
+import { NewPlanDialog } from './features/library/NewPlanDialog';
+import { startAutosave } from './core/storage/projects';
+import { registerPwa } from './core/pwa';
+
+const Workspace = lazy(() => import('./features/workspace/Workspace').then((module) => ({ default: module.Workspace })));
 
 export function App() {
-    const t = useT();
+    const route = useRoute((state) => state.route);
+
+    useEffect(() => {
+        const stop = startAutosave();
+        void registerPwa();
+        return stop;
+    }, []);
+
     return (
         <>
-            <main className="boot">
-                <h1>AS-TAC</h1>
-                <p className="muted">{t('app.tagline')}</p>
-            </main>
+            {route.name === 'library' ? (
+                <Library />
+            ) : (
+                <Suspense fallback={<div className="boot"><span className="muted">AS-TAC</span></div>}>
+                    <Workspace key={route.projectId} />
+                </Suspense>
+            )}
+            <NewPlanDialog />
             <Toasts />
         </>
     );
