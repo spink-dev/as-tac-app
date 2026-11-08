@@ -1,7 +1,7 @@
 import { db, kvGet, kvSet, type LiveLinkRow, type OutboxRow } from '../storage/db';
 import { getAsset, isRenderableImage, putVerifiedAsset, safeMime, sha256Hex } from '../storage/assets';
 import { mayAutoDownload } from '../net';
-import { flushNow, onSavedAsCopy, saveProject, savedAs } from '../storage/projects';
+import { flushNow, onProjectSaved, onSavedAsCopy, saveProject, savedAs } from '../storage/projects';
 import { mutate, onProjectChange, useProject } from '../store/project';
 import { applyOps, diffProjects, entityOf, metaOf, ORDER_ID, type DiffCollection, type EntityOp } from '../store/diff';
 import { FORMAT_VERSION, SYNCED_COLLECTIONS, ProjectSchema, type Project } from '../model/schema';
@@ -375,7 +375,9 @@ class Session {
             // Queued before an app update: bring it to this format (or hold it, if a newer app queued it).
             const result = migrateQueued(stored);
             if (!result) {
-                console.warn('live: queued change could not be migrated; kept on the device, not sent', stored.id);
+                // A bug in a migration step: never sent half-converted. The change itself is in the plan.
+                console.warn('live: queued change could not be migrated and is not sent', stored.id);
+                toast(t('live.queuedUnusable'), { tone: 'warn' });
                 continue;
             }
             if ('newer' in result) {
@@ -393,6 +395,22 @@ class Session {
         }
         useLive.setState({ queued: this.pending.size });
         this.stop.push(onProjectChange((prev, next, source) => this.onLocal(prev, next, source)));
+        // Queued changes that the stored plan already holds are no longer "only in this window".
+        this.stop.push(onProjectSaved((saved) => {
+            if (saved.id !== this.link.projectId) {
+                return;
+            }
+            for (const key of [...this.touched]) {
+                const row = this.pending.get(key);
+                const op = row ? toLocal({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: row.data }) : null;
+                const inPlan = !row || (row.data === null
+                    ? entityOf(saved, { collection: row.collection as DiffCollection, entityId: row.entityId, data: null }) === undefined
+                    : op !== null && same(wire(entityOf(saved, op) ?? null), row.data));
+                if (inPlan) {
+                    this.touched.delete(key);
+                }
+            }
+        }));
         // A newer app took this plan over on the device: this window's edits now go to a local copy,
         // which is not the live plan. Stop syncing (the queue stays for the newer app to send).
         this.stop.push(onSavedAsCopy((original) => {
@@ -400,7 +418,7 @@ class Session {
                 return;
             }
             toast(t('live.stoppedCopy'), { tone: 'warn' });
-            // What this window queued in this session now lives only in the local copy: it must not
+            // What this window queued since its last good save lives only in the local copy: it must not
             // reach the live plan through the newer window, whose plan never had it.
             for (const key of this.touched) {
                 const row = this.pending.get(key);
@@ -736,7 +754,8 @@ class Session {
     }
 
     private onLocal(prev: Project | null, next: Project | null, source: string) {
-        if (this.closed || !prev || !next || source === 'remote' || source === 'load' || next.id !== this.link.projectId || this.role === 'viewer') {
+        if (this.closed || !prev || !next || source === 'remote' || source === 'load' || next.id !== this.link.projectId || this.role === 'viewer'
+            || savedAs(this.link.projectId) !== this.link.projectId) {
             return;
         }
         const ops = diffProjects(prev, next, SYNCED_COLLECTIONS);
@@ -811,7 +830,7 @@ class Session {
         }
         this.outdated = version;
         useLive.setState({ outdated: version });
-        toast(t('live.outdated'), { tone: 'warn', action: { label: t('update.check'), run: () => void checkForUpdate(true) } });
+        toast(t(this.role === 'viewer' ? 'live.outdatedViewer' : 'live.outdated'), { tone: 'warn', action: { label: t('update.check'), run: () => void checkForUpdate(true) } });
         void checkForUpdate();
     }
 
@@ -824,8 +843,9 @@ class Session {
     private async writeVersions(): Promise<void> {
         const versions = Object.fromEntries(this.versions);
         const lastSeq = this.storedSeq();
-        if (!(await flushNow().catch(() => false))) {
-            // The plan couldn't be stored: keep the old position, so the next session fetches again.
+        if (!(await flushNow().catch(() => false)) || savedAs(this.link.projectId) !== this.link.projectId) {
+            // The plan couldn't be stored — or it went to a copy (a newer app took the original over):
+            // keep the old position, so the next session fetches again what the original lacks.
             return;
         }
         await kvSet(versionsKey(this.link.projectId), versions).catch(() => undefined);
@@ -915,7 +935,9 @@ class Session {
                             // Mine stays queued and goes out after the update, checked against it then.
                             this.outdate(incoming.newer);
                         } else if (row) {
-                            // Unusable on the server: mine is offered to the user instead of being lost.
+                            // Unusable on the server: mine is offered to the user instead of being lost,
+                            // and «keep mine» can replace the broken row (its version is known now).
+                            this.versions.set(key, raw.version);
                             const current = this.pending.get(key);
                             if (current) {
                                 this.pending.delete(key);
@@ -1401,12 +1423,16 @@ class Session {
         this.markSeq(raw.seq);
         const incoming = readFormat(raw.collection, raw.data);
         if (!incoming.ok) {
-            // Not applied: the stored position stays below it, so it is fetched again (after an update).
-            this.holdSeq = Math.min(this.holdSeq, raw.seq - 1);
             if (incoming.newer !== null) {
+                // Not applied: the stored position stays below it, so it is fetched again after the update.
+                this.holdSeq = Math.min(this.holdSeq, raw.seq - 1);
                 this.outdate(incoming.newer);
-            } else {
+            } else if (raw.version > (this.versions.get(keyOf(raw.collection, raw.entityId)) ?? 0)) {
+                // Broken beyond any update: skipped for good. Its version is recorded, so an edit here
+                // can replace it (no endless clash) and it is not fetched again every session.
                 console.warn('live: ignoring unusable entity', raw.collection, raw.entityId);
+                this.versions.set(keyOf(raw.collection, raw.entityId), raw.version);
+                this.saveVersions();
             }
             return;
         }
@@ -1430,9 +1456,10 @@ class Session {
         }
         if (this.inflight.has(key)) {
             // Hold it until my push returns, then apply or let the version check catch the clash.
+            // Held as it came (tagged): the replay goes through `onRemote` and reads the format again.
             const held = this.deferred.get(key);
             if (!held || held.version < entity.version) {
-                this.deferred.set(key, entity);
+                this.deferred.set(key, raw);
             }
             return;
         }
@@ -1443,6 +1470,11 @@ class Session {
         if (!this.applyRemote([entity])) {
             // Not applied (invalid for this device, or the plan was just closed): its version is not
             // recorded and the stored seq stays below it, so the next session pulls it again.
+            this.holdSeq = Math.min(this.holdSeq, entity.seq - 1);
+            return;
+        }
+        if (entity.collection === 'order' && this.outdated !== null) {
+            // It may place objects this device held back: applied now, applied again after the update.
             this.holdSeq = Math.min(this.holdSeq, entity.seq - 1);
             return;
         }

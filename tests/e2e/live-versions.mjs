@@ -72,9 +72,11 @@ const same = await newer.waitForFunction(() => window.__asTacCounts().elements =
 check('same-version-syncs', same);
 
 // The partner now writes a newer plan format.
-await newer.evaluate(() => {
-    window.__asTacWireFormat = 99;
-});
+// (One format ahead: a real next version. Tags implausibly far ahead count as broken instead.)
+const NEXT_FORMAT = 2;
+await newer.evaluate((format) => {
+    window.__asTacWireFormat = format;
+}, NEXT_FORMAT);
 await mark(newer, 0.5);
 const asked = await owner.locator('.live-badge').filter({ hasText: /Update nötig/ }).waitFor({ timeout: 30000 }).then(() => true, () => false);
 check('older-device-asks-for-update', asked);
@@ -101,6 +103,40 @@ await late.getByTestId('join-code').waitFor();
 await late.getByTestId('join-submit').click();
 const refused = await late.getByText(/neueren AS-TAC-Version bearbeitet/).waitFor({ timeout: 30000 }).then(() => true, () => false);
 check('join-refused-with-reason', refused);
+
+// "Update": the owner's app now reads that format — simulated by retagging the newer object on the
+// test server as the current format, then reloading into the same plan as an update does.
+await owner.evaluate((format) => {
+    const key = Object.keys(localStorage).find((k) => k.startsWith('as-tac-loopback:plan:'));
+    const state = JSON.parse(localStorage.getItem(key));
+    for (const entity of Object.values(state.entities)) {
+        if (entity.data && entity.data._fv === format) {
+            entity.data._fv = 1;
+        }
+    }
+    localStorage.setItem(key, JSON.stringify(state));
+}, NEXT_FORMAT);
+await newer.evaluate(() => {
+    delete window.__asTacWireFormat;
+});
+const projectId = await owner.evaluate(() => new Promise((resolve) => {
+    const request = indexedDB.open('as-tac-v2');
+    request.onsuccess = () => {
+        request.result.transaction('liveLinks').objectStore('liveLinks').getAll().onsuccess = (event) => {
+            const owned = event.target.result.find((link) => link.role === 'owner');
+            resolve(owned?.projectId ?? null);
+            request.result.close();
+        };
+    };
+}));
+await owner.evaluate((id) => sessionStorage.setItem('as-tac.resume', JSON.stringify({ projectId: id, mode: 'plan', streamer: 'off', at: Date.now() })), projectId);
+await owner.reload();
+await owner.waitForSelector('.maplibregl-canvas', { timeout: 60000 });
+const fetched = await owner.waitForFunction(() => window.__asTacCounts().elements === 3, null, { timeout: 30000 }).then(() => true, () => false);
+check('after-update-held-object-arrives', fetched, String((await counts(owner)).elements));
+const sent = await newer.waitForFunction(() => window.__asTacCounts().elements === 3, null, { timeout: 30000 }).then(() => true, () => false);
+check('after-update-held-edit-goes-out', sent, String((await counts(newer)).elements));
+check('after-update-no-longer-outdated', !(await owner.locator('.live-badge').filter({ hasText: /Update nötig/ }).count()));
 
 await browser.close();
 console.log(JSON.stringify(results, null, 1));

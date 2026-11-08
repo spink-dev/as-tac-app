@@ -4,6 +4,7 @@ import { formatBytes, formatTime, useT } from '../../i18n';
 import { useLive } from '../../core/live/state';
 import { usePrefs } from '../../core/store/prefs';
 import { UpdateAction } from '../update/Update';
+import { usePwa } from '../../core/pwa';
 import { useProject } from '../../core/store/project';
 import { toast, useUi } from '../../core/store/ui';
 import { Button, Empty, Field, Segmented } from '../../ui/components';
@@ -198,12 +199,13 @@ export function LivePanel() {
     const receiving = useLive((state) => state.receiving);
     const conflicts = useLive((state) => state.conflicts);
     const leaderId = useLive((state) => state.leaderId);
+    const outdated = useLive((state) => state.outdated);
+    const updateStatus = usePwa((state) => state.status);
     const project = useProject((state) => state.project);
     const [confirmStop, setConfirmStop] = useState(false);
     if (!project) {
         return null;
     }
-    const outdated = useLive((state) => state.outdated);
     if (status === 'off') {
         return <NotLive />;
     }
@@ -234,7 +236,10 @@ export function LivePanel() {
             </div>
             {outdated !== null ? (
                 <div className="notice notice--warn update-banner" role="status" data-testid="live-outdated">
-                    <span className="spacer">{t('live.outdated')}</span>
+                    <span className="spacer">
+                        {t(role === 'viewer' ? 'live.outdatedViewer' : 'live.outdated')}
+                        {updateStatus === 'current' ? ` ${t('live.outdatedNoUpdate')}` : ''}
+                    </span>
                     <UpdateAction small />
                 </div>
             ) : null}

@@ -238,6 +238,17 @@ export function savedAs(id: string): string {
     return copies.get(id) ?? id;
 }
 
+type SavedListener = (project: Project) => void;
+const savedListeners = new Set<SavedListener>();
+
+/** A plan was autosaved under its own id (not redirected to a copy): the stored record holds this state. */
+export function onProjectSaved(listener: SavedListener): () => void {
+    savedListeners.add(listener);
+    return () => {
+        savedListeners.delete(listener);
+    };
+}
+
 type CopyListener = (originalId: string, copyId: string) => void;
 const copyListeners = new Set<CopyListener>();
 
@@ -288,6 +299,9 @@ async function write(): Promise<boolean> {
     try {
         await saveProject(target(project));
         useSaveState.setState({ state: pending ? 'saving' : 'saved', error: undefined });
+        if (!copies.has(project.id)) {
+            savedListeners.forEach((listener) => listener(project));
+        }
         return true;
     } catch (error) {
         if ((error as Error)?.message === 'newer' && !copies.has(project.id)) {

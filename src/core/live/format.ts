@@ -12,6 +12,9 @@ import type { RemoteCollection } from './types';
  */
 export const FORMAT_KEY = '_fv';
 
+/** Plan formats a newer app can plausibly be ahead by (one per release at most). */
+const MAX_AHEAD = 20;
+
 function kindOf(collection: RemoteCollection): EntityKind | null {
     return collection === 'order' ? null : collection;
 }
@@ -35,6 +38,10 @@ export function readFormat(collection: RemoteCollection, data: unknown, current:
     const { [FORMAT_KEY]: tag, ...rest } = data;
     const version = tag === undefined ? 1 : tag;
     if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+        return { ok: false, newer: null };
+    }
+    if (version > current + MAX_AHEAD) {
+        // No real app is that far ahead: a broken or hostile tag must not lock every partner out.
         return { ok: false, newer: null };
     }
     if (version > current) {
@@ -62,7 +69,10 @@ export function migrateQueued<T extends { collection: string; data: unknown; pre
         return { newer: from };
     }
     if (from === current) {
-        return { row, changed: false };
+        // 1.0.0-alpha.1 kept received tags inside its entities and could queue them: drop them.
+        const strip = (value: unknown) => (isJson(value) && FORMAT_KEY in value ? (({ [FORMAT_KEY]: _tag, ...rest }) => rest)(value) : value);
+        const tagged = [row.data, row.prev, ...(row.unacked ?? [])].some((value) => isJson(value) && FORMAT_KEY in value);
+        return tagged ? { row: { ...row, data: strip(row.data), prev: strip(row.prev), unacked: row.unacked?.map(strip) }, changed: true } : { row, changed: false };
     }
     const collection = row.collection as RemoteCollection;
     const one = (value: unknown) => {
