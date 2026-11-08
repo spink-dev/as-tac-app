@@ -50,7 +50,7 @@ export function ToolRail() {
     const button = (id: ToolId) => {
         const Icon = TOOL_ICONS[id];
         return (
-            <IconButton key={id} label={label(id)} pressed={tool === id} onClick={() => {
+            <IconButton key={id} label={label(id)} pressed={tool === id} onPointerDown={(event) => event.preventDefault()} onClick={() => {
                 setMore(false);
                 armTool(id);
             }} data-testid={`tool-${id}`}>
@@ -223,11 +223,11 @@ export function DraftBar() {
     const canFinish = (draft.tool === 'route' && draft.points.length >= 2) || (draft.tool === 'zone' && draft.points.length >= 3) || (draft.tool === 'measure' && draft.points.length >= 2);
     return (
         <div className="draftbar hud" data-testid="draftbar">
-            <IconButton label={t('draft.cancel')} onClick={() => cancelDraft()}><X {...ICON} /></IconButton>
-            <IconButton label={t('draft.undoPoint')} onClick={() => removeLastDraftPoint()}><Undo2 {...ICON} /></IconButton>
+            <IconButton label={t('draft.cancel')} onPointerDown={(event) => event.preventDefault()} onClick={() => cancelDraft()}><X {...ICON} /></IconButton>
+            <IconButton label={t('draft.undoPoint')} onPointerDown={(event) => event.preventDefault()} onClick={() => removeLastDraftPoint()}><Undo2 {...ICON} /></IconButton>
             <span className="draftbar__info num">{draft.points.length}</span>
             {canFinish ? (
-                <button type="button" className="btn btn--primary btn--sm" onClick={() => finishDraft()} data-testid="finish-draft">
+                <button type="button" className="btn btn--primary btn--sm" onPointerDown={(event) => event.preventDefault()} onClick={() => finishDraft()} data-testid="finish-draft">
                     <Check size={18} /> {t('draft.finish')}
                 </button>
             ) : null}

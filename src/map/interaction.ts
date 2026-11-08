@@ -312,11 +312,11 @@ function commitGeometry(next: Element) {
     });
 }
 
-let abortActive: (() => void) | null = null;
+let abortActive: (() => boolean) | null = null;
 
-/** Cancel any in-progress drag, stroke or erase without committing it. */
-export function abortGesture() {
-    abortActive?.();
+/** Cancel any in-progress drag, stroke or erase without committing it. Returns true if one was active. */
+export function abortGesture(): boolean {
+    return abortActive?.() ?? false;
 }
 
 export function installInteraction(map: MlMap): () => void {
@@ -343,20 +343,23 @@ export function installInteraction(map: MlMap): () => void {
         canvas.style.cursor = CREATION.includes(tool) ? 'crosshair' : inking ? 'cell' : '';
     }
 
-    function abort() {
+    function abort(): boolean {
         if (!gesture) {
-            return;
+            return false;
         }
         const ui = useUi.getState();
         gesture = null;
         ui.set({ override: null, draft: ui.draft?.tool === 'draw' ? null : ui.draft });
         stopWindowWatch();
         applyToolState();
+        return true;
     }
     abortActive = abort;
 
     const onWindowUp = () => endPress();
-    const onWindowBlur = () => abort();
+    const onWindowBlur = () => {
+        abort();
+    };
     function startWindowWatch() {
         window.addEventListener('pointerup', onWindowUp);
         window.addEventListener('blur', onWindowBlur);
@@ -405,7 +408,10 @@ export function installInteraction(map: MlMap): () => void {
         if (drafting || (ui.tool !== 'select' && !project.settings.directManipulation)) {
             return false;
         }
-        const ids = hitIds(map, point, false, 8, DRAG_LAYERS);
+        const handleOwned = selectedWithHandles ? project.elements.find((e) => e.id === ui.selection[0]) : undefined;
+        const ownsGeometry = handleOwned && (handleOwned.kind === 'route' || handleOwned.kind === 'zone' || handleOwned.kind === 'bearing');
+        // A selected line/zone is moved by its handles only, so it never blocks grabbing a marker on top of it.
+        const ids = hitIds(map, point, false, 8, DRAG_LAYERS).filter((id) => !(ownsGeometry && id === handleOwned.id));
         // Prefer the element the user selected (e.g. after tap-cycling to a lower one).
         const preferred = ids.find((id) => ui.selection.includes(id)) ?? ids[0];
         const element = project.elements.find((e) => e.id === preferred);
@@ -413,10 +419,6 @@ export function installInteraction(map: MlMap): () => void {
             return false;
         }
         if (ui.tool !== 'select' && element.kind !== 'marker' && element.kind !== 'text') {
-            return false;
-        }
-        // A selected line/zone shows precision handles; those own its geometry.
-        if (selectedWithHandles && ui.selection[0] === element.id && (element.kind === 'route' || element.kind === 'zone' || element.kind === 'bearing')) {
             return false;
         }
         gesture = { type: 'drag', kind: 'element', id: element.id, index: 0, start: p, startPoint: point, original: element, moved: false };
@@ -610,7 +612,9 @@ export function installInteraction(map: MlMap): () => void {
     };
 
     const onKey = (event: KeyboardEvent) => {
-        if (event.code !== 'Space' || (event.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable]')) {
+        const target = event.target as HTMLElement | null;
+        // Space belongs to focused controls (buttons, tabs, switches, dialogs) and text fields.
+        if (event.code !== 'Space' || target?.closest?.('input, textarea, select, [contenteditable], button, a[href], summary, [role="button"], [role="menuitem"], [role="switch"], [role="tab"], [role="option"], dialog')) {
             return;
         }
         // Keep space from activating a focused button while it is used for panning.
@@ -705,8 +709,11 @@ export function removeLastDraftPoint() {
 
 export function cancelDraft() {
     const ui = useUi.getState();
+    if (abortGesture()) {
+        return true;
+    }
     if (ui.override) {
-        abortGesture();
+        ui.set({ override: null });
         return true;
     }
     if (ui.draft) {
