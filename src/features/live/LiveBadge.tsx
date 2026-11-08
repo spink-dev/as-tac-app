@@ -10,15 +10,17 @@ export function LiveBadge() {
     const queued = useLive((state) => state.queued);
     const unread = useLive((state) => state.unread);
     const receiving = useLive((state) => state.receiving);
+    const outdated = useLive((state) => state.outdated);
     if (status === 'off') {
         return null;
     }
-    const label = receiving !== null ? t('live.receiving', { n: receiving })
+    const label = outdated !== null ? t('live.outdatedShort')
+        : receiving !== null ? t('live.receiving', { n: receiving })
         : status === 'online' ? t('live.present', { n: presence.length })
             : status === 'limited' ? (queued > 0 ? t('live.sending', { n: queued }) : t('live.limitedShort'))
                 : status === 'connecting' ? t('live.connecting') : t('live.offlineQueued', { n: queued });
     return (
-        <button type="button" className={`live-badge live-badge--${status}`} onClick={() => useUi.getState().openPanel('live')} title={label}>
+        <button type="button" className={`live-badge live-badge--${outdated !== null ? 'outdated' : status}`} onClick={() => useUi.getState().openPanel('live')} title={label}>
             {status === 'online' || status === 'limited' ? <Radio size={16} strokeWidth={2} /> : <CloudOff size={16} strokeWidth={2} />}
             <span className="live-badge__faces" aria-hidden>
                 {presence.slice(0, 3).map((person) => (

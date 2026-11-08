@@ -22,6 +22,10 @@ export const RELEASES: readonly Release[] = [
                 'Plans, files and settings from older versions are brought up to date when opened; data from a newer version stays untouched until the app is updated.',
             ],
             [
+                'Live-Pläne funktionieren über App-Versionen hinweg. Arbeitet ein Partner mit einer neueren Version, zeigt die App «Update nötig» und hält die eigenen Änderungen zurück, bis aktualisiert ist – nichts geht verloren.',
+                'Live plans work across app versions. When a partner uses a newer version, the app shows "Update needed" and holds back your changes until you update – nothing is lost.',
+            ],
+            [
                 'Versionsanzeige und «Nach Updates suchen». Ein Update wird erst auf Tippen eingespielt; vorher wird alles gespeichert, danach öffnet sich derselbe Plan im selben Modus.',
                 'Version display and "Check for updates". An update is only applied when you tap it; everything is saved first, then the same plan reopens in the same mode.',
             ],

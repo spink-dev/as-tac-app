@@ -4,13 +4,14 @@ import { mayAutoDownload } from '../net';
 import { flushNow, saveProject } from '../storage/projects';
 import { mutate, onProjectChange, useProject } from '../store/project';
 import { applyOps, diffProjects, entityOf, metaOf, ORDER_ID, type DiffCollection, type EntityOp } from '../store/diff';
-import { SYNCED_COLLECTIONS, ProjectSchema, type Project } from '../model/schema';
+import { FORMAT_VERSION, SYNCED_COLLECTIONS, ProjectSchema, type Project } from '../model/schema';
+import { migrateQueued, readFormat, tagFormat } from './format';
 import { createProject, uid } from '../model/factory';
 import { validEntity } from '../model/validate';
 import { usePrefs } from '../store/prefs';
 import { toast, useUi } from '../store/ui';
 import { t } from '../../i18n';
-import { onBeforeUpdate } from '../pwa';
+import { checkForUpdate, onBeforeUpdate } from '../pwa';
 import { resetLive, useLive, type LiveRole, type Presence } from './state';
 import { broadcastBriefing, setBriefingSender } from './briefingSync';
 import { currentCamera, mapRef, renderPlan } from '../../map/MapView';
@@ -142,7 +143,17 @@ function snapshotOps(project: Project): Omit<PushOp, 'base'>[] {
 export function projectFromEntities(entities: RemoteEntity[], info: { name: string; areaId: string | null }): Project {
     const project = createProject({ name: info.name, areaId: info.areaId });
     project.layers = [];
-    const live = entities.filter((e) => e.data !== null).sort((a, b) => a.seq - b.seq);
+    const live = entities.filter((e) => e.data !== null).flatMap((e) => {
+        const incoming = readFormat(e.collection, e.data);
+        if (!incoming.ok) {
+            if (incoming.newer !== null) {
+                // Joining would build a plan without the partner's newest objects: update first.
+                throw new Error('live-newer');
+            }
+            return [];
+        }
+        return [{ ...e, data: incoming.data }];
+    }).sort((a, b) => a.seq - b.seq);
     const rank = (c: RemoteCollection) => (c === 'meta' ? -1 : c === 'order' ? 99 : (SYNCED_COLLECTIONS as readonly string[]).indexOf(c));
     live.sort((a, b) => rank(a.collection) - rank(b.collection) || a.seq - b.seq);
     const ops = live.map(toLocal).filter((op): op is EntityOp => op !== null);
@@ -359,9 +370,23 @@ class Session {
         for (const [key, version] of Object.entries(stored)) {
             this.versions.set(key, version);
         }
-        for (const row of (await db.liveOutbox.where('projectId').equals(this.link.projectId).toArray()).sort((a, b) => a.order - b.order)) {
-            this.pending.set(keyOf(row.collection, row.entityId), row);
-            this.order = Math.max(this.order, row.order);
+        for (const stored of (await db.liveOutbox.where('projectId').equals(this.link.projectId).toArray()).sort((a, b) => a.order - b.order)) {
+            this.order = Math.max(this.order, stored.order);
+            // Queued before an app update: bring it to this format (or hold it, if a newer app queued it).
+            const result = migrateQueued(stored);
+            if (!result) {
+                console.warn('live: queued change could not be migrated; kept on the device, not sent', stored.id);
+                continue;
+            }
+            if ('newer' in result) {
+                this.outdate(result.newer);
+                this.pending.set(keyOf(stored.collection, stored.entityId), stored);
+                continue;
+            }
+            if (result.changed) {
+                this.persist(result.row);
+            }
+            this.pending.set(keyOf(stored.collection, stored.entityId), result.row);
         }
         if (this.closed) {
             return;
@@ -711,10 +736,11 @@ class Session {
             // Repeated edits of one entity before sending collapse into one op with the original base.
             const data = wire(op.data);
             const row: OutboxRow = existing
-                ? { ...existing, data, createdAt: now }
+                ? { ...existing, data, createdAt: now, formatVersion: FORMAT_VERSION }
                 : {
                     id: `${this.link.projectId}|${key}`, projectId: this.link.projectId, collection: op.collection, entityId: op.entityId,
                     data, prev: wire(op.prev ?? null), base: this.versions.get(key) ?? 0, order: ++this.order, clientId: this.clientId, createdAt: now,
+                    formatVersion: FORMAT_VERSION,
                 };
             this.pending.set(key, row);
             this.persist(row);
@@ -748,6 +774,29 @@ class Session {
     private saveVersions() {
         window.clearTimeout(this.versionTimer);
         this.versionTimer = window.setTimeout(() => void this.writeVersions(), 800);
+    }
+
+    private outdated: number | null = null;
+
+    /**
+     * A partner's app writes a newer plan format. Its entities are not applied (fetched again after
+     * the update), and this device's changes stay queued until then — reading older formats is
+     * possible, writing next to a newer one is not.
+     */
+    private outdate(version: number) {
+        if (this.outdated !== null || this.closed) {
+            return;
+        }
+        this.outdated = version;
+        useLive.setState({ outdated: version });
+        toast(t('live.outdated'), { tone: 'warn', action: { label: t('update.check'), run: () => void checkForUpdate(true) } });
+        void checkForUpdate();
+    }
+
+    /** The format sent; the local test mode can pretend to be a newer app (`window.__asTacWireFormat`). */
+    private wireFormat(): number {
+        const override = this.transport.kind === 'loopback' && typeof window !== 'undefined' ? (window as unknown as { __asTacWireFormat?: unknown }).__asTacWireFormat : undefined;
+        return typeof override === 'number' && Number.isInteger(override) && override >= 1 ? override : FORMAT_VERSION;
     }
 
     private async writeVersions(): Promise<void> {
@@ -785,19 +834,20 @@ class Session {
     }
 
     async flush(): Promise<void> {
-        if (this.flushing || this.closed || !this.httpOk) {
+        if (this.flushing || this.closed || !this.httpOk || this.outdated !== null) {
             return;
         }
         this.flushing = true;
         let batch: OutboxRow[] = [];
         try {
-            while (this.pending.size > 0 && !this.closed) {
+            while (this.pending.size > 0 && !this.closed && this.outdated === null) {
                 batch = this.nextBatch();
                 // Pictures go up in the background: plan edits never wait behind a large upload.
                 this.queueUploads(batch);
                 const sent = new Map(batch.map((row) => [keyOf(row.collection, row.entityId), row]));
                 sent.forEach((row, key) => this.inflight.set(key, row));
-                const ops = batch.map((row) => ({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: row.data, base: row.base }));
+                const format = this.wireFormat();
+                const ops = batch.map((row) => ({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: tagFormat(row.collection as RemoteCollection, row.data, format), base: row.base }));
                 const bytes = JSON.stringify(ops).length;
                 const started = Date.now();
                 let result: PushResult;
@@ -832,9 +882,28 @@ class Session {
                     this.markSeq(applied.seq);
                     this.settle(key, sent.get(key), applied.version);
                 }
-                for (const conflict of result.conflicts) {
-                    const key = keyOf(conflict.collection, conflict.entityId);
+                for (const raw of result.conflicts) {
+                    const key = keyOf(raw.collection, raw.entityId);
                     const row = sent.get(key);
+                    const incoming = readFormat(raw.collection, raw.data);
+                    if (!incoming.ok) {
+                        // The server holds something this app can't read. Its version is not recorded,
+                        // so no later edit can silently replace it.
+                        if (incoming.newer !== null) {
+                            // Mine stays queued and goes out after the update, checked against it then.
+                            this.outdate(incoming.newer);
+                        } else if (row) {
+                            // Unusable on the server: mine is offered to the user instead of being lost.
+                            const current = this.pending.get(key);
+                            if (current) {
+                                this.pending.delete(key);
+                                this.forget(current);
+                            }
+                            this.surface({ collection: raw.collection, entityId: raw.entityId, mine: current?.data ?? row.data });
+                        }
+                        continue;
+                    }
+                    const conflict = { ...raw, data: incoming.data };
                     this.versions.set(key, conflict.version);
                     if (!row) {
                         continue;
@@ -1303,11 +1372,23 @@ class Session {
     }
     private gapTimer = 0;
 
-    private onRemote(entity: RemoteEntity) {
+    private onRemote(raw: RemoteEntity) {
         if (this.closed) {
             return;
         }
-        this.markSeq(entity.seq);
+        this.markSeq(raw.seq);
+        const incoming = readFormat(raw.collection, raw.data);
+        if (!incoming.ok) {
+            // Not applied: the stored position stays below it, so it is fetched again (after an update).
+            this.holdSeq = Math.min(this.holdSeq, raw.seq - 1);
+            if (incoming.newer !== null) {
+                this.outdate(incoming.newer);
+            } else {
+                console.warn('live: ignoring unusable entity', raw.collection, raw.entityId);
+            }
+            return;
+        }
+        const entity = { ...raw, data: incoming.data };
         const key = keyOf(entity.collection, entity.entityId);
         if (entity.version <= (this.versions.get(key) ?? 0)) {
             return;

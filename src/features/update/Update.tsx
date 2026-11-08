@@ -50,7 +50,7 @@ function statusText(t: T, status: UpdateStatus, available: BuildInfo | null, las
     }
 }
 
-function UpdateAction({ small }: { small?: boolean }) {
+export function UpdateAction({ small }: { small?: boolean }) {
     const t = useT();
     const status = usePwa((state) => state.status);
     const older = usePwa((state) => state.older);

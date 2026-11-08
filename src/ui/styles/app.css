@@ -737,7 +737,8 @@
 
 .live-badge--offline,
 .live-badge--error,
-.live-badge--connecting {
+.live-badge--connecting,
+.live-badge--outdated {
     background: var(--warn-weak);
     color: var(--warn);
 }

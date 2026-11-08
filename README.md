@@ -44,6 +44,8 @@ Das Szenario `update` baut dafür selbst zwei Versionen und spielt ein echtes Up
 
 Jeder gespeicherte oder verschickte Datensatz trägt die Formatversion, in der er geschrieben wurde: Pläne (`formatVersion`), `.astac`-Container, Teamvorlagen, Gebietspakete, Geräteeinstellungen (`v`) und die IndexedDB (Dexie-Versionen). Ältere Daten werden beim Lesen Schritt für Schritt auf das aktuelle Format gebracht; im Gerät gespeicherte Pläne werden dabei einmal neu geschrieben, das Original bleibt 60 Tage als Sicherung (`backups`). Daten aus einer **neueren** App werden nie geraten oder überschrieben: Die App sagt «neuere Version – bitte aktualisieren» und lässt den Datensatz unverändert, damit nach dem Update nichts fehlt.
 
+Im Live-Betrieb trägt jedes verschickte Objekt sein Format (`_fv`). Ältere Objekte von Partnern werden beim Empfang mit denselben Schritten migriert; Objekte aus einer neueren App werden nicht angewendet: Die App meldet «Update nötig», hält die eigenen Änderungen in der Warteschlange (sie gehen nach dem Update raus, mit Versionsprüfung) und holt die neueren Objekte nach dem Update erneut. Wer einem Live-Plan mit neueren Objekten beitreten will, wird zuerst zum Aktualisieren aufgefordert. Die Warteschlange übersteht Updates und wird dabei ebenfalls migriert.
+
 Formatänderung: `FORMAT_VERSION` in `src/core/model/schema.ts` erhöhen, Schritt in `src/core/model/migrations.ts` ergänzen (pro Objekt, damit Live-Daten denselben Weg nehmen), neue Datenbankversion nur anhängen, nie eine alte ändern. Die eingefrorenen Beispieldateien in `tests/fixtures/formats` (mit Prüfsummen) müssen weiterhin öffnen.
 
 ## Live-Zusammenarbeit einrichten (optional)

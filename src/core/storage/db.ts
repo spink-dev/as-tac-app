@@ -69,6 +69,8 @@ export interface OutboxRow {
     createdAt: string;
     /** Data sent in requests whose reply never came (it may have landed). */
     unacked?: unknown[];
+    /** Plan format of `data`/`prev`/`unacked` (absent = 1): the queue survives app updates. */
+    formatVersion?: number;
 }
 
 /** A stored plan as it was before a format migration rewrote it (kept 60 days, removed with the plan). */

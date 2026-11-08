@@ -43,6 +43,8 @@ interface LiveState {
     following: boolean;
     error: string | null;
     conflicts: LiveConflict[];
+    /** A partner's app writes a newer plan format: this device holds its changes until it is updated. */
+    outdated: number | null;
 }
 
 export const useLive = create<LiveState>(() => ({
@@ -62,8 +64,9 @@ export const useLive = create<LiveState>(() => ({
     following: false,
     error: null,
     conflicts: [],
+    outdated: null,
 }));
 
 export function resetLive() {
-    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, receiving: null, transfers: {}, missing: [], presence: [], chat: [], unread: 0, leaderId: null, leaderName: null, following: false, error: null, conflicts: [] });
+    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, receiving: null, transfers: {}, missing: [], presence: [], chat: [], unread: 0, leaderId: null, leaderName: null, following: false, error: null, conflicts: [], outdated: null });
 }

@@ -3,6 +3,7 @@ import { Copy, Download, LogIn, Radio, Send, Unplug, UserPlus } from 'lucide-rea
 import { formatBytes, formatTime, useT } from '../../i18n';
 import { useLive } from '../../core/live/state';
 import { usePrefs } from '../../core/store/prefs';
+import { UpdateAction } from '../update/Update';
 import { useProject } from '../../core/store/project';
 import { toast, useUi } from '../../core/store/ui';
 import { Button, Empty, Field, Segmented } from '../../ui/components';
@@ -202,6 +203,7 @@ export function LivePanel() {
     if (!project) {
         return null;
     }
+    const outdated = useLive((state) => state.outdated);
     if (status === 'off') {
         return <NotLive />;
     }
@@ -230,6 +232,12 @@ export function LivePanel() {
                 <span className="badge">{role ? t(`live.role.${role}`) : ''}</span>
                 {backend === 'loopback' ? <span className="badge badge--warn">{t('live.testMode')}</span> : null}
             </div>
+            {outdated !== null ? (
+                <div className="notice notice--warn update-banner" role="status" data-testid="live-outdated">
+                    <span className="spacer">{t('live.outdated')}</span>
+                    <UpdateAction small />
+                </div>
+            ) : null}
             {conflicts.length > 0 ? (
                 <section className="section">
                     <div className="section__title">{t('live.conflicts')}</div>
