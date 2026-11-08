@@ -459,7 +459,6 @@ export const S = {
     'live.receiving': ['Empfange Änderungen · {n}', 'Receiving changes · {n}'],
     'live.sending': ['Sende {n} Änderungen …', 'Sending {n} changes …'],
     'live.joinProgress': ['Plan wird geladen · {n} Objekte', 'Loading plan · {n} objects'],
-    'live.weakHint': ['Schwaches Netz: Änderungen werden in kleinen Stücken übertragen und nach einem Abbruch fortgesetzt.', 'Weak network: changes travel in small pieces and continue after a dropout.'],
     'live.offlineQueued': ['Offline · {n} Änderungen warten', 'Offline · {n} changes waiting'],
     'live.synced': ['Synchron', 'In sync'],
     'live.invite': ['Einladen', 'Invite'],

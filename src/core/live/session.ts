@@ -43,17 +43,24 @@ const BATCH = 400;
 const BUDGET_MIN = 8 * 1024;
 const BUDGET_START = 64 * 1024;
 const BUDGET_MAX = 1_500_000;
-const PAGE_MIN = 25;
 const PAGE_START = 200;
 const PAGE_MAX = 1000;
+/** Bytes per row, for deadlines: a first guess, then learned from what arrives. */
+const ROW_GUESS = 600;
+const ROW_MIN = 200;
+const ROW_MAX = 2_000_000;
 /** Edits within this window go out together (typing, dragging). */
 const FLUSH_DELAY_MS = 250;
 /** Without realtime (websocket blocked or dropping), changes are fetched this often over HTTP. */
 const POLL_MS = 20000;
 /** With realtime up, a rare missed message is still picked up within this time. */
 const SAFETY_POLL_MS = 60000;
-/** Every request gets a deadline: base time plus a floor of about 2 KB/s for its size. */
-const deadline = (bytes: number) => 15000 + bytes / 2;
+/**
+ * Every request gets a deadline: base time plus a floor of about 0.5 KB/s for its size. On
+ * Supabase a request that receives nothing for 30 s is cut earlier (see `stallFetch`), so this
+ * is only the outer limit; sizes come from what was actually seen.
+ */
+const deadline = (bytes: number) => 15000 + bytes * 2;
 /** A leader re-announces itself this often; silence for the timeout ends its leadership. */
 const LEADER_HEARTBEAT_MS = 5000;
 const LEADER_TIMEOUT_MS = 15000;
@@ -177,39 +184,54 @@ export function wire(value: unknown): unknown {
 }
 
 /** Run a request with a deadline; running out of time counts as network trouble. */
-async function withDeadline<T>(run: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
+async function withDeadline<T>(run: (signal: AbortSignal) => Promise<T>, ms: number, outer?: AbortSignal): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ms);
+    const cancel = () => controller.abort();
+    outer?.addEventListener('abort', cancel, { once: true });
     try {
         return await run(controller.signal);
     } catch (error) {
-        throw controller.signal.aborted ? new Error('timeout') : error;
+        // `restart`: asked to start over (network back); `timeout`: ran out of time.
+        throw outer?.aborted ? new Error('restart') : controller.signal.aborted ? new Error('timeout') : error;
     } finally {
         clearTimeout(timer);
+        outer?.removeEventListener('abort', cancel);
     }
+}
+
+/** Average size of a row in a page (for request deadlines), learned from what arrives. */
+function rowSize(page: RemoteEntity[]): number {
+    return page.length ? JSON.stringify(page).length / page.length : 0;
 }
 
 /**
  * Download a whole live plan page by page (join, role change). Pages shrink and are retried on
  * a weak connection instead of failing the whole download; the newest version per object wins.
  */
-export async function pullAll(transport: LiveTransport, onProgress?: (count: number) => void): Promise<RemoteEntity[]> {
+export async function pullAll(transport: LiveTransport, onProgress?: (count: number) => void, signal?: AbortSignal): Promise<RemoteEntity[]> {
     const latest = new Map<string, RemoteEntity>();
     let since = 0;
     let limit = PAGE_START;
+    let bytesPerRow = ROW_GUESS;
     let failures = 0;
     while (true) {
+        signal?.throwIfAborted();
         const started = Date.now();
         let page: RemoteEntity[];
         try {
-            page = await withDeadline((signal) => transport.pull(since, { limit, signal }), deadline(limit * 600));
+            page = await withDeadline((inner) => transport.pull(since, { limit, signal: inner }), deadline(limit * bytesPerRow), signal);
         } catch (error) {
             const message = error instanceof Error ? error.message : '';
-            if (failures >= 5 || permanentError(error) || ['forbidden', 'unauthenticated'].includes(message)) {
+            if (signal?.aborted || failures >= 6 || permanentError(error) || ['forbidden', 'unauthenticated'].includes(message)) {
                 throw error;
             }
             failures += 1;
-            limit = Math.max(PAGE_MIN, Math.floor(limit / 2));
+            // Smaller pages, and assume bigger rows (long routes, drawings) next time.
+            limit = Math.max(1, Math.floor(limit / 2));
+            if (message === 'timeout') {
+                bytesPerRow = Math.min(ROW_MAX, bytesPerRow * 2);
+            }
             await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** failures));
             continue;
         }
@@ -217,12 +239,13 @@ export async function pullAll(transport: LiveTransport, onProgress?: (count: num
         for (const entity of page) {
             latest.set(keyOf(entity.collection, entity.entityId), entity);
         }
+        bytesPerRow = page.length ? Math.max(ROW_MIN, rowSize(page)) : bytesPerRow;
         onProgress?.(latest.size);
         if (page.length < limit) {
             return [...latest.values()];
         }
         since = Math.max(since, ...page.map((entity) => entity.seq));
-        if (Date.now() - started < 2000) {
+        if (Date.now() - started < 3000) {
             limit = Math.min(PAGE_MAX, limit * 2);
         }
     }
@@ -256,6 +279,17 @@ class Session {
     private pollTimer = 0;
     private budget = BUDGET_START;
     private pageSize = PAGE_START;
+    private rowBytes = ROW_GUESS;
+    /** Highest seq of my own writes the server confirmed. */
+    private ownSeqMax = 0;
+    private pullRestart: AbortController | null = null;
+    /** Aborted on close: ends waits and downloads of this session. */
+    private readonly life = new AbortController();
+    /** Pictures being downloaded, and when a failed one may be tried again. */
+    private assetJobs = new Map<string, Promise<void>>();
+    private assetRetry = new Map<string, { at: number; wait: number }>();
+    /** The first realtime connect attempt has finished (until then: «connecting»). */
+    private connectSettled = false;
     private isolate = false;
     private retry = 0;
     private order = 0;
@@ -336,17 +370,24 @@ class Session {
                 this.lastApplied = null;
             }
         }));
-        const onOnline = () => void (this.subscribed ? this.catchUp() : this.connect());
+        const onOnline = () => {
+            this.kick();
+            if (!this.subscribed) {
+                void this.connect();
+            }
+        };
         window.addEventListener('online', onOnline);
         this.stop.push(() => window.removeEventListener('online', onOnline));
         // Back from the background (phone locked, app switched): the link may have died meanwhile.
         const onVisible = () => {
             if (!document.hidden) {
-                void this.catchUp();
+                this.kick();
             }
         };
         document.addEventListener('visibilitychange', onVisible);
         this.stop.push(() => document.removeEventListener('visibilitychange', onVisible));
+        // HTTP does not wait for realtime: a blocked or slow websocket must not delay the data.
+        void this.catchUp();
         void this.connect();
     }
 
@@ -381,22 +422,24 @@ class Session {
                             return;
                         }
                         this.realtime = online;
+                        this.connectSettled = true;
                         this.showStatus();
                         // Back online: fetch what was missed. Dropped: keep fetching over HTTP.
-                        void this.catchUp();
+                        this.kick();
                     },
-                }),
+                }, { exclude: this.clientId }),
                 new Promise((_, reject) => window.setTimeout(() => reject(new Error('timeout')), 30000)),
             ]);
         } catch (error) {
             console.warn('live: connect failed', error);
             if (!this.closed) {
                 this.realtime = false;
+                this.connectSettled = true;
                 this.showStatus();
                 this.connectRetry = Math.min(this.connectRetry + 1, 6);
                 this.later(() => void this.connect(), 1000 * 2 ** this.connectRetry);
                 // Realtime may be blocked (proxy, flaky websocket) while plain HTTP works.
-                void this.catchUp();
+                this.kick();
             }
             return;
         }
@@ -416,7 +459,7 @@ class Session {
     /** online = realtime + HTTP; limited = HTTP only (polling); offline = nothing gets through. */
     private showStatus() {
         if (!this.closed) {
-            useLive.setState({ status: this.httpOk ? (this.realtime ? 'online' : 'limited') : this.subscribed || this.retry > 0 ? 'offline' : 'connecting' });
+            useLive.setState({ status: this.httpOk ? (this.realtime ? 'online' : this.connectSettled ? 'limited' : 'connecting') : this.subscribed || this.retry > 0 ? 'offline' : 'connecting' });
         }
     }
 
@@ -516,11 +559,32 @@ class Session {
         try {
             do {
                 this.pullAgain = false;
-                while (!this.closed) {
+                // Everything up to my own latest write is known once a full pass is done:
+                // unseen rows at or below it can only be mine (excluded from pulls).
+                const ceiling = this.ownSeqMax;
+                let complete = false;
+                while (!this.closed && !complete) {
                     const limit = this.pageSize;
                     const started = Date.now();
-                    // Own writes of this session are already here: never download them again.
-                    const page = await this.timed((signal) => this.transport.pull(this.lastSeq, { limit, signal, exclude: this.clientId }), deadline(limit * 600));
+                    const restart = new AbortController();
+                    this.pullRestart = restart;
+                    let page: RemoteEntity[];
+                    try {
+                        page = await withDeadline((signal) => this.transport.pull(this.lastSeq, { limit, signal, exclude: this.clientId }), deadline(limit * this.rowBytes), restart.signal);
+                    } catch (error) {
+                        if (error instanceof Error && error.message === 'restart') {
+                            // The network came back while this request hung: ask again right away.
+                            continue;
+                        }
+                        if (error instanceof Error && error.message === 'timeout') {
+                            // Rows are bigger than assumed (long routes, drawings): smaller pages.
+                            this.rowBytes = Math.min(ROW_MAX, this.rowBytes * 2);
+                            this.pageSize = Math.max(1, Math.floor(this.pageSize / 2));
+                        }
+                        throw error;
+                    } finally {
+                        this.pullRestart = null;
+                    }
                     if (this.closed) {
                         return;
                     }
@@ -529,25 +593,32 @@ class Session {
                         this.onRemote(entity);
                     }
                     if (page.length > 0) {
+                        this.rowBytes = Math.max(ROW_MIN, Math.round(this.rowBytes * 0.5 + rowSize(page) * 0.5));
                         // A page holds every change up to its highest seq (ordered, then limited).
                         this.advanceTo(Math.max(...page.map((entity) => entity.seq)));
                         received += page.length;
                         useLive.setState({ receiving: received });
                     }
-                    if (Date.now() - started < 2000) {
+                    complete = page.length < limit;
+                    // Grow only on full pages that came quickly (idle polls say nothing about the link).
+                    if (!complete && Date.now() - started < 3000) {
                         this.pageSize = Math.min(PAGE_MAX, this.pageSize * 2);
                     }
-                    if (page.length < limit) {
-                        break;
-                    }
                 }
+                if (this.closed) {
+                    return;
+                }
+                if (complete) {
+                    this.advanceTo(ceiling);
+                }
+                useLive.setState({ receiving: null });
+                this.showStatus();
+                // A request for another pass that arrives during this flush is handled by the loop.
+                await this.flush();
             } while (this.pullAgain && !this.closed);
             if (this.closed) {
                 return;
             }
-            useLive.setState({ receiving: null });
-            this.showStatus();
-            await this.flush();
             if (this.pending.size === 0) {
                 // Back off again only once something actually got through.
                 this.retry = 0;
@@ -558,13 +629,21 @@ class Session {
             console.warn('live: catch-up failed', error);
             if (!this.closed) {
                 this.httpOk = false;
-                this.pageSize = Math.max(PAGE_MIN, Math.floor(this.pageSize / 2));
                 useLive.setState({ receiving: null });
                 this.showStatus();
                 this.scheduleRetry(() => void this.catchUp());
             }
         } finally {
             this.pulling = false;
+        }
+    }
+
+    /** Something changed (network back, realtime resumed, app visible): fetch now. */
+    private kick() {
+        if (this.pullRestart) {
+            this.pullRestart.abort();
+        } else {
+            void this.catchUp();
         }
     }
 
@@ -617,12 +696,24 @@ class Session {
         this.persistChain = this.persistChain.then(() => db.liveOutbox.delete(row.id)).catch(() => undefined);
     }
 
+    /**
+     * Remember versions and position — only after the plan itself is stored, so a crash can
+     * never leave a position that claims changes the stored plan doesn't have.
+     */
     private saveVersions() {
         window.clearTimeout(this.versionTimer);
-        this.versionTimer = window.setTimeout(() => {
-            void kvSet(versionsKey(this.link.projectId), Object.fromEntries(this.versions));
-            void db.liveLinks.update(this.link.projectId, { lastSeq: this.storedSeq() });
-        }, 800);
+        this.versionTimer = window.setTimeout(() => void this.writeVersions(), 800);
+    }
+
+    private async writeVersions(): Promise<void> {
+        const versions = Object.fromEntries(this.versions);
+        const lastSeq = this.storedSeq();
+        if (!(await flushNow().catch(() => false))) {
+            // The plan couldn't be stored: keep the old position, so the next session fetches again.
+            return;
+        }
+        await kvSet(versionsKey(this.link.projectId), versions).catch(() => undefined);
+        await db.liveLinks.update(this.link.projectId, { lastSeq }).catch(() => undefined);
     }
     private versionTimer = 0;
 
@@ -673,7 +764,7 @@ class Session {
                         for (const [key, row] of sent) {
                             const current = this.pending.get(key);
                             if (current) {
-                                current.unacked = [...(current.unacked ?? []).slice(-2), row.data];
+                                current.unacked = [...(current.unacked ?? []).slice(-9), row.data];
                                 this.persist(current);
                             }
                         }
@@ -691,6 +782,7 @@ class Session {
                 for (const applied of result.applied) {
                     const key = keyOf(applied.collection, applied.entityId);
                     this.versions.set(key, Math.max(this.versions.get(key) ?? 0, applied.version));
+                    this.ownSeqMax = Math.max(this.ownSeqMax, applied.seq);
                     this.markSeq(applied.seq);
                     this.settle(key, sent.get(key), applied.version);
                 }
@@ -805,7 +897,7 @@ class Session {
             toast(t('live.nowViewer'), { tone: 'warn' });
         }
         try {
-            const all = await pullAll(this.transport);
+            const all = await pullAll(this.transport, undefined, this.life.signal);
             const wanted = new Set(keys);
             for (const entity of all) {
                 const key = keyOf(entity.collection, entity.entityId);
@@ -865,20 +957,49 @@ class Session {
         }
     }
 
-    private async ensureAsset(hash: string | undefined, mime: string | undefined) {
-        if (!hash || await getAsset(hash)) {
-            return;
+    /**
+     * Fetch one picture. Never twice at the same time (polls would otherwise start parallel
+     * copies that share — and starve — a weak link), and a failed one waits before the next try.
+     */
+    private ensureAsset(hash: string | undefined, mime: string | undefined): Promise<void> {
+        if (!hash) {
+            return Promise.resolve();
         }
-        const blob = await this.transport.downloadAsset(hash).catch(() => null);
-        if (!blob || blob.size > 40 * 1024 * 1024 || this.closed) {
-            return;
+        const running = this.assetJobs.get(hash);
+        if (running) {
+            return running;
         }
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        // Content-addressed: anything that doesn't hash to its name is dropped.
-        if ((await sha256Hex(bytes)) === hash) {
-            await putVerifiedAsset(hash, bytes, safeMime(mime ?? blob.type));
-            renderPlan();
+        const retry = this.assetRetry.get(hash);
+        if (retry && retry.at > Date.now()) {
+            return Promise.resolve();
         }
+        const job = (async () => {
+            if (await getAsset(hash)) {
+                return;
+            }
+            let blob: Blob | null = null;
+            try {
+                blob = await this.transport.downloadAsset(hash, { signal: this.life.signal });
+            } catch {
+                blob = null;
+            }
+            if (this.closed) {
+                return;
+            }
+            const bytes = blob && blob.size <= 40 * 1024 * 1024 ? new Uint8Array(await blob.arrayBuffer()) : null;
+            // Content-addressed: anything that doesn't hash to its name is dropped.
+            if (bytes && (await sha256Hex(bytes)) === hash) {
+                this.assetRetry.delete(hash);
+                await putVerifiedAsset(hash, bytes, safeMime(mime ?? blob?.type));
+                renderPlan();
+                return;
+            }
+            // Not there yet (uploader still on its way) or the link broke: try later, less often.
+            const wait = Math.min((retry?.wait ?? 15000) * 2, 15 * 60 * 1000);
+            this.assetRetry.set(hash, { at: Date.now() + wait, wait });
+        })().finally(() => this.assetJobs.delete(hash));
+        this.assetJobs.set(hash, job);
+        return job;
     }
 
     /** Everything up to `seq` is known (after a complete pull). */
@@ -1063,6 +1184,7 @@ class Session {
 
     async close() {
         this.closed = true;
+        this.life.abort();
         window.clearInterval(this.heartbeat);
         stopCameraShare?.();
         stopCameraShare = null;
@@ -1072,8 +1194,7 @@ class Session {
         this.timers.clear();
         window.clearTimeout(this.versionTimer);
         await this.persistChain;
-        await kvSet(versionsKey(this.link.projectId), Object.fromEntries(this.versions)).catch(() => undefined);
-        await db.liveLinks.update(this.link.projectId, { lastSeq: this.storedSeq() }).catch(() => undefined);
+        await this.writeVersions();
         setBriefingSender(null, () => null);
         this.transport.close();
     }

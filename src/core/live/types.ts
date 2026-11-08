@@ -79,7 +79,8 @@ export interface LiveTransport {
     /** One page of entities changed after `since`. */
     pull(since: number, options: PullOptions): Promise<RemoteEntity[]>;
     push(ops: PushOp[], clientId: string, signal?: AbortSignal): Promise<PushResult>;
-    subscribe(handlers: TransportHandlers): Promise<void>;
+    /** `exclude`: don't deliver changes written by this client back to it. */
+    subscribe(handlers: TransportHandlers, options?: { exclude?: string }): Promise<void>;
     track(me: Presence): void;
     broadcast(message: BriefingMessage): void;
     createInvite(role: 'admin' | 'viewer'): Promise<string>;

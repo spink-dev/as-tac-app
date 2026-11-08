@@ -17,12 +17,89 @@ export function supabaseConfigured(): boolean {
 
 let client: Promise<SupabaseClient> | null = null;
 
+/** Wait for the first byte of an answer; long enough for a slow upload of the request itself. */
+const FIRST_BYTE_MS = 60000;
+/** Then: no byte for this long means the connection is dead (mobile links stall silently). */
+const STALL_MS = 30000;
+
+function bodySize(body: BodyInit | null | undefined): number | null {
+    if (body == null) {
+        return 0;
+    }
+    if (typeof body === 'string') {
+        return body.length;
+    }
+    if (body instanceof Blob) {
+        return body.size;
+    }
+    if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+        return body.byteLength;
+    }
+    // FormData and streams: unknown size.
+    return null;
+}
+
+/**
+ * `fetch` for the Supabase client on weak links: a request is cut only when it stops receiving
+ * data, never because it is merely slow, so large answers still arrive over EDGE.
+ */
+export function stallFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+    const controller = new AbortController();
+    const outer = init.signal;
+    if (outer?.aborted) {
+        controller.abort(outer.reason);
+    }
+    outer?.addEventListener('abort', () => controller.abort(outer.reason), { once: true });
+    const size = bodySize(init.body);
+    // Sending the request body itself takes time on a slow uplink (about 1 KB/s assumed).
+    const firstByte = size === null ? 10 * 60 * 1000 : FIRST_BYTE_MS + size;
+    let timer = setTimeout(() => controller.abort(new DOMException('stalled', 'TimeoutError')), firstByte);
+    return fetch(input, { ...init, signal: controller.signal }).then((response) => {
+        clearTimeout(timer);
+        if (!response.body) {
+            return response;
+        }
+        const reader = response.body.getReader();
+        const arm = () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => controller.abort(new DOMException('stalled', 'TimeoutError')), STALL_MS);
+        };
+        arm();
+        const body = new ReadableStream<Uint8Array>({
+            async pull(sink) {
+                try {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        clearTimeout(timer);
+                        sink.close();
+                        return;
+                    }
+                    arm();
+                    sink.enqueue(value);
+                } catch (error) {
+                    clearTimeout(timer);
+                    sink.error(error);
+                }
+            },
+            cancel(reason) {
+                clearTimeout(timer);
+                return reader.cancel(reason);
+            },
+        });
+        return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+    }, (error: unknown) => {
+        clearTimeout(timer);
+        throw error;
+    });
+}
+
 export function supabaseClient(): Promise<SupabaseClient> {
     if (!supabaseConfigured()) {
         return Promise.reject(new Error('not-configured'));
     }
     client ??= import('@supabase/supabase-js').then(({ createClient }) => createClient(URL_!, KEY!, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        global: { fetch: stallFetch },
     }));
     return client;
 }
@@ -184,7 +261,7 @@ class SupabaseTransport implements LiveTransport {
         this.rolesAt = Date.now();
     }
 
-    async subscribe(handlers: TransportHandlers): Promise<void> {
+    async subscribe(handlers: TransportHandlers, options: { exclude?: string } = {}): Promise<void> {
         const sb = await supabaseClient();
         const me = await storedUserId();
         await this.loadRoles();
@@ -213,8 +290,14 @@ class SupabaseTransport implements LiveTransport {
             handlers.presence(people);
         };
         channel
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'live_entities', filter: `plan_id=eq.${this.planId}` }, (payload) => {
+            // Realtime allows one filter. Filtering out this device's own writes saves sending every
+            // change back to its author (half the downlink when working alone); other plans' rows
+            // that pass the filter (only plans this account is a member of, by RLS) are dropped here.
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'live_entities', filter: options.exclude && /^[A-Za-z0-9_-]+$/.test(options.exclude) ? `client_id=neq.${options.exclude}` : `plan_id=eq.${this.planId}` }, (payload) => {
                 const row = (payload.new ?? {}) as Record<string, unknown>;
+                if (row.plan_id !== undefined && row.plan_id !== this.planId) {
+                    return;
+                }
                 const entity = toEntity(row);
                 if (entity) {
                     handlers.entity(entity);
