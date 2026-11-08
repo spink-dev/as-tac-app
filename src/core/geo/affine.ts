@@ -125,6 +125,9 @@ export function fitControlPoints(points: ControlPoint[], prefer: 'similarity' | 
         const [p, q, tx, ty] = leastSquares(rows, values);
         affine = { a: p, b: q, c: tx, d: q, e: -p, f: ty };
     }
+    if (Math.abs(affine.a * affine.e - affine.b * affine.d) < 1e-9) {
+        throw new Error('degenerate');
+    }
     const residualsM = points.map((p, i) => {
         const [x, y] = applyAffine(affine, p.px[0], p.px[1]);
         return Math.hypot(x - geo[i][0], y - geo[i][1]);

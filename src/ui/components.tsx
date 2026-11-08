@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import gsap from 'gsap';
 import Lenis from 'lenis';
@@ -94,6 +94,9 @@ export function Swatches({ value, colors, onChange, allowCustom = true }: { valu
 
 export function Dialog({ open, onClose, title, children, footer, wide, labelledBy }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode; wide?: boolean; labelledBy?: string }) {
     const ref = useRef<HTMLDialogElement>(null);
+    const pressedBackdrop = useRef(false);
+    const fallbackId = useId();
+    const titleId = labelledBy ?? fallbackId;
     const t = useT();
     useEffect(() => {
         const dialog = ref.current;
@@ -110,21 +113,25 @@ export function Dialog({ open, onClose, title, children, footer, wide, labelledB
         <dialog
             ref={ref}
             className={`dialog ${wide ? 'dialog--wide' : ''}`}
-            aria-labelledby={labelledBy}
+            aria-labelledby={titleId}
             onCancel={(event) => {
                 event.preventDefault();
                 onClose();
             }}
+            onPointerDown={(event) => {
+                pressedBackdrop.current = event.target === ref.current;
+            }}
             onClick={(event) => {
-                if (event.target === ref.current) {
+                if (event.target === ref.current && pressedBackdrop.current) {
                     onClose();
                 }
+                pressedBackdrop.current = false;
             }}
         >
             {open ? (
                 <>
                     <div className="dialog__head">
-                        <h2 id={labelledBy}>{title}</h2>
+                        <h2 id={titleId}>{title}</h2>
                         <IconButton label={t('common.close')} onClick={onClose} tipPos="left">
                             <X {...ICON} />
                         </IconButton>

@@ -84,3 +84,72 @@ describe('entity diff', () => {
         expect(replay.name).toBe('Renamed');
     });
 });
+
+describe('review regressions (P0-fix)', () => {
+    beforeEach(() => {
+        useProject.getState().load(createProject({ name: 'R', areaId: null }));
+        useProject.getState().mutate('seed', (draft) => {
+            draft.elements.push(marker('a'), marker('b'), marker('c'));
+        });
+    });
+
+    it('treats no-op edits as no-ops and keeps redo', () => {
+        const store = useProject.getState();
+        store.mutate('rename b', (draft) => {
+            draft.elements[1].label = 'Bravo';
+        });
+        useProject.getState().undo();
+        expect(useProject.getState().future).toHaveLength(1);
+        expect(useProject.getState().mutate('noop', (draft) => {
+            draft.name = draft.name;
+        })).toBe(false);
+        expect(useProject.getState().future).toHaveLength(1);
+    });
+
+    it('keeps undo correct after a remote delete shifts indexes', () => {
+        const store = useProject.getState();
+        store.mutate('rename b', (draft) => {
+            draft.elements[1].label = 'Bravo';
+        });
+        store.mutate('remote delete a', (draft) => {
+            draft.elements.splice(0, 1);
+        }, { remote: true });
+        useProject.getState().undo();
+        const els = useProject.getState().project!.elements;
+        expect(els.map((e) => [e.id, e.label])).toEqual([['b', 'b'], ['c', 'c']]);
+    });
+
+    it('does not overwrite an entity a peer changed after my edit', () => {
+        const store = useProject.getState();
+        store.mutate('rename b', (draft) => {
+            draft.elements[1].label = 'Bravo';
+        });
+        store.mutate('peer', (draft) => {
+            draft.elements[1] = { ...draft.elements[1], label: 'Peer' };
+        }, { remote: true });
+        useProject.getState().undo();
+        expect(useProject.getState().project!.elements[1].label).toBe('Peer');
+    });
+
+    it('syncs reorders and repairs orphaned layers', () => {
+        const store = useProject.getState();
+        store.mutate('layer', (draft) => {
+            draft.layers.push({ id: 'L2', name: 'Two', visible: true, opacity: 1, locked: false });
+        });
+        const before = useProject.getState().project!;
+        store.mutate('reorder', (draft) => {
+            draft.layers.reverse();
+        });
+        const after = useProject.getState().project!;
+        const ops = diffProjects(before, after);
+        expect(ops.some((op) => op.entityId === '__order')).toBe(true);
+        const peer = structuredClone(before);
+        applyOps(peer, ops);
+        expect(peer.layers.map((l) => l.id)).toEqual(after.layers.map((l) => l.id));
+
+        const orphan = structuredClone(after);
+        orphan.elements.push({ ...marker('x'), layerId: 'L2' });
+        applyOps(orphan, [{ collection: 'layers', entityId: 'L2', data: null }]);
+        expect(ProjectSchema.safeParse(orphan).success).toBe(true);
+    });
+});

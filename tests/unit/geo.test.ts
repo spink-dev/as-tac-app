@@ -87,3 +87,9 @@ describe('image georeferencing', () => {
         expect(distanceM(remapped, expected)).toBeLessThan(0.01);
     });
 });
+
+describe('degenerate control points', () => {
+    it('rejects coincident geography', () => {
+        expect(() => fitControlPoints([{ px: [0, 0], lngLat: [8, 47] }, { px: [100, 0], lngLat: [8, 47] }], 'similarity')).toThrow('degenerate');
+    });
+});

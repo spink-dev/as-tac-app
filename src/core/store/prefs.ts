@@ -80,7 +80,14 @@ export const usePrefs = create<PrefsState>((set, get) => ({
         if (patch.appearance && typeof document !== 'undefined') {
             document.documentElement.dataset.appearance = patch.appearance;
         }
+        if (patch.locale && typeof document !== 'undefined') {
+            document.documentElement.lang = patch.locale === 'en' ? 'en' : 'de-CH';
+        }
     },
 }));
+
+if (typeof document !== 'undefined') {
+    document.documentElement.lang = usePrefs.getState().locale === 'en' ? 'en' : 'de-CH';
+}
 
 export const APPEARANCE_ORDER: Appearance[] = ['day', 'dark', 'red'];

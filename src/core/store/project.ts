@@ -1,14 +1,18 @@
-import { applyPatches, enablePatches, produceWithPatches, type Draft, type Patch } from 'immer';
+import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
 import type { Project } from '../model/schema';
 import { nowIso } from '../model/factory';
+import { applyOps, diffProjects, entityOf, HISTORY_COLLECTIONS, type EntityOp } from './diff';
 
-enablePatches();
-
+/**
+ * Undo history is stored as entity operations, not array-index patches. That keeps it
+ * correct while live peers insert or delete entities, and undo never overwrites an
+ * object somebody else changed since (those ops are skipped).
+ */
 export interface HistoryEntry {
     label: string;
-    patches: Patch[];
-    inverse: Patch[];
+    forward: EntityOp[];
+    inverse: EntityOp[];
     at: number;
     key?: string;
 }
@@ -56,6 +60,38 @@ function emit(prev: Project | null, next: Project | null, source: ChangeSource) 
     }
 }
 
+function equal(a: unknown, b: unknown): boolean {
+    return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
+function lastOpFor(ops: EntityOp[], op: EntityOp): EntityOp | undefined {
+    for (let i = ops.length - 1; i >= 0; i--) {
+        if (ops[i].collection === op.collection && ops[i].entityId === op.entityId) {
+            return ops[i];
+        }
+    }
+    return undefined;
+}
+
+/** Keep only ops whose entity still has the value this history step left behind. */
+function applicable(project: Project, ops: EntityOp[], expectedState: EntityOp[]): EntityOp[] {
+    return ops.filter((op) => {
+        const expected = lastOpFor(expectedState, op);
+        if (!expected) {
+            return true;
+        }
+        const current = entityOf(project, op);
+        return expected.data === null ? current === undefined : equal(current, expected.data);
+    });
+}
+
+function step(project: Project, ops: EntityOp[]): Project {
+    return produce(project, (draft) => {
+        applyOps(draft as Project, ops);
+        draft.updatedAt = nowIso();
+    });
+}
+
 export const useProject = create<ProjectState>((set, get) => ({
     project: null,
     past: [],
@@ -80,29 +116,32 @@ export const useProject = create<ProjectState>((set, get) => ({
         if (!project || (readOnly && !options.remote)) {
             return false;
         }
-        const [next, patches, inverse] = produceWithPatches(project, (draft) => {
-            recipe(draft);
-            if (!options.remote) {
-                draft.updatedAt = nowIso();
-            }
-        });
-        if (patches.length === 0 || next === project) {
+        const changed = produce(project, recipe);
+        const forward = diffProjects(project, changed, HISTORY_COLLECTIONS);
+        const otherFields = changed.view !== project.view;
+        if (forward.length === 0 && !otherFields) {
             return false;
         }
         if (options.remote) {
-            set({ project: next, revision: get().revision + 1 });
-            emit(project, next, 'remote');
+            set({ project: changed, revision: get().revision + 1 });
+            emit(project, changed, 'remote');
             return true;
         }
+        const next = produce(changed, (draft) => {
+            draft.updatedAt = nowIso();
+        });
+        const inverse = diffProjects(changed, project, HISTORY_COLLECTIONS);
         const now = Date.now();
         const last = past[past.length - 1];
-        let nextPast: HistoryEntry[];
-        if (options.key && last && last.key === options.key && now - last.at < 800) {
-            nextPast = [...past.slice(0, -1), { ...last, patches: [...last.patches, ...patches], inverse: [...inverse, ...last.inverse], at: now }];
-        } else {
-            nextPast = [...past, { label, patches, inverse, at: now, key: options.key }].slice(-HISTORY_LIMIT);
+        let nextPast = past;
+        if (forward.length > 0) {
+            if (options.key && last && last.key === options.key && now - last.at < 800) {
+                nextPast = [...past.slice(0, -1), { ...last, forward: [...last.forward, ...forward], inverse: [...inverse, ...last.inverse], at: now }];
+            } else {
+                nextPast = [...past, { label, forward, inverse, at: now, key: options.key }].slice(-HISTORY_LIMIT);
+            }
         }
-        set({ project: next, past: nextPast, future: [], revision: get().revision + 1 });
+        set({ project: next, past: nextPast, future: forward.length > 0 ? [] : get().future, revision: get().revision + 1 });
         emit(project, next, 'local');
         return true;
     },
@@ -112,9 +151,12 @@ export const useProject = create<ProjectState>((set, get) => ({
         if (!project || !entry || readOnly) {
             return null;
         }
-        const next = applyPatches(project, entry.inverse);
+        const ops = applicable(project, entry.inverse, entry.forward);
+        const next = ops.length > 0 ? step(project, ops) : project;
         set({ project: next, past: past.slice(0, -1), future: [entry, ...future], revision: get().revision + 1 });
-        emit(project, next, 'undo');
+        if (next !== project) {
+            emit(project, next, 'undo');
+        }
         return entry.label;
     },
     redo() {
@@ -123,9 +165,12 @@ export const useProject = create<ProjectState>((set, get) => ({
         if (!project || !entry || readOnly) {
             return null;
         }
-        const next = applyPatches(project, entry.patches);
+        const ops = applicable(project, entry.forward, entry.inverse);
+        const next = ops.length > 0 ? step(project, ops) : project;
         set({ project: next, past: [...past, entry], future: future.slice(1), revision: get().revision + 1 });
-        emit(project, next, 'redo');
+        if (next !== project) {
+            emit(project, next, 'redo');
+        }
         return entry.label;
     },
 }));

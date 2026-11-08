@@ -7,7 +7,9 @@ const lng = z.number().finite().min(-180).max(180);
 const lat = z.number().finite().min(-85.06).max(85.06);
 export const LngLatSchema = z.tuple([lng, lat]);
 export const ColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i);
-export const AssetRefSchema = z.string().regex(/^[a-f0-9]{64}$/i, 'AssetRef must be a SHA-256 hex digest');
+export const AssetRefSchema = z.string().regex(/^[a-f0-9]{64}$/, 'AssetRef must be a lowercase SHA-256 hex digest');
+const passiveMime = z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf', 'text/plain', 'application/octet-stream']);
+const imageMime = z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const id = z.string().min(1).max(80);
 const shortText = z.string().max(160);
 const longText = z.string().max(8000);
@@ -16,7 +18,7 @@ export const AttachmentSchema = z.object({
     id,
     asset: AssetRefSchema,
     name: z.string().min(1).max(200),
-    mime: z.string().min(1).max(120),
+    mime: passiveMime,
     addedAt: z.string(),
 });
 
@@ -117,7 +119,7 @@ export const ImageOverlaySchema = z.object({
     id,
     name: z.string().min(1).max(160),
     asset: AssetRefSchema,
-    mime: z.string().min(1).max(80),
+    mime: imageMime,
     width: z.number().int().positive().max(16384),
     height: z.number().int().positive().max(16384),
     /** Top-left, top-right, bottom-right, bottom-left. */
@@ -230,6 +232,10 @@ export const SettingsSchema = z.object({
     unitScale: z.number().min(0.75).max(2.5),
 });
 
+/** Collections that are synchronised entity-by-entity in live sessions. */
+export const SYNCED_COLLECTIONS = ['elements', 'drawings', 'images', 'teams', 'phases', 'layers', 'log'] as const;
+export type SyncedCollection = typeof SYNCED_COLLECTIONS[number];
+
 export const ProjectSchema = z.object({
     id,
     formatVersion: z.literal(FORMAT_VERSION),
@@ -250,12 +256,16 @@ export const ProjectSchema = z.object({
     settings: SettingsSchema,
 }).superRefine((project, ctx) => {
     const layerIds = new Set(project.layers.map((layer) => layer.id));
-    const seen = new Set<string>();
-    for (const element of project.elements) {
-        if (seen.has(element.id)) {
-            ctx.addIssue({ code: 'custom', path: ['elements'], message: `duplicate element id ${element.id}` });
+    for (const collection of SYNCED_COLLECTIONS) {
+        const seen = new Set<string>();
+        for (const item of project[collection] as { id: string }[]) {
+            if (seen.has(item.id)) {
+                ctx.addIssue({ code: 'custom', path: [collection], message: `duplicate id ${item.id}` });
+            }
+            seen.add(item.id);
         }
-        seen.add(element.id);
+    }
+    for (const element of project.elements) {
         if (element.layerId && !layerIds.has(element.layerId)) {
             ctx.addIssue({ code: 'custom', path: ['elements'], message: `unknown layer ${element.layerId}` });
         }
@@ -289,6 +299,3 @@ export type EventRef = z.infer<typeof EventRefSchema>;
 export type Settings = z.infer<typeof SettingsSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
 
-/** Collections that are synchronised entity-by-entity in live sessions. */
-export const SYNCED_COLLECTIONS = ['elements', 'drawings', 'images', 'teams', 'phases', 'layers', 'log'] as const;
-export type SyncedCollection = typeof SYNCED_COLLECTIONS[number];
