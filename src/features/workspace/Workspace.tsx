@@ -12,6 +12,7 @@ import { BriefingBar } from '../briefing/BriefingBar';
 import { FieldPanel, useFieldLayers } from '../field/FieldHud';
 import '../maps/MapsPanel';
 import '../briefing/PhasesPanel';
+import '../share/SharePanel';
 
 export function Workspace() {
     const mode = useUi((state) => state.mode);

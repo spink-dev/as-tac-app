@@ -5,6 +5,9 @@ import { Library } from './features/library/Library';
 import { NewPlanDialog } from './features/library/NewPlanDialog';
 import { AreaDownloadDialog } from './features/areas/AreaDownloadDialog';
 import { ShortcutsDialog } from './features/workspace/ShortcutsDialog';
+import { ImportDialog } from './features/share/ImportDialog';
+import { showDialog } from './core/store/dialogs';
+import { decodePlanLink, LINK_PREFIX } from './core/files/link';
 import { startAutosave } from './core/storage/projects';
 import { registerPwa } from './core/pwa';
 import { onMutationRejected } from './core/store/project';
@@ -12,6 +15,31 @@ import { toast } from './core/store/ui';
 import { t } from './i18n';
 
 const Workspace = lazy(() => import('./features/workspace/Workspace').then((module) => ({ default: module.Workspace })));
+
+type LaunchParams = { files: { getFile: () => Promise<File> }[] };
+
+/** Files opened with the installed app (PWA file handlers) and plans arriving as `#plan=` links. */
+async function receiveLaunch() {
+    const queue = (window as unknown as { launchQueue?: { setConsumer: (fn: (params: LaunchParams) => void) => void } }).launchQueue;
+    queue?.setConsumer((params) => {
+        const handle = params.files[0];
+        if (handle) {
+            void handle.getFile().then((file) => showDialog('import', { file }));
+        }
+    });
+    if (location.hash.startsWith(LINK_PREFIX)) {
+        const hash = location.hash;
+        // Drop the plan from the address bar and history right away.
+        history.replaceState(null, '', location.pathname + location.search);
+        try {
+            const project = await decodePlanLink(hash);
+            showDialog('import', { result: { kind: 'project', project, source: 'link', unaligned: [], skipped: 0, missingAssets: 0 } });
+        } catch (error) {
+            console.warn('plan link rejected', error);
+            toast(t('import.errorInvalid'), { tone: 'danger' });
+        }
+    }
+}
 
 export function App() {
     const route = useRoute((state) => state.route);
@@ -27,6 +55,7 @@ export function App() {
             }
         });
         void registerPwa();
+        void receiveLaunch();
         return () => {
             stop();
             stopRejected();
@@ -45,6 +74,7 @@ export function App() {
             <NewPlanDialog />
             <AreaDownloadDialog />
             <ShortcutsDialog />
+            <ImportDialog />
             <Toasts />
         </>
     );

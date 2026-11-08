@@ -535,6 +535,11 @@ button.list-row:hover,
     color: var(--ink);
 }
 
+.notice--danger {
+    background: var(--danger-weak);
+    color: var(--ink);
+}
+
 .notice svg {
     flex: none;
     margin-top: 1px;
