@@ -18,11 +18,14 @@ export async function searchPlaces(query: string, locale: string, signal?: Abort
     if (trimmed.length < 2) {
         return [];
     }
-    const wait = last + 1100 - Date.now();
-    if (wait > 0) {
-        await new Promise((resolve) => setTimeout(resolve, wait));
+    // Reserve the slot before waiting so concurrent searches queue instead of firing together.
+    const now = Date.now();
+    const at = Math.max(now, last + 1100);
+    last = at;
+    if (at > now) {
+        await new Promise((resolve) => setTimeout(resolve, at - now));
     }
-    last = Date.now();
+    signal?.throwIfAborted();
     const url = new URL('https://nominatim.openstreetmap.org/search');
     url.searchParams.set('q', trimmed);
     url.searchParams.set('format', 'jsonv2');

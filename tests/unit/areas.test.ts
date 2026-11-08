@@ -124,3 +124,48 @@ describe('as-tac 0.x conversion', () => {
         expect(project.teams[0]).toMatchObject({ name: 'Blau', unitNumber: 'B', color: '#2244aa' });
     });
 });
+
+describe('as-tac 0.x conversion hardening (P2-fix)', () => {
+    it('keeps 0.6 phase semantics: unlisted elements are hidden in every briefing phase', async () => {
+        const { NO_BRIEFING_PHASE } = await import('../../src/core/legacy/astac');
+        const { visibleInPhase } = await import('../../src/map/planFeatures');
+        const old = {
+            id: 'x', schemaVersion: 2, name: 'Phasen',
+            phases: [{ id: 'p1', title: 'A', visibleElementIds: ['a'] }, { id: 'p2', title: 'B', visibleElementIds: ['a'] }],
+            elements: [
+                { id: 'a', type: 'point', geometry: { coordinates: [8.5, 47.3] } },
+                { id: 'b', type: 'point', geometry: { coordinates: [8.5, 47.3] } },
+                { id: 'f', type: 'freehand', geometry: { coordinates: [[8.5, 47.3], [8.51, 47.31]] } },
+            ],
+        };
+        const project = convertOldProject(old as never, null);
+        const a = project.elements.find((e) => e.id === 'a');
+        const b = project.elements.find((e) => e.id === 'b');
+        expect(a?.phaseIds).toBeUndefined();
+        expect(b?.phaseIds).toEqual([NO_BRIEFING_PHASE]);
+        expect(visibleInPhase(b?.phaseIds, 'p1')).toBe(false);
+        expect(project.drawings[0].phaseIds).toEqual([NO_BRIEFING_PHASE]);
+    });
+
+    it('survives hostile input and always yields a schema-valid project', () => {
+        const hostile = {
+            id: 'h', schemaVersion: 1, name: 'Böse',
+            workspace: { siteId: 42, layers: 'nope' },
+            teams: [{ id: '', name: 'x' }, { id: 't', name: 'A' }, { id: 't', name: 'dup' }],
+            phases: { length: 3 },
+            elements: [
+                null,
+                { id: 'x'.repeat(200), type: 'point', geometry: { coordinates: [8, 47] }, sourceId: 5, style: { symbol: 7 } },
+                { id: 'x'.repeat(100), type: 'point', geometry: { coordinates: [8, 47] } },
+                { id: 'r', type: 'line', geometry: { coordinates: Array.from({ length: 6000 }, (_, i) => [8 + i * 1e-5, 47]) } },
+                { id: 'c', type: 'circle', geometry: { center: [8, 47], radiusMeters: 'big' } },
+            ],
+        };
+        const project = convertOldProject(hostile as never, null);
+        const parsed = ProjectSchema.safeParse(project);
+        expect(parsed.success).toBe(true);
+        expect(project.teams).toHaveLength(1);
+        expect(project.elements.filter((e) => e.kind === 'marker')).toHaveLength(1);
+        expect(project.elements.find((e) => e.id === 'r')?.kind === 'route' ? (project.elements.find((e) => e.id === 'r') as { points: unknown[] }).points.length : 0).toBe(5000);
+    });
+});

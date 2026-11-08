@@ -49,6 +49,8 @@ export function AreaDownloadDialog() {
     const [busy, setBusy] = useState<{ phase: DownloadPhase; bytes: number } | null>(null);
     const [online, setOnline] = useState(navigator.onLine);
     const abort = useRef<AbortController | null>(null);
+    const searchAbort = useRef<AbortController | null>(null);
+    const [searching, setSearching] = useState(false);
     const nameId = useId();
     const searchId = useId();
 
@@ -82,25 +84,35 @@ export function AreaDownloadDialog() {
                 attributionControl: { compact: true },
             });
             instance.touchZoomRotate.disableRotation();
+            instance.keyboard.disableRotation();
             const update = () => {
                 const box = frame.current?.getBoundingClientRect();
                 const host = container.current?.getBoundingClientRect();
                 if (!box || !host) {
                     return;
                 }
-                const sw = instance.unproject([box.left - host.left, box.bottom - host.top]);
-                const ne = instance.unproject([box.right - host.left, box.top - host.top]);
-                setBounds([sw.lng, sw.lat, ne.lng, ne.lat]);
+                const x0 = box.left - host.left;
+                const x1 = box.right - host.left;
+                const y0 = box.top - host.top;
+                const y1 = box.bottom - host.top;
+                const corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => instance.unproject([x, y]));
+                const lngs = corners.map((c) => c.lng);
+                const lats = corners.map((c) => c.lat);
+                setBounds([Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)]);
             };
             instance.on('move', update);
-            instance.on('load', update);
+            instance.on('resize', update);
             map.current = instance;
+            update();
         });
         return () => {
             cancelAnimationFrame(id);
             abort.current?.abort();
+            searchAbort.current?.abort();
             map.current?.remove();
             map.current = null;
+            setBounds(null);
+            setSearching(false);
             setResults(null);
             setBusy(null);
             setQuery('');
@@ -109,10 +121,25 @@ export function AreaDownloadDialog() {
     }, [open]);
 
     async function runSearch() {
+        if (searching) {
+            return;
+        }
+        const controller = new AbortController();
+        searchAbort.current = controller;
+        setSearching(true);
         try {
-            setResults(await searchPlaces(query, locale));
+            const found = await searchPlaces(query, locale, controller.signal);
+            if (!controller.signal.aborted) {
+                setResults(found);
+            }
         } catch {
-            toast(t('area.searchFailed'), { tone: 'warn' });
+            if (!controller.signal.aborted) {
+                toast(t('area.searchFailed'), { tone: 'warn' });
+            }
+        } finally {
+            if (!controller.signal.aborted) {
+                setSearching(false);
+            }
         }
     }
 
@@ -140,9 +167,17 @@ export function AreaDownloadDialog() {
                 name: areaName,
                 bounds,
                 signal: controller.signal,
-                onProgress: (phase, bytes) => setBusy({ phase, bytes }),
+                onProgress: (phase, bytes) => {
+                    if (!controller.signal.aborted) {
+                        setBusy({ phase, bytes });
+                    }
+                },
             });
+            controller.signal.throwIfAborted();
             const meta = await saveArea(pkg);
+            if (controller.signal.aborted) {
+                return;
+            }
             toast(t('area.saved', { name: meta.name }), { tone: 'ok' });
             window.dispatchEvent(new Event('as-tac:library-changed'));
             if (payload?.returnTo === 'newPlan') {
@@ -198,7 +233,7 @@ export function AreaDownloadDialog() {
                 }}>
                     <label htmlFor={searchId} className="sr-only">{t('area.search')}</label>
                     <input id={searchId} className="input" value={query} placeholder={t('area.search')} onChange={(event) => setQuery(event.target.value)} />
-                    <Button type="submit" disabled={!online}><Search {...ICON} /><span className="sr-only">{t('common.search')}</span></Button>
+                    <Button type="submit" disabled={!online || searching}><Search {...ICON} /><span className="sr-only">{t('common.search')}</span></Button>
                     {results ? (
                         <ul className="menu area-dl__results" role="listbox">
                             {results.length === 0 ? <li className="menu__item muted">{t('area.noResults')}</li> : null}

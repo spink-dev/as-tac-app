@@ -147,9 +147,11 @@ export async function downloadArea(options: DownloadOptions): Promise<AreaPackag
     if (!raw) {
         throw lastError instanceof Error ? lastError : new Error('download');
     }
+    options.signal.throwIfAborted();
     options.onProgress('convert', 0);
     await new Promise((resolve) => setTimeout(resolve, 0));
     const data = toBasemap(raw);
+    options.signal.throwIfAborted();
     options.onProgress('verify', 0);
     const text = JSON.stringify(data);
     return {
@@ -162,7 +164,7 @@ export async function downloadArea(options: DownloadOptions): Promise<AreaPackag
         source: `OpenStreetMap via Overpass API (${OVERPASS_ENDPOINTS[0]})`,
         attribution: '© OpenStreetMap contributors',
         license: 'ODbL 1.0',
-        byteSize: text.length,
+        byteSize: new TextEncoder().encode(text).byteLength,
         sha256: await sha256Hex(text),
         featureCount: data.features.length,
         origin: 'download',

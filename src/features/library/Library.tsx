@@ -243,7 +243,7 @@ export function Library() {
                                         </div>
                                         {area.meta ? (
                                             <>
-                                                <IconButton label={t('area.exportFile')} tipPos="left" onClick={() => void exportAreaFile(area.id).then(({ blob, filename }) => saveFile(blob, filename))}>
+                                                <IconButton label={t('area.exportFile')} tipPos="left" onClick={() => void exportAreaFile(area.id).then(({ blob, filename }) => saveFile(blob, filename)).catch(() => toast(t('error.generic'), { tone: 'danger' }))}>
                                                     <Download {...ICON} />
                                                 </IconButton>
                                                 <IconButton label={t('area.remove')} tipPos="left" onClick={() => void uninstall(area.meta as AreaMeta)}>

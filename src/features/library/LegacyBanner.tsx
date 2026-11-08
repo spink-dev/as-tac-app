@@ -27,8 +27,8 @@ export function LegacyBanner({ onImported }: { onImported: () => void }) {
             <Button small variant="primary" disabled={busy} onClick={async () => {
                 setBusy(true);
                 try {
-                    const n = await importLegacy(scan);
-                    toast(t('share.imported', { name: `${n}` }), { tone: 'ok' });
+                    const { imported, skipped } = await importLegacy(scan);
+                    toast(t('share.imported', { name: `${imported}` }) + (skipped ? ` · ${skipped} ✕` : ''), { tone: skipped ? 'warn' : 'ok' });
                     setScan(null);
                     onImported();
                 } catch {

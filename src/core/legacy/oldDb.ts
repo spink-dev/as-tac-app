@@ -1,5 +1,7 @@
 import { convertOldProject, isOldProject, type OldProject } from './astac';
+import { ProjectSchema } from '../model/schema';
 import { saveArea, verifyArea } from '../areas/store';
+import { sanitizeArea } from '../areas/files';
 import { db, kvGet, kvSet } from '../storage/db';
 import { saveProject } from '../storage/projects';
 import { BUNDLED_AREAS } from '../areas/store';
@@ -47,7 +49,6 @@ async function openOld(): Promise<IDBDatabase | null> {
 
 export interface LegacyScan {
     projects: OldProject[];
-    maps: unknown[];
 }
 
 export async function scanLegacy(): Promise<LegacyScan | null> {
@@ -60,19 +61,20 @@ export async function scanLegacy(): Promise<LegacyScan | null> {
     }
     try {
         const rows = await readAll(database, 'projects');
-        const projects = rows.map((row) => (row as { project?: unknown }).project ?? row).filter(isOldProject);
-        const maps = await readAll(database, 'maps');
-        return projects.length > 0 ? { projects, maps } : null;
+        const projects = rows.filter((row) => row && typeof row === 'object').map((row) => (row as { project?: unknown }).project ?? row).filter(isOldProject);
+        return projects.length > 0 ? { projects } : null;
     } finally {
         database.close();
     }
 }
 
-export async function importLegacy(scan: LegacyScan): Promise<number> {
+export async function importLegacy(scan: LegacyScan): Promise<{ imported: number; skipped: number }> {
     const areaIds = new Map<string, string>();
-    for (const raw of scan.maps) {
+    const database = await openOld();
+    const maps = database ? await readAll(database, 'maps').finally(() => database.close()) : [];
+    for (const raw of maps) {
         try {
-            const pkg = await verifyArea(raw);
+            const pkg = await sanitizeArea(await verifyArea(raw));
             if (!(await db.areas.get(pkg.id))) {
                 await saveArea({ ...pkg, origin: 'legacy' });
             }
@@ -81,16 +83,26 @@ export async function importLegacy(scan: LegacyScan): Promise<number> {
             // A damaged legacy map package is skipped; its plans fall back to the bundled area or none.
         }
     }
-    let count = 0;
+    let imported = 0;
+    let skipped = 0;
     for (const old of scan.projects) {
-        const area = old.mapPackageId && (areaIds.has(old.mapPackageId) || BUNDLED_AREAS.some((b) => b.id === old.mapPackageId)) ? old.mapPackageId : null;
-        const project = convertOldProject(old, area);
-        project.name = `${project.name}`;
-        await saveProject(project);
-        count++;
+        try {
+            const mapId = typeof old.mapPackageId === 'string' ? old.mapPackageId : '';
+            const area = mapId && (areaIds.has(mapId) || BUNDLED_AREAS.some((b) => b.id === mapId)) ? mapId : null;
+            const parsed = ProjectSchema.safeParse(convertOldProject(old, area));
+            if (!parsed.success) {
+                skipped++;
+                continue;
+            }
+            await saveProject(parsed.data as never);
+            imported++;
+        } catch {
+            skipped++;
+        }
     }
+    // Mark as done even with skips: re-running would duplicate the plans already brought over.
     await kvSet('legacyImported', true);
-    return count;
+    return { imported, skipped };
 }
 
 export async function dismissLegacy(): Promise<void> {

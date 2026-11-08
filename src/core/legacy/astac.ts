@@ -18,7 +18,7 @@ interface OldElement {
     sourceId?: string;
     teamId?: string;
     phaseIds?: string[];
-    style?: { colour?: string; width?: number; opacity?: number; symbol?: string; pattern?: string };
+    style?: { colour?: unknown; width?: unknown; opacity?: unknown; symbol?: unknown; pattern?: unknown };
     deletedAt?: string;
 }
 export interface OldProject {
@@ -50,7 +50,23 @@ function text(value: unknown, max: number): string | undefined {
     return typeof value === 'string' && value.trim() ? value.slice(0, max) : undefined;
 }
 
-function markerType(symbol: string | undefined, sourceId: string | undefined): MarkerType {
+function str(value: unknown, max: number): string {
+    return typeof value === 'string' ? value.slice(0, max) : '';
+}
+
+function list<T = unknown>(value: unknown): T[] {
+    return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function cleanId(value: unknown): string | null {
+    const id = typeof value === 'string' ? value.trim().slice(0, 80) : '';
+    return id ? id : null;
+}
+
+/** 0.6 showed only listed elements in a phase; unlisted ones were hidden in every briefing phase. */
+export const NO_BRIEFING_PHASE = 'no-briefing';
+
+function markerType(symbol: unknown, sourceId: string | undefined): MarkerType {
     switch (symbol) {
         case 'flag':
             return 'hq';
@@ -63,7 +79,7 @@ function markerType(symbol: string | undefined, sourceId: string | undefined): M
         case 'shield':
             return 'flag';
         default:
-            return sourceId?.includes('poi') ? 'poi' : 'custom';
+            return typeof sourceId === 'string' && sourceId.includes('poi') ? 'poi' : 'custom';
     }
 }
 
@@ -92,86 +108,129 @@ export function isOldProject(value: unknown): value is OldProject {
 /** Convert an as-tac 0.x plan into the 1.0 model. Unknown or broken items are skipped, not guessed. */
 export function convertOldProject(old: OldProject, areaId: string | null): Project {
     const project = createProject({ name: text(old.name, 120) ?? 'Plan', areaId });
-    const layers = (old.workspace?.layers ?? []).filter((layer) => typeof layer?.id === 'string' && typeof layer.name === 'string');
+    const workspace = old.workspace && typeof old.workspace === 'object' ? old.workspace : undefined;
+    const layerSeen = new Set<string>();
+    const layers = [];
+    for (const layer of list<{ id: unknown; name: unknown; opacity?: unknown; locked?: unknown }>(workspace?.layers)) {
+        const id = cleanId(layer?.id);
+        if (!id || layerSeen.has(id) || layers.length >= 64) {
+            continue;
+        }
+        layerSeen.add(id);
+        const opacity = Number(layer.opacity);
+        layers.push({ id, name: text(layer.name, 80) ?? 'Ebene', visible: true, opacity: Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1, locked: layer.locked === true });
+    }
     if (layers.length > 0) {
-        project.layers = layers.slice(0, 64).map((layer) => ({
-            id: layer.id.slice(0, 80), name: layer.name.slice(0, 80) || 'Ebene', visible: true,
-            opacity: Number.isFinite(layer.opacity) ? Math.min(1, Math.max(0, layer.opacity as number)) : 1, locked: Boolean(layer.locked),
-        }));
+        project.layers = layers;
     }
-    const layerIds = new Set(project.layers.map((layer) => layer.id));
-    if (old.workspace?.siteId) {
-        project.event = {
-            siteId: old.workspace.siteId.slice(0, 80), eventId: (old.workspace.eventId ?? '').slice(0, 80),
-            edition: (old.workspace.edition ?? '').slice(0, 120), source: (old.workspace.source ?? 'as-tac 0.x').slice(0, 400),
-        };
+    if (workspace && typeof workspace.siteId === 'string' && workspace.siteId) {
+        project.event = { siteId: str(workspace.siteId, 80), eventId: str(workspace.eventId, 80), edition: str(workspace.edition, 120), source: str(workspace.source, 400) || 'as-tac 0.x' };
     }
-    project.teams = (old.teams ?? []).filter((team) => typeof team?.id === 'string' && typeof team.name === 'string').slice(0, 200).map((team) => ({
-        id: team.id.slice(0, 80), name: team.name.slice(0, 80) || 'Team', unitNumber: text(team.shortLabel, 12),
-        color: HEX.test(team.colour ?? '') ? (team.colour as string) : '#2f6fc4', side: 'friendly', displayMode: 'icon', symbol: 'infantry',
-    }));
-    const phases = [...(old.phases ?? [])].filter((phase) => typeof phase?.id === 'string').sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).slice(0, 100);
-    project.phases = phases.map((phase, i) => {
-        const center = point(phase.camera?.center);
-        return {
-            id: phase.id.slice(0, 80), name: text(phase.title, 120) ?? `Phase ${i + 1}`, notes: text(phase.notes, 8000),
-            camera: center && phase.camera ? { center, zoom: Math.min(24, Math.max(0, Number(phase.camera.zoom) || 14)), bearing: Number(phase.camera.bearing) || 0 } : undefined,
-        };
-    });
-    const phaseMembership = new Map<string, string[]>();
-    for (const phase of phases) {
-        for (const id of phase.visibleElementIds ?? []) {
-            phaseMembership.set(id, [...(phaseMembership.get(id) ?? []), phase.id]);
+    const teamSeen = new Set<string>();
+    for (const team of list<{ id: unknown; name: unknown; shortLabel?: unknown; colour?: unknown }>(old.teams)) {
+        const id = cleanId(team?.id);
+        if (!id || teamSeen.has(id) || project.teams.length >= 200) {
+            continue;
+        }
+        teamSeen.add(id);
+        project.teams.push({
+            id, name: text(team.name, 80) ?? 'Team', unitNumber: text(team.shortLabel, 12),
+            color: typeof team.colour === 'string' && HEX.test(team.colour) ? team.colour : '#2f6fc4', side: 'friendly', displayMode: 'icon', symbol: 'infantry',
+        });
+    }
+    type OldPhase = { id: unknown; order?: unknown; title?: unknown; notes?: unknown; camera?: { center?: unknown; zoom?: unknown; bearing?: unknown } | null; visibleElementIds?: unknown };
+    const phaseSeen = new Set<string>();
+    const phases: { id: string; raw: OldPhase }[] = [];
+    for (const raw of list<OldPhase>(old.phases)) {
+        const id = cleanId(raw?.id);
+        if (id && !phaseSeen.has(id) && id !== NO_BRIEFING_PHASE && phases.length < 100) {
+            phaseSeen.add(id);
+            phases.push({ id, raw });
         }
     }
+    phases.sort((a, b) => (Number(a.raw.order) || 0) - (Number(b.raw.order) || 0));
+    project.phases = phases.map(({ id, raw }, i) => {
+        const center = point(raw.camera?.center);
+        const zoom = Number(raw.camera?.zoom);
+        const bearing = Number(raw.camera?.bearing);
+        return {
+            id, name: text(raw.title, 120) ?? `Phase ${i + 1}`, notes: text(raw.notes, 8000),
+            camera: center ? { center, zoom: Number.isFinite(zoom) ? Math.min(24, Math.max(0, zoom)) : 14, bearing: Number.isFinite(bearing) ? bearing : 0 } : undefined,
+        };
+    });
+    const membership = new Map<string, string[]>();
+    for (const { id, raw } of phases) {
+        for (const elementId of list(raw.visibleElementIds)) {
+            const key = cleanId(elementId);
+            if (key) {
+                membership.set(key, [...(membership.get(key) ?? []), id]);
+            }
+        }
+    }
+    const phaseIdsFor = (id: string): string[] | undefined => {
+        if (phases.length === 0) {
+            return undefined;
+        }
+        const listed = [...new Set(membership.get(id) ?? [])];
+        if (listed.length === phases.length) {
+            return undefined;
+        }
+        return listed.length > 0 ? listed : [NO_BRIEFING_PHASE];
+    };
     const elements: Element[] = [];
     const drawings: Stroke[] = [];
     const seen = new Set<string>();
-    for (const old_ of old.elements ?? []) {
-        if (!old_ || typeof old_.id !== 'string' || old_.deletedAt || seen.has(old_.id)) {
+    for (const raw of list<OldElement>(old.elements)) {
+        if (!raw || typeof raw !== 'object' || raw.deletedAt) {
             continue;
         }
-        seen.add(old_.id);
-        const color = HEX.test(old_.style?.colour ?? '') ? old_.style?.colour : undefined;
-        const listed = phaseMembership.get(old_.id) ?? old_.phaseIds ?? [];
-        const phaseIds = listed.length > 0 && listed.length < phases.length ? listed.slice(0, 200) : undefined;
+        const id = cleanId(raw.id);
+        if (!id || seen.has(id)) {
+            continue;
+        }
+        seen.add(id);
+        const style = raw.style && typeof raw.style === 'object' ? raw.style : {};
+        const color = typeof style.colour === 'string' && HEX.test(style.colour) ? style.colour : undefined;
+        const layerId = cleanId(raw.layerId);
+        const teamId = cleanId(raw.teamId);
         const base = {
-            id: old_.id.slice(0, 80),
-            layerId: old_.layerId && layerIds.has(old_.layerId) ? old_.layerId : undefined,
-            teamId: old_.teamId && project.teams.some((team) => team.id === old_.teamId) ? old_.teamId : undefined,
-            label: text(old_.label, 160), notes: text(old_.notes, 8000), sourceId: text(old_.sourceId, 120), color, phaseIds,
+            id,
+            layerId: layerId && layerSeen.has(layerId) ? layerId : undefined,
+            teamId: teamId && teamSeen.has(teamId) ? teamId : undefined,
+            label: text(raw.label, 160), notes: text(raw.notes, 8000), sourceId: text(raw.sourceId, 120), color, phaseIds: phaseIdsFor(id),
         };
-        const g = old_.geometry ?? ({} as OldGeometry);
-        switch (old_.type) {
+        const width = Number(style.width);
+        const g = raw.geometry && typeof raw.geometry === 'object' ? raw.geometry : ({} as OldGeometry);
+        switch (raw.type) {
             case 'point': {
                 const pos = point(g.coordinates);
                 if (pos) {
-                    elements.push({ kind: 'marker', ...base, pos, type: markerType(old_.style?.symbol, old_.sourceId) });
+                    elements.push({ kind: 'marker', ...base, pos, type: markerType(style.symbol, base.sourceId) });
                 }
                 break;
             }
             case 'text': {
                 const pos = point(g.coordinates);
                 if (pos) {
-                    elements.push({ kind: 'text', ...base, pos, text: base.label ?? '' });
+                    elements.push({ kind: 'text', ...base, pos, text: (base.label ?? '').slice(0, 400) });
                 }
                 break;
             }
             case 'line': {
-                const line = points(g.coordinates);
+                const line = points(g.coordinates).slice(0, 5000);
                 if (line.length >= 2) {
-                    elements.push({ kind: 'route', ...base, points: line, style: 'planned', arrow: false, width: Math.min(16, Math.max(1, Number(old_.style?.width) || 3)) });
+                    elements.push({ kind: 'route', ...base, points: line, style: 'planned', arrow: false, width: Number.isFinite(width) ? Math.min(16, Math.max(1, width)) : 3 });
                 }
                 break;
             }
             case 'polygon': {
-                const ring = points(Array.isArray(g.coordinates) ? (g.coordinates as unknown[])[0] : undefined);
-                const open = ring.length > 3 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? ring.slice(0, -1) : ring;
+                const ring = points(list(g.coordinates)[0]);
+                const open = (ring.length > 3 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? ring.slice(0, -1) : ring).slice(0, 5000);
                 if (open.length >= 3) {
                     const safe = /safe/i.test(base.label ?? '');
                     elements.push({
                         kind: 'zone', ...base, shape: { type: 'polygon', points: open }, category: safe ? 'safe' : 'custom',
-                        fillOpacity: 0.18, pattern: pattern(old_.style?.pattern) ?? (safe ? 'hatch' : undefined),
+                        fillOpacity: 0.18, pattern: pattern(typeof style.pattern === 'string' ? style.pattern : undefined) ?? (safe ? 'hatch' : undefined),
                     });
                 }
                 break;
@@ -180,14 +239,17 @@ export function convertOldProject(old: OldProject, areaId: string | null): Proje
                 const center = point(g.center);
                 const radius = Number(g.radiusMeters);
                 if (center && radius > 0 && radius < 200000) {
-                    elements.push({ kind: 'zone', ...base, shape: { type: 'circle', center, radiusM: radius }, category: 'custom', fillOpacity: 0.18, pattern: pattern(old_.style?.pattern) });
+                    elements.push({ kind: 'zone', ...base, shape: { type: 'circle', center, radiusM: radius }, category: 'custom', fillOpacity: 0.18, pattern: pattern(typeof style.pattern === 'string' ? style.pattern : undefined) });
                 }
                 break;
             }
             case 'freehand': {
-                const line = points(g.coordinates);
+                const line = points(g.coordinates).slice(0, 4000);
                 if (line.length >= 2) {
-                    drawings.push({ id: base.id, points: line.slice(0, 4000), color: color ?? '#e8402a', width: Math.min(24, Math.max(1, Number(old_.style?.width) || 4)), opacity: 0.95, layerId: base.layerId });
+                    drawings.push({
+                        id, points: line, color: color ?? '#e8402a', width: Number.isFinite(width) ? Math.min(24, Math.max(1, width)) : 4, opacity: 0.95,
+                        layerId: base.layerId, phaseIds: base.phaseIds,
+                    });
                 }
                 break;
             }
