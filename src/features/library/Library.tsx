@@ -88,7 +88,7 @@ export function Library() {
             await installBundled(id, (fraction) => setInstalling((state) => ({ ...state, [id]: fraction ?? state[id] ?? 0 })));
             toast(t('area.saved', { name: BUNDLED_AREAS.find((a) => a.id === id)?.name ?? id }), { tone: 'ok' });
         } catch (error) {
-            toast(areaErrorText(error instanceof Error ? error.message : String(error)), { tone: 'danger' });
+            toast(areaErrorText(error), { tone: 'danger' });
         } finally {
             setInstalling((state) => {
                 const next = { ...state };

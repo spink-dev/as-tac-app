@@ -191,10 +191,9 @@ export function AreaDownloadDialog() {
             if (controller.signal.aborted) {
                 return;
             }
-            const message = error instanceof Error ? error.message : String(error);
             const kept = cachedTiles(bounds);
             const total = tileBounds(resumeBounds(bounds)).length;
-            toast(areaErrorText(message, kept, total), { tone: 'danger' });
+            toast(areaErrorText(error, kept, total), { tone: 'danger' });
             setBusy(null);
             setResumable(kept);
         }

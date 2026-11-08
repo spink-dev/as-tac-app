@@ -70,6 +70,8 @@ await owner.keyboard.press('m');
 const box = await owner.locator('.maplibregl-canvas').boundingBox();
 await owner.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.5);
 await settle();
+await viewer.waitForFunction(() => window.__asTacCounts().elements === 1, null, { timeout: 15000 }).catch(() => undefined);
+await admin.waitForFunction(() => window.__asTacCounts().elements === 1, null, { timeout: 15000 }).catch(() => undefined);
 const ownerCount = (await counts(owner)).elements;
 check('owner-marker', ownerCount === 1);
 check('viewer-sees', (await counts(viewer)).elements === ownerCount);
@@ -79,7 +81,9 @@ check('admin-sees', (await counts(admin)).elements === ownerCount);
 await admin.keyboard.press('m');
 const box2 = await admin.locator('.maplibregl-canvas').boundingBox();
 await admin.mouse.click(box2.x + box2.width * 0.6, box2.y + box2.height * 0.45);
-await settle();
+// Edits go out in short batches (250 ms); wait for arrival instead of a fixed pause.
+await owner.waitForFunction(() => window.__asTacCounts().elements === 2, null, { timeout: 15000 }).catch(() => undefined);
+await viewer.waitForFunction(() => window.__asTacCounts().elements === 2, null, { timeout: 15000 }).catch(() => undefined);
 check('owner-sees-admin', (await counts(owner)).elements === 2);
 check('viewer-sees-admin', (await counts(viewer)).elements === 2);
 

@@ -291,7 +291,10 @@ class Session {
     private assetRetry = new Map<string, { at: number; wait: number }>();
     /** Pictures to put on the server, sent one at a time in the background. */
     private uploadQueue = new Set<string>();
+    /** Uploads that failed and wait for their retry (restarted early when the link comes back). */
+    private failedUploads = new Set<string>();
     private uploading = false;
+    private ensureTimer = 0;
     private progressAt = 0;
     private ownPicturesQueued = false;
     /** The first realtime connect attempt has finished (until then: «connecting»). */
@@ -641,6 +644,7 @@ class Session {
                 this.retry = 0;
             }
             void this.ensureAssets();
+            this.resumeUploads();
             if (!this.ownPicturesQueued) {
                 this.ownPicturesQueued = true;
                 this.queueOwnPictures();
@@ -916,6 +920,8 @@ class Session {
             this.forget(row);
         }
         this.pending.clear();
+        this.uploadQueue.clear();
+        this.failedUploads.clear();
         useProject.getState().setReadOnly('viewer');
         useLive.setState({ role: 'viewer', queued: 0 });
         if (!this.demoted) {
@@ -988,7 +994,13 @@ class Session {
                     return;
                 }
                 this.uploadQueue.delete(hash);
-                const asset = await getAsset(hash);
+                if (this.role === 'viewer') {
+                    // Demoted meanwhile: the server would refuse it anyway.
+                    this.uploadQueue.clear();
+                    this.failedUploads.clear();
+                    return;
+                }
+                const asset = await getAsset(hash).catch(() => undefined);
                 // Only real images go to the shared bucket (passive types only); a missing one can't.
                 if (!asset || !isRenderableImage(asset)) {
                     continue;
@@ -999,17 +1011,22 @@ class Session {
                         await this.transport.uploadAsset(hash, asset.blob, { signal: this.life.signal, onProgress: (p) => this.showTransfer(hash, 'up', p) });
                     }
                     this.uploaded.add(hash);
+                    this.failedUploads.delete(hash);
+                    this.assetRetry.delete(`up:${hash}`);
                 } catch (error) {
                     if (this.closed) {
                         return;
                     }
                     console.warn('live: picture upload failed, retrying later', error);
                     const retry = this.assetRetry.get(`up:${hash}`);
-                    const wait = Math.min((retry?.wait ?? 15000) * 2, 15 * 60 * 1000);
+                    const wait = retry ? Math.min(retry.wait * 2, 15 * 60 * 1000) : 15000;
                     this.assetRetry.set(`up:${hash}`, { at: Date.now() + wait, wait });
+                    this.failedUploads.add(hash);
                     this.later(() => {
-                        this.uploadQueue.add(hash);
-                        void this.runUploads();
+                        if (this.failedUploads.delete(hash)) {
+                            this.uploadQueue.add(hash);
+                            void this.runUploads();
+                        }
                     }, wait);
                 } finally {
                     this.showTransfer(hash, 'up', null);
@@ -1080,6 +1097,29 @@ class Session {
         }
     }
 
+    /** Many picture rows in one catch-up: one sweep for all of them, shortly after. */
+    private scheduleEnsureAssets() {
+        if (!this.ensureTimer) {
+            this.ensureTimer = this.later(() => {
+                this.ensureTimer = 0;
+                void this.ensureAssets();
+            }, 500);
+        }
+    }
+
+    /** The link works again: failed uploads go now instead of after their (long) backoff. */
+    private resumeUploads() {
+        if (this.failedUploads.size === 0 || this.role === 'viewer') {
+            return;
+        }
+        for (const hash of this.failedUploads) {
+            this.assetRetry.delete(`up:${hash}`);
+            this.uploadQueue.add(hash);
+        }
+        this.failedUploads.clear();
+        void this.runUploads();
+    }
+
     /** Download pictures now, regardless of the data-saver setting (the user asked for them). */
     loadPictures(hashes?: string[]) {
         if (!hashes) {
@@ -1106,6 +1146,13 @@ class Session {
             return running;
         }
         const retry = this.assetRetry.get(hash);
+        if (retry?.at === Number.POSITIVE_INFINITY) {
+            // Arrived before but wasn't this picture (or too large): fetching again won't help.
+            if (force) {
+                toast(t('maps.imageUnusable'), { tone: 'warn' });
+            }
+            return Promise.resolve();
+        }
         if (!force && retry && retry.at > Date.now()) {
             return Promise.resolve();
         }
@@ -1114,12 +1161,14 @@ class Session {
                 return;
             }
             let blob: Blob | null = null;
+            let unreachable = false;
             // Visible from the start: the first piece can take a while on a weak link.
             this.showTransfer(hash, 'down', { done: 0, total: null });
             try {
                 blob = await this.transport.downloadAsset(hash, { signal: this.life.signal, onProgress: (p) => this.showTransfer(hash, 'down', p) });
             } catch {
                 blob = null;
+                unreachable = true;
             } finally {
                 this.showTransfer(hash, 'down', null);
             }
@@ -1140,9 +1189,14 @@ class Session {
                 this.assetRetry.set(hash, { at: Number.POSITIVE_INFINITY, wait: 0 });
                 return;
             }
-            // Not there yet (uploader still on its way) or the link broke: try later, less often.
-            const wait = retry ? Math.min(retry.wait * 2, 15 * 60 * 1000) : 15000;
+            // Not on the server yet (the partner is still uploading): ask again soon — that is one
+            // tiny request. The link broke: back off longer. A tap never makes later tries slower.
+            const cap = unreachable ? 5 * 60 * 1000 : 60 * 1000;
+            const wait = force || !retry ? 15000 : Math.min(retry.wait * 2, cap);
             this.assetRetry.set(hash, { at: Date.now() + wait, wait });
+            if (force && !unreachable) {
+                toast(t('maps.imageNotYet'), { tone: 'warn' });
+            }
         })().finally(() => this.assetJobs.delete(hash));
         this.assetJobs.set(hash, job);
         return job;
@@ -1242,8 +1296,13 @@ class Session {
         this.versions.set(key, entity.version);
         this.saveVersions();
         if (entity.collection === 'images' || entity.collection === 'teams') {
-            // A new picture: fetch it (if allowed) or list it as waiting for a tap.
-            void this.ensureAssets();
+            // A new or changed picture row: its picture may be ready now — no waiting out an old backoff.
+            const data = entity.data as { asset?: string; logoAsset?: string } | null;
+            const hash = entity.collection === 'images' ? data?.asset : data?.logoAsset;
+            if (hash && this.assetRetry.get(hash)?.at !== Number.POSITIVE_INFINITY) {
+                this.assetRetry.delete(hash);
+            }
+            this.scheduleEnsureAssets();
         }
     }
 

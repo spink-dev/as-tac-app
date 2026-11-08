@@ -34,7 +34,8 @@ export function supabaseConfigured(): boolean {
 
 /** Storage says "no such object" (as opposed to: could not ask). */
 function missingObject(error: { message?: string; statusCode?: string | number } | null): boolean {
-    return Boolean(error && (/not.?found|does not exist/i.test(error.message ?? '') || ['400', '404', 400, 404].includes(error.statusCode ?? '')));
+    // Storage also reports invalid tokens with statusCode 400: only the wording or a 404 means "missing".
+    return Boolean(error && (/not.?found|does not exist/i.test(error.message ?? '') || ['404', 404].includes(error.statusCode ?? '')));
 }
 
 let client: Promise<SupabaseClient> | null = null;

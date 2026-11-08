@@ -66,7 +66,7 @@ export function NewPlanDialog() {
             await createAndOpen(project);
         } catch (error) {
             setBusy(null);
-            toast(areaErrorText(error instanceof Error ? error.message : String(error)), { tone: 'danger' });
+            toast(areaErrorText(error), { tone: 'danger' });
         } finally {
             creating.current = false;
         }

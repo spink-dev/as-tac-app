@@ -109,7 +109,7 @@ async function readBody(response: Response, limit: number, attempt: AbortControl
 /** Pieces received so far, by key: an interrupted download continues from here. */
 const partial = new Map<string, { pieces: Uint8Array[]; total: number; used: number }>();
 /** Downloads running, by key: a second caller shares the first one instead of competing. */
-const running = new Map<string, Promise<Uint8Array<ArrayBuffer>>>();
+const running = new Map<string, { promise: Promise<Uint8Array<ArrayBuffer>>; signal?: AbortSignal; listeners: Set<(progress: TransferProgress) => void> }>();
 
 export function partialBytes(key: string): number {
     return partial.get(key)?.pieces.reduce((sum, piece) => sum + piece.length, 0) ?? 0;
@@ -143,12 +143,26 @@ export interface DownloadOptions {
  */
 export function rangeDownload(url: string | (() => Promise<string>), key: string, options: DownloadOptions = {}): Promise<Uint8Array<ArrayBuffer>> {
     const existing = running.get(key);
-    if (existing) {
-        return existing;
+    // Share a running download — unless its owner already cancelled it (closed session).
+    if (existing && !existing.signal?.aborted) {
+        if (options.onProgress) {
+            existing.listeners.add(options.onProgress);
+        }
+        return existing.promise;
     }
-    const job = download(url, key, options).finally(() => running.delete(key));
-    running.set(key, job);
-    return job;
+    const listeners = new Set<(progress: TransferProgress) => void>(options.onProgress ? [options.onProgress] : []);
+    const entry = {
+        signal: options.signal,
+        listeners,
+        promise: download(url, key, { ...options, onProgress: (progress) => listeners.forEach((listener) => listener(progress)) })
+            .finally(() => {
+                if (running.get(key) === entry) {
+                    running.delete(key);
+                }
+            }),
+    };
+    running.set(key, entry);
+    return entry.promise;
 }
 
 async function download(source: string | (() => Promise<string>), key: string, options: DownloadOptions): Promise<Uint8Array<ArrayBuffer>> {
@@ -364,6 +378,10 @@ export async function tusUpload(target: TusTarget, blob: Blob, options: { signal
                     // object first (Supabase re-checks "already exists" on every piece).
                     const head = await request(fetcher, location, { method: 'HEAD', headers: base }, 0, options.signal);
                     cleanup.push(head.done);
+                    if (!head.response.ok && ![404, 410, 403].includes(head.response.status)) {
+                        // Locked or busy (423, 5xx): the upload is still there, ask again later.
+                        throw new Error(`HTTP ${head.response.status}`);
+                    }
                     const server = head.response.ok ? offsetOf(head.response, blob.size) : -1;
                     if (server >= 0 && server !== offset) {
                         offset = server;
