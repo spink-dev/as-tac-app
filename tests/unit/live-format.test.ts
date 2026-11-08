@@ -27,13 +27,22 @@ describe('live format tags', () => {
     });
 
     it('refuse data from a newer app and report its format', () => {
-        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: FORMAT_VERSION + 1 })).toEqual({ ok: false, newer: FORMAT_VERSION + 1 });
+        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: FORMAT_VERSION + 1 })).toEqual({ ok: false, reason: 'newer', newer: FORMAT_VERSION + 1 });
+        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: FORMAT_VERSION + 20 })).toMatchObject({ ok: false, reason: 'newer' });
     });
 
-    it('refuse a broken tag', () => {
-        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: 'x' })).toEqual({ ok: false, newer: null });
-        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: 0 })).toEqual({ ok: false, newer: null });
-        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: 1 }, 3, future)).toEqual({ ok: false, newer: null });
+    it('call a tag no update can read broken (no lock-out by a far-future or garbage tag)', () => {
+        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: 'x' })).toEqual({ ok: false, reason: 'tag', newer: null });
+        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: 0 })).toEqual({ ok: false, reason: 'tag', newer: null });
+        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: FORMAT_VERSION + 21 })).toEqual({ ok: false, reason: 'tag', newer: null });
+    });
+
+    it('tell a failed migration step from a broken tag (it may be fixed by a later release)', () => {
+        const failing: Record<number, ProjectStep> = { 1: { entity: { elements: () => {
+            throw new Error('step bug');
+        } } } };
+        expect(readFormat('elements', marker, 2, failing)).toEqual({ ok: false, reason: 'migration', newer: null });
+        expect(readFormat('elements', { ...marker, [FORMAT_KEY]: 1 }, 3, future)).toEqual({ ok: false, reason: 'migration', newer: null });
     });
 });
 
@@ -55,6 +64,17 @@ describe('queued changes across an app update', () => {
         expect(migrateQueued({ ...row, formatVersion: FORMAT_VERSION })).toEqual({ row: { ...row, formatVersion: FORMAT_VERSION }, changed: false });
         const deletion = migrateQueued({ collection: 'elements', data: null, prev: marker }, 2, future);
         expect(deletion && !('newer' in deletion) ? deletion.row.data : 'x').toBeNull();
+    });
+
+    it('lose stray tags that 1.0.0-alpha.1 kept in its entities', () => {
+        const tagged = { ...row, formatVersion: FORMAT_VERSION, data: { ...marker, [FORMAT_KEY]: 1 }, prev: { ...marker, [FORMAT_KEY]: 1 }, unacked: [{ ...marker, [FORMAT_KEY]: 1 }] };
+        const result = migrateQueued(tagged);
+        expect(result && !('newer' in result) && result.changed).toBe(true);
+        if (result && !('newer' in result)) {
+            expect(result.row.data).toEqual(marker);
+            expect(result.row.prev).toEqual(marker);
+            expect(result.row.unacked).toEqual([marker]);
+        }
     });
 
     it('from a newer app (after going back a version) are held', () => {

@@ -26,8 +26,12 @@ export function tagFormat(collection: RemoteCollection, data: unknown, version: 
 
 export type Incoming =
     | { ok: true; data: unknown }
-    /** `newer`: the format it was written in, when that is newer than this app's; `null` = unusable. */
-    | { ok: false; newer: number | null };
+    /**
+     * `newer`: written by a newer app (format in `newer`) — held, fetched again after the update.
+     * `tag`: a broken or implausible tag — no update will make it readable.
+     * `migration`: a migration step failed on it — a later release may fix the step, so it is held too.
+     */
+    | { ok: false; reason: 'newer' | 'tag' | 'migration'; newer: number | null };
 
 /** Incoming: the tag removed and older data migrated to `current`. */
 export function readFormat(collection: RemoteCollection, data: unknown, current: number = FORMAT_VERSION, steps: Readonly<Record<number, ProjectStep>> = PROJECT_STEPS): Incoming {
@@ -38,22 +42,23 @@ export function readFormat(collection: RemoteCollection, data: unknown, current:
     const { [FORMAT_KEY]: tag, ...rest } = data;
     const version = tag === undefined ? 1 : tag;
     if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
-        return { ok: false, newer: null };
+        return { ok: false, reason: 'tag', newer: null };
     }
     if (version > current + MAX_AHEAD) {
         // No real app is that far ahead: a broken or hostile tag must not lock every partner out.
-        return { ok: false, newer: null };
+        return { ok: false, reason: 'tag', newer: null };
     }
     if (version > current) {
-        return { ok: false, newer: version };
+        return { ok: false, reason: 'newer', newer: version };
     }
     if (version === current) {
         return { ok: true, data: rest };
     }
     try {
         return { ok: true, data: migrateEntity(kind, rest, version, current, steps) };
-    } catch {
-        return { ok: false, newer: null };
+    } catch (error) {
+        console.warn('live: migration step failed', collection, error);
+        return { ok: false, reason: 'migration', newer: null };
     }
 }
 

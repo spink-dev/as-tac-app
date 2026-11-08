@@ -4,7 +4,7 @@ import { mayAutoDownload } from '../net';
 import { flushNow, onProjectSaved, onSavedAsCopy, saveProject, savedAs } from '../storage/projects';
 import { mutate, onProjectChange, useProject } from '../store/project';
 import { applyOps, diffProjects, entityOf, metaOf, ORDER_ID, type DiffCollection, type EntityOp } from '../store/diff';
-import { FORMAT_VERSION, SYNCED_COLLECTIONS, ProjectSchema, type Project } from '../model/schema';
+import { FORMAT_VERSION, SYNCED_COLLECTIONS, ProjectSchema, type Project, type SyncedCollection } from '../model/schema';
 import { migrateQueued, readFormat, tagFormat } from './format';
 import { createProject, uid } from '../model/factory';
 import { validEntity } from '../model/validate';
@@ -146,9 +146,13 @@ export function projectFromEntities(entities: RemoteEntity[], info: { name: stri
     const live = entities.filter((e) => e.data !== null).flatMap((e) => {
         const incoming = readFormat(e.collection, e.data);
         if (!incoming.ok) {
-            if (incoming.newer !== null) {
+            if (incoming.reason === 'newer') {
                 // Joining would build a plan without the partner's newest objects: update first.
                 throw new Error('live-newer');
+            }
+            if (incoming.reason === 'migration') {
+                // Same for an object a migration step failed on: no plan with holes.
+                throw new Error('live-migration');
             }
             return [];
         }
@@ -375,9 +379,12 @@ class Session {
             // Queued before an app update: bring it to this format (or hold it, if a newer app queued it).
             const result = migrateQueued(stored);
             if (!result) {
-                // A bug in a migration step: never sent half-converted. The change itself is in the plan.
+                // A bug in a migration step: never sent half-converted. The change itself is in the plan;
+                // the row is kept on the device (kv `live:stuck:…`) and leaves the queue, so this is said once.
                 console.warn('live: queued change could not be migrated and is not sent', stored.id);
                 toast(t('live.queuedUnusable'), { tone: 'warn' });
+                this.persistChain = this.persistChain.then(() => kvSet(`live:stuck:${stored.id}`, stored)).then(() => db.liveOutbox.delete(stored.id))
+                    .catch((error) => console.warn('live: could not set the stuck change aside', error));
                 continue;
             }
             if ('newer' in result) {
@@ -400,6 +407,7 @@ class Session {
             if (saved.id !== this.link.projectId) {
                 return;
             }
+            this.lastSaved = saved;
             for (const key of [...this.touched]) {
                 const row = this.pending.get(key);
                 const op = row ? toLocal({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: row.data }) : null;
@@ -419,13 +427,25 @@ class Session {
             }
             toast(t('live.stoppedCopy'), { tone: 'warn' });
             // What this window queued since its last good save lives only in the local copy: it must not
-            // reach the live plan through the newer window, whose plan never had it.
+            // reach the live plan through the newer window, whose plan never had it. A queued row goes
+            // back to what the original plan holds (it may combine a saved and an unsaved edit);
+            // without a known saved state, or for an object the server never had, it is withdrawn.
             for (const key of this.touched) {
                 const row = this.pending.get(key);
-                if (row) {
+                if (!row) {
+                    continue;
+                }
+                const op = toLocal({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: row.data })
+                    ?? (row.data === null ? { collection: row.collection as DiffCollection, entityId: row.entityId, data: null } : null);
+                const saved = this.lastSaved && op ? entityOf(this.lastSaved, op) : undefined;
+                if (!this.lastSaved || !op || (saved === undefined && row.base === 0)) {
                     this.pending.delete(key);
                     this.forget(row);
+                    continue;
                 }
+                const restored = { ...row, data: saved === undefined ? null : wire(saved) };
+                this.pending.set(key, restored);
+                this.persist(restored);
             }
             void disconnectLive();
         }));
@@ -766,6 +786,8 @@ class Session {
 
     /** Keys this window queued in this session (see the copy takeover in `start`). */
     private touched = new Set<string>();
+    /** The plan as last saved under its own id in this session. */
+    private lastSaved: Project | null = null;
 
     /** Synchronous: the pending map is always current; Dexie writes follow in order. */
     enqueue(ops: (Omit<PushOp, 'base'> & { prev?: unknown | null })[]) {
@@ -773,6 +795,9 @@ class Session {
         for (const op of ops) {
             const key = keyOf(op.collection, op.entityId);
             this.touched.add(key);
+            if (op.collection === 'order' && Array.isArray(op.data)) {
+                this.lastOrder.set(op.entityId, op.data as string[]);
+            }
             const existing = this.pending.get(key);
             // Repeated edits of one entity before sending collapse into one op with the original base.
             const data = wire(op.data);
@@ -818,6 +843,33 @@ class Session {
     }
 
     private outdated: number | null = null;
+    private migrationWarned = false;
+    /** Some object was held back in this session (newer, or a failed migration step). */
+    private heldBack = false;
+    /** Seq of the last order list applied per collection (an order may place objects held back later). */
+    private appliedOrder = new Map<string, number>();
+    /** The last known list order per collection (from partners or sent by this device). */
+    private lastOrder = new Map<string, string[]>();
+
+    /**
+     * An object of `collection` was held back: an order list of that collection applied earlier (e.g.
+     * earlier in the same catch-up) may already place it. Its version is forgotten and the stored
+     * position kept below it, so it is applied again together with the object.
+     */
+    private holdOrderOf(collection: RemoteCollection) {
+        this.heldBack = true;
+        if (collection === 'order' || collection === 'meta') {
+            return;
+        }
+        const seq = this.appliedOrder.get(collection);
+        if (this.versions.delete(keyOf('order', collection))) {
+            // Also on disk: an earlier write may already hold it.
+            this.saveVersions();
+        }
+        if (seq !== undefined) {
+            this.holdSeq = Math.min(this.holdSeq, seq - 1);
+        }
+    }
 
     /**
      * A partner's app writes a newer plan format. Its entities are not applied (fetched again after
@@ -929,15 +981,17 @@ class Session {
                     const row = sent.get(key);
                     const incoming = readFormat(raw.collection, raw.data);
                     if (!incoming.ok) {
-                        // The server holds something this app can't read. Its version is not recorded,
-                        // so no later edit can silently replace it.
-                        if (incoming.newer !== null) {
-                            // Mine stays queued and goes out after the update, checked against it then.
+                        if (incoming.reason === 'newer' && incoming.newer !== null) {
+                            // Its version is not recorded, so no later edit replaces it silently. Mine
+                            // stays queued and goes out after the update, checked against it then.
                             this.outdate(incoming.newer);
                         } else if (row) {
-                            // Unusable on the server: mine is offered to the user instead of being lost,
-                            // and «keep mine» can replace the broken row (its version is known now).
-                            this.versions.set(key, raw.version);
+                            // Mine is offered to the user instead of being lost. A broken tag may be
+                            // replaced («keep mine»: its version is recorded); a row a migration step
+                            // failed on may not (not recorded: «keep mine» meets it as a clash again).
+                            if (incoming.reason === 'tag') {
+                                this.versions.set(key, raw.version);
+                            }
                             const current = this.pending.get(key);
                             if (current) {
                                 this.pending.delete(key);
@@ -1423,16 +1477,25 @@ class Session {
         this.markSeq(raw.seq);
         const incoming = readFormat(raw.collection, raw.data);
         if (!incoming.ok) {
-            if (incoming.newer !== null) {
-                // Not applied: the stored position stays below it, so it is fetched again after the update.
-                this.holdSeq = Math.min(this.holdSeq, raw.seq - 1);
+            if (incoming.reason === 'tag') {
+                if (raw.version > (this.versions.get(keyOf(raw.collection, raw.entityId)) ?? 0)) {
+                    // A broken tag no update can read: skipped for good. Its version is recorded, so an
+                    // edit here can replace it (no endless clash) and it is not fetched every session.
+                    console.warn('live: ignoring entity with a broken format tag', raw.collection, raw.entityId);
+                    this.versions.set(keyOf(raw.collection, raw.entityId), raw.version);
+                    this.saveVersions();
+                }
+                return;
+            }
+            // Newer, or a failed migration step (a later release may fix it): not applied, its version
+            // not recorded, and the stored position stays below it, so it is fetched again later.
+            this.holdSeq = Math.min(this.holdSeq, raw.seq - 1);
+            this.holdOrderOf(raw.collection);
+            if (incoming.reason === 'newer' && incoming.newer !== null) {
                 this.outdate(incoming.newer);
-            } else if (raw.version > (this.versions.get(keyOf(raw.collection, raw.entityId)) ?? 0)) {
-                // Broken beyond any update: skipped for good. Its version is recorded, so an edit here
-                // can replace it (no endless clash) and it is not fetched again every session.
-                console.warn('live: ignoring unusable entity', raw.collection, raw.entityId);
-                this.versions.set(keyOf(raw.collection, raw.entityId), raw.version);
-                this.saveVersions();
+            } else if (!this.migrationWarned) {
+                this.migrationWarned = true;
+                toast(t('live.migrationFailed'), { tone: 'warn' });
             }
             return;
         }
@@ -1467,16 +1530,32 @@ class Session {
             // My waiting edit is based on an older version: its push meets this one as a conflict.
             return;
         }
+        const plan = useProject.getState().project;
+        const existed = entity.collection === 'meta' || entity.collection === 'order'
+            || Boolean((plan?.[entity.collection as SyncedCollection] as { id: string }[] | undefined)?.some((item) => item.id === entity.entityId));
         if (!this.applyRemote([entity])) {
             // Not applied (invalid for this device, or the plan was just closed): its version is not
             // recorded and the stored seq stays below it, so the next session pulls it again.
             this.holdSeq = Math.min(this.holdSeq, entity.seq - 1);
             return;
         }
-        if (entity.collection === 'order' && this.outdated !== null) {
+        if (entity.collection === 'order' && Array.isArray(entity.data)) {
+            this.lastOrder.set(entity.entityId, entity.data as string[]);
+        } else if (!existed && entity.data !== null) {
+            const order = this.lastOrder.get(entity.collection);
+            if (order?.includes(entity.entityId) && !this.pending.has(keyOf('order', entity.collection))) {
+                // Its list order arrived first (catch-up pages run by seq, and an object edited again
+                // after being placed comes later): place it now, where the partner put it.
+                this.applyRemote([{ collection: 'order', entityId: entity.collection, data: order }]);
+            }
+        }
+        if (entity.collection === 'order' && (this.outdated !== null || this.heldBack)) {
             // It may place objects this device held back: applied now, applied again after the update.
             this.holdSeq = Math.min(this.holdSeq, entity.seq - 1);
             return;
+        }
+        if (entity.collection === 'order') {
+            this.appliedOrder.set(entity.entityId, entity.seq);
         }
         this.versions.set(key, entity.version);
         this.saveVersions();
@@ -1514,7 +1593,16 @@ class Session {
         if (!applied) {
             const current = useProject.getState().project;
             // A no-op (already equal) is fine; a rejection is not.
-            const unchanged = current && all.every((op) => same(entityOf(current, op) ?? null, op.data));
+            const unchanged = current && all.every((op) => {
+                const value = entityOf(current, op) ?? null;
+                if (op.entityId === ORDER_ID && Array.isArray(op.data) && Array.isArray(value)) {
+                    // An order may name objects not here (yet): it holds when the ones here follow it.
+                    const here = new Set(value as string[]);
+                    const listed = new Set(op.data as string[]);
+                    return same((value as string[]).filter((id) => listed.has(id)), (op.data as string[]).filter((id) => here.has(id)));
+                }
+                return same(value, op.data);
+            });
             if (!unchanged) {
                 console.warn('live: remote change rejected locally', all.map((op) => `${op.collection}:${op.entityId}`));
                 return false;

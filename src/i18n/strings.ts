@@ -490,6 +490,7 @@ export const S = {
     'live.limitedShort': ['Eingeschränkt', 'Limited'],
     'live.outdated': ['Ein Partner nutzt eine neuere AS-TAC-Version. Deine Änderungen warten, bis du aktualisierst; seine neuen Objekte erscheinen danach.', 'A partner uses a newer AS-TAC version. Your changes wait until you update; their new objects appear afterwards.'],
     'live.outdatedShort': ['Update nötig', 'Update needed'],
+    'live.migrationFailed': ['Ein Live-Objekt liess sich nicht ins Format dieser Version bringen und wird übersprungen, bis eine korrigierte Version da ist.', 'A live object could not be brought to this version\'s format and is skipped until a fixed version is available.'],
     'live.outdatedViewer': ['Ein Partner nutzt eine neuere AS-TAC-Version. Seine neuen Objekte erscheinen nach dem Update.', 'A partner uses a newer AS-TAC version. Their new objects appear after you update.'],
     'live.outdatedNoUpdate': ['Für dieses Gerät gibt es noch keine neuere Version. Deine Änderungen bleiben gespeichert und gehen raus, sobald die App aktualisiert ist.', 'There is no newer version for this device yet. Your changes stay saved and go out once the app is updated.'],
     'live.queuedUnusable': ['Eine wartende Live-Änderung liess sich nicht ins neue Format bringen und wird nicht gesendet. Sie bleibt in diesem Plan.', 'A queued live change could not be brought to the new format and is not sent. It stays in this plan.'],

@@ -238,7 +238,7 @@ export function LivePanel() {
                 <div className="notice notice--warn update-banner" role="status" data-testid="live-outdated">
                     <span className="spacer">
                         {t(role === 'viewer' ? 'live.outdatedViewer' : 'live.outdated')}
-                        {updateStatus === 'current' ? ` ${t('live.outdatedNoUpdate')}` : ''}
+                        {updateStatus === 'current' && role !== 'viewer' ? ` ${t('live.outdatedNoUpdate')}` : ''}
                     </span>
                     <UpdateAction small />
                 </div>

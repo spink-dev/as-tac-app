@@ -11,6 +11,9 @@ import { FORMAT_VERSION, ProjectSchema, type Project, type SyncedCollection } fr
  *    single entities (`migrateEntity`) with the same steps;
  * 3. keep tests/fixtures/formats/project-v<old>.json as it is (it must still open) and add a
  *    sample of the new format; never edit an existing fixture to make a test pass.
+ * 4. live: a build with a new format must not share a backend with production before its release
+ *    (every older member would hold its changes until updated); 1.0.0-alpha.1 applies received
+ *    `_fv` tags and sends them back, so data it edits can carry a newer tag than it was written in.
  */
 
 export type Json = Record<string, unknown>;
