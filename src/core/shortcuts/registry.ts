@@ -75,13 +75,13 @@ export function eventCombo(event: KeyboardEvent): string {
     return parts.join('+');
 }
 
-/** Key names as printed on keyboards in the app language (German keyboards: Strg, Entf). */
+/** Key names as printed on Swiss keyboards (Ctrl, Delete); only the space bar gets a German word. */
 export function formatCombo(combo: string): string {
     const de = usePrefs.getState().locale !== 'en';
     return combo.split('+').map((part) => {
         switch (part) {
             case 'mod':
-                return MAC ? '⌘' : de ? 'Strg' : 'Ctrl';
+                return MAC ? '⌘' : 'Ctrl';
             case 'shift':
                 return MAC ? '⇧' : 'Shift';
             case 'alt':
@@ -91,7 +91,7 @@ export function formatCombo(combo: string): string {
             case 'enter':
                 return '↵';
             case 'delete':
-                return de ? 'Entf' : 'Del';
+                return 'Del';
             case 'backspace':
                 return '⌫';
             case 'arrowright':

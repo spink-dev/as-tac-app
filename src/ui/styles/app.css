@@ -99,8 +99,8 @@
     }
 }
 
-@media (max-width: 359px) {
-    /* Icon only; the words stay for screen readers and as tooltip. */
+@media (max-width: 389px) {
+    /* Icon only (a cut "Offline …" would read as offline); the words stay for screen readers and as tooltip. */
     .lib__status-text {
         position: absolute;
         width: 1px;
