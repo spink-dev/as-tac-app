@@ -1,0 +1,7 @@
+.boot {
+    display: grid;
+    place-content: center;
+    gap: var(--sp-2);
+    height: 100%;
+    text-align: center;
+}

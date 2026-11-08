@@ -1,8 +1,9 @@
 node_modules/
 dist/
-.astro/
+dev-dist/
 test-results/
 playwright-report/
+tests/e2e/screenshots/
 .env*
 .DS_Store
 
