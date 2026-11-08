@@ -180,7 +180,6 @@ export function migrateProject(input: unknown): Project {
 async function readAstacV2(files: Map<string, Uint8Array>, manifest: Record<string, unknown>, signal?: AbortSignal): Promise<ImportResult> {
     const project = migrateProject(decode(await verifyEntry(files, manifest.project)));
     const declared = Array.isArray(manifest.assets) ? manifest.assets as Manifest['assets'] : [];
-    let missingAssets = 0;
     const needed = new Set(assetRefs(project));
     for (const entry of declared) {
         signal?.throwIfAborted();
@@ -194,11 +193,6 @@ async function readAstacV2(files: Map<string, Uint8Array>, manifest: Record<stri
         await storeAsset(entry.hash, bytes, entry.mime);
         needed.delete(entry.hash);
     }
-    for (const hash of needed) {
-        if (!(await getAsset(hash))) {
-            missingAssets += 1;
-        }
-    }
     let area: AreaMeta | undefined;
     if (manifest.area) {
         signal?.throwIfAborted();
@@ -209,7 +203,7 @@ async function readAstacV2(files: Map<string, Uint8Array>, manifest: Record<stri
             project.areaId = area.id;
         }
     }
-    return { kind: 'project', project, source: 'astac', area, unaligned: [], skipped: 0, missingAssets };
+    return { kind: 'project', project, source: 'astac', area, unaligned: [], skipped: 0, missingAssets: 0 };
 }
 
 /** as-tac 0.6 `.astac.zip`: fixed files, plan in the 0.x schema, map package included. */
@@ -299,11 +293,6 @@ async function readTacMap(files: Map<string, Uint8Array>, manifest: Record<strin
 }
 
 /**
- * Read any supported file: `.astac`, `.tacmap`, as-tac 0.x `.astac.zip` / plan JSON, or a
- * `.astac-map.json` offline area. Nothing is stored until it is fully verified, except
- * content-addressed assets and areas (harmless duplicates at worst).
- */
-/**
  * What of a plan's pictures this device can't show: image maps and logos that are missing or were
  * stored inert (not a real image, too large to decode), and missing attachments. Logos that can't
  * be shown fall back to the team symbol instead of an empty marker.
@@ -335,6 +324,12 @@ export async function checkPlanAssets(project: Project): Promise<{ project: Proj
     return { project: { ...project, teams }, unusable };
 }
 
+/**
+ * Read any supported file: `.astac`, `.tacmap`, as-tac 0.x `.astac.zip` / plan JSON, or a
+ * `.astac-map.json` offline area. Nothing is stored until it is fully verified, except
+ * content-addressed assets and areas (harmless duplicates at worst).
+ * Unusable pictures are counted in `missingAssets` (see `checkPlanAssets`).
+ */
 export async function readImportFile(file: Blob, place: PlacementResolver, signal?: AbortSignal): Promise<ImportResult> {
     const result = await readAnyFile(file, place, signal);
     if (result.kind !== 'project') {

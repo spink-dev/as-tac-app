@@ -117,10 +117,11 @@ if (sketch && existsSync(sketch)) {
 }
 // Something that only claims to be a PNG is refused with an explanation, never stored as a map.
 const before = await page.locator('.image-row').count();
-await page.locator('.toast').evaluateAll((nodes) => nodes.forEach((node) => node.remove()));
+const refusal = page.locator('.toast', { hasText: /kann nicht gelesen|can’t be read/ });
+const earlier = await refusal.count();
 await addImage(fake);
-const refused = await page.locator('.toast', { hasText: /kann nicht gelesen|can’t be read/ }).count();
-console.log('fake image refused:', refused > 0);
+const refused = (await refusal.count()) > earlier;
+console.log('fake image refused:', refused);
 if (!refused || (await page.locator('.image-row').count()) !== before) {
     fail('fake image was not refused clearly');
 }

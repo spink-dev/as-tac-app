@@ -23,6 +23,8 @@ Sobald OSM-Daten enthalten sind: auf der Karte **© OpenStreetMap contributors**
 
 Bei Aufnahme der Karten-/PWA-Abhängigkeiten ihre tatsächlichen Lizenzhinweise erfassen. Schriften, Icons, Bilder und exportierte Daten separat inventarisieren. Dieses Dokument behauptet keine allgemeine Veröffentlichungslizenz für as-tac.
 
+> Die Abschnitte AST-001 bis AST-012 und «Kartenarbeitsplatz» dokumentieren as-tac 0.x (Astro) und bleiben als Herkunftsnachweis stehen. Was für AS-TAC 1.0 gilt (Vite statt Astro, mitgelieferte Noto-Sans-Glyphen statt Systemschrift), steht im Abschnitt «AS-TAC 1.0» unten.
+
 ## AST-001 — implementierter Stand
 
 - `scripts/fetch-map.mjs`: eigene Implementierung; Overpass-JSON wird mit osmtogeojson nach WGS84-GeoJSON konvertiert, einschliesslich Multipolygon-Innenringen. Keine FieldMaps-/TacMap-Codekopie.

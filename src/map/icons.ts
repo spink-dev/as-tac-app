@@ -445,7 +445,12 @@ export function installIconFactory(map: MlMap) {
             } else if (parts[0] === 'arrow' || parts[0] === 'head') {
                 image = drawArrow(parts[1], parts[0] === 'head');
             } else if (parts[0] === 'logo') {
+                const ready = isRenderableImage(await getAsset(parts[1]));
                 image = await drawLogo(parts[1], Number(parts[2]) || 1);
+                // The logo may have arrived while the stand-in was drawn: draw the real one.
+                if (!ready && isRenderableImage(await getAsset(parts[1]))) {
+                    image = await drawLogo(parts[1], Number(parts[2]) || 1);
+                }
             }
             if (image && !map.hasImage(id)) {
                 map.addImage(id, image, { pixelRatio: RATIO });

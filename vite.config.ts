@@ -7,10 +7,15 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Their manifests too: a precached manifest from an older deploy would not match fresh data.
 const ON_DEMAND = ['maps/zurich.geojson', 'maps/benglen.geojson', 'maps/zurich.json', 'maps/benglen.json'];
 
-/** Ship CREDITS.md with the app (offline credits dialog links to it). */
+/** Ship CREDITS.md with the app (offline credits dialog links to it); served in dev too. */
 const shipCredits: Plugin = {
     name: 'as-tac-credits',
-    apply: 'build',
+    configureServer(server) {
+        server.middlewares.use('/licenses/CREDITS.md', (_req, res) => {
+            res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+            res.end(readFileSync('CREDITS.md', 'utf8'));
+        });
+    },
     generateBundle() {
         this.emitFile({ type: 'asset', fileName: 'licenses/CREDITS.md', source: readFileSync('CREDITS.md', 'utf8') });
     },
