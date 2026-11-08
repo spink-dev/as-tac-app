@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, Download, FileUp, HardDrive, Map as MapIcon, MoreHorizontal, Pencil, Plus, Radio, Trash2, Wifi } from 'lucide-react';
+import { Check, Copy, Download, FileUp, HardDrive, Map as MapIcon, MoreHorizontal, Pencil, Plus, Radio, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { areaErrorText } from '../areas/areaErrors';
 import { useT, relativeTime, formatBytes } from '../../i18n';
 import { usePrefs } from '../../core/store/prefs';
@@ -31,6 +31,7 @@ export function Library() {
     const scroller = useSmoothScroll<HTMLDivElement>();
     const listRef = useStaggerIn<HTMLUListElement>([projects === null]);
     const pwa = usePwa();
+    const statusText = pwa.offlineReady ? t('library.offlineReady') : navigator.onLine ? t('common.online') : t('common.offline');
 
     const refresh = useCallback(async () => {
         const [p, a, s] = await Promise.all([listProjects(), listAreas(), storageEstimate()]);
@@ -123,9 +124,9 @@ export function Library() {
                         <span className="lib__word">AS-TAC</span>
                     </div>
                     <div className="spacer" />
-                    <span className={`badge ${pwa.offlineReady ? 'badge--ok' : ''}`} title={pwa.offlineReady ? t('library.offlineReady') : undefined}>
-                        {navigator.onLine ? <Wifi size={14} strokeWidth={2} /> : null}
-                        {pwa.offlineReady ? t('library.offlineReady') : navigator.onLine ? t('common.online') : t('common.offline')}
+                    <span className={`badge lib__status ${pwa.offlineReady ? 'badge--ok' : ''}`} title={statusText}>
+                        {navigator.onLine ? <Wifi size={14} strokeWidth={2} aria-hidden="true" /> : <WifiOff size={14} strokeWidth={2} aria-hidden="true" />}
+                        <span className="lib__status-text">{statusText}</span>
                     </span>
                     <LanguageToggle />
                     <AppearanceToggle />

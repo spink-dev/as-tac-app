@@ -1,4 +1,5 @@
 import type { StringKey } from '../../i18n';
+import { usePrefs } from '../store/prefs';
 
 /**
  * Every keyboard shortcut is declared once here. Feature code reacts to action ids and never
@@ -74,11 +75,13 @@ export function eventCombo(event: KeyboardEvent): string {
     return parts.join('+');
 }
 
+/** Key names as printed on keyboards in the app language (German keyboards: Strg, Entf). */
 export function formatCombo(combo: string): string {
+    const de = usePrefs.getState().locale !== 'en';
     return combo.split('+').map((part) => {
         switch (part) {
             case 'mod':
-                return MAC ? '⌘' : 'Ctrl';
+                return MAC ? '⌘' : de ? 'Strg' : 'Ctrl';
             case 'shift':
                 return MAC ? '⇧' : 'Shift';
             case 'alt':
@@ -88,7 +91,7 @@ export function formatCombo(combo: string): string {
             case 'enter':
                 return '↵';
             case 'delete':
-                return 'Del';
+                return de ? 'Entf' : 'Del';
             case 'backspace':
                 return '⌫';
             case 'arrowright':
@@ -96,7 +99,7 @@ export function formatCombo(combo: string): string {
             case 'arrowleft':
                 return '←';
             case 'space':
-                return 'Space';
+                return de ? 'Leertaste' : 'Space';
             default:
                 return part.toUpperCase();
         }

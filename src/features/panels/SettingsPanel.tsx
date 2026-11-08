@@ -54,7 +54,7 @@ export function SettingsPanel() {
             <section className="section">
                 <div className="section__title">{t('settings.device')}</div>
                 <Field label={t('settings.language')}>
-                    <Segmented block value={prefs.locale} onChange={(locale) => prefs.set({ locale })} options={[{ value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }]} />
+                    <Segmented block value={prefs.locale} onChange={(locale) => prefs.set({ locale })} options={[{ value: 'de', label: <span lang="de-CH">Deutsch</span> }, { value: 'en', label: <span lang="en">English</span> }]} />
                 </Field>
                 <Field label={t('settings.bearing')}>
                     <Segmented block value={prefs.bearingUnit} onChange={(bearingUnit) => prefs.set({ bearingUnit })} options={[{ value: 'deg', label: t('settings.degrees') }, { value: 'mil', label: t('settings.mils') }]} />

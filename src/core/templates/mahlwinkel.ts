@@ -38,7 +38,8 @@ export interface EventTemplate {
     siteId: 'mahlwinkel';
     name: string;
     areaId: 'mahlwinkel';
-    summary: string;
+    /** Counts for the template's short description (worded in the UI language). */
+    counts: { buildings: number; hq: number; zones: number };
 }
 
 export const MAHLWINKEL_EVENTS: EventTemplate[] = data.events.map((event) => ({
@@ -46,7 +47,7 @@ export const MAHLWINKEL_EVENTS: EventTemplate[] = data.events.map((event) => ({
     siteId: 'mahlwinkel',
     name: event.name,
     areaId: 'mahlwinkel',
-    summary: `${Object.keys(event.poiNames).length} Gebäude · ${event.headquarters.length} HQ · ${event.zones.length} Zonen`,
+    counts: { buildings: Object.keys(event.poiNames).length, hq: event.headquarters.length, zones: event.zones.length },
 }));
 
 function zoneStyle(zone: FmZone): { category: ZoneCategory; pattern: ZonePattern } {

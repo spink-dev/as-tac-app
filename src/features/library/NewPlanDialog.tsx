@@ -134,7 +134,7 @@ export function NewPlanDialog() {
                     <div className="chip-row" role="radiogroup" aria-label={t('new.template')}>
                         <button type="button" role="radio" className="chip" aria-checked={template === ''} onClick={() => setTemplate('')}>{t('new.templateNone')}</button>
                         {templates.map((event) => (
-                            <button key={event.id} type="button" role="radio" className="chip" aria-checked={template === event.id} title={event.summary} onClick={() => setTemplate(event.id)}>
+                            <button key={event.id} type="button" role="radio" className="chip" aria-checked={template === event.id} title={t('new.templateSummary', { buildings: event.counts.buildings, hq: event.counts.hq, zones: event.counts.zones })} onClick={() => setTemplate(event.id)}>
                                 {event.name}
                             </button>
                         ))}

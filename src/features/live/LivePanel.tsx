@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Copy, Download, LogIn, Radio, Send, Unplug, UserPlus } from 'lucide-react';
-import { formatBytes, useT } from '../../i18n';
+import { formatBytes, formatTime, useT } from '../../i18n';
 import { useLive } from '../../core/live/state';
 import { usePrefs } from '../../core/store/prefs';
 import { useProject } from '../../core/store/project';
@@ -128,6 +128,7 @@ function Invite() {
 
 function Chat() {
     const t = useT();
+    const locale = usePrefs((state) => state.locale);
     const chat = useLive((state) => state.chat);
     const [text, setText] = useState('');
     useEffect(() => {
@@ -140,7 +141,7 @@ function Chat() {
                 <ol className="chat" aria-live="polite">
                     {chat.slice(-50).map((message) => (
                         <li key={message.id} className="chat__msg">
-                            <span className="chat__meta"><strong>{message.authorName || t('live.anonymous')}</strong> <time className="num">{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span>
+                            <span className="chat__meta"><strong>{message.authorName || t('live.anonymous')}</strong> <time className="num">{formatTime(message.createdAt, locale)}</time></span>
                             <span className="chat__body">{message.body}</span>
                         </li>
                     ))}

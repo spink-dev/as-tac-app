@@ -74,24 +74,12 @@ function keybindsOf(value: unknown): Record<string, string> {
     return Object.fromEntries(Object.entries(value as Stored).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
 }
 
-/** Fields of the stored record this version does not know (written by a newer app); kept on write. */
-let foreign: Stored = {};
-let storedVersion = PREFS_VERSION;
-
-function initial(): Prefs {
-    const browser = typeof navigator !== 'undefined' ? navigator.language ?? '' : '';
-    const raw = typeof localStorage === 'undefined' ? null : readStorage<unknown>(KEY);
-    const { prefs: stored, version, changed } = migratePrefs(raw, browser);
-    storedVersion = Math.max(version, PREFS_VERSION);
-    let appearance: Appearance = systemAppearance();
-    try {
-        const explicit = localStorage.getItem('as-tac.appearance');
-        if (explicit === 'day' || explicit === 'dark' || explicit === 'red') {
-            appearance = explicit;
-        }
-    } catch {
-        // Storage may be blocked; the choice then lasts for this session only.
-    }
+/**
+ * Known preferences from a stored (already migrated) record; anything missing or malformed takes
+ * its default, and German is the default language. `rejected` lists the known fields whose stored
+ * value was not usable, and `foreign` the fields this version does not know. Pure.
+ */
+export function normalizePrefs(stored: Stored, appearance: Appearance): { prefs: Prefs; rejected: Stored; foreign: Stored } {
     const prefs: Prefs = {
         appearance,
         // German first, whatever the browser says; English only when chosen.
@@ -106,7 +94,40 @@ function initial(): Prefs {
         mediaDownload: oneOf(stored.mediaDownload, ['auto', 'wifi', 'manual'] as const, 'auto'),
     };
     const known = new Set<string>([...Object.keys(prefs), 'v']);
-    foreign = Object.fromEntries(Object.entries(stored).filter(([key]) => !known.has(key)));
+    const foreign = Object.fromEntries(Object.entries(stored).filter(([key]) => !known.has(key)));
+    const rejected = Object.fromEntries(Object.entries(stored).filter(([key, value]) => known.has(key) && key !== 'v' && key !== 'appearance'
+        && JSON.stringify(value) !== JSON.stringify(prefs[key as keyof Prefs])));
+    return { prefs, rejected, foreign };
+}
+
+/**
+ * The record to store. A record from a newer app (`version` above ours) keeps what this version
+ * could not read: unknown fields, and the stored value of known fields this version rejected —
+ * until the user changes that preference here. `appearance` lives under its own key.
+ */
+export function storedRecord(prefs: Prefs, keep: { foreign: Stored; preserved: Stored; version: number }): Stored {
+    return { ...keep.foreign, ...prefs, ...keep.preserved, appearance: undefined, v: keep.version };
+}
+
+const keep: { foreign: Stored; preserved: Stored; version: number } = { foreign: {}, preserved: {}, version: PREFS_VERSION };
+
+function initial(): Prefs {
+    const browser = typeof navigator !== 'undefined' ? navigator.language ?? '' : '';
+    const raw = typeof localStorage === 'undefined' ? null : readStorage<unknown>(KEY);
+    const { prefs: stored, version, changed } = migratePrefs(raw, browser);
+    let appearance: Appearance = systemAppearance();
+    try {
+        const explicit = localStorage.getItem('as-tac.appearance');
+        if (explicit === 'day' || explicit === 'dark' || explicit === 'red') {
+            appearance = explicit;
+        }
+    } catch {
+        // Storage may be blocked; the choice then lasts for this session only.
+    }
+    const { prefs, rejected, foreign } = normalizePrefs(stored, appearance);
+    keep.version = Math.max(version, PREFS_VERSION);
+    keep.foreign = foreign;
+    keep.preserved = version > PREFS_VERSION ? rejected : {};
     if (raw && changed) {
         write(prefs);
     }
@@ -115,7 +136,7 @@ function initial(): Prefs {
 
 function write(prefs: Prefs) {
     try {
-        localStorage.setItem(KEY, JSON.stringify({ ...foreign, ...prefs, appearance: undefined, v: storedVersion }));
+        localStorage.setItem(KEY, JSON.stringify(storedRecord(prefs, keep)));
     } catch {
         // Session-only preference when storage is unavailable.
     }
@@ -131,6 +152,8 @@ export const usePrefs = create<PrefsState>((set, get) => ({
         set(patch);
         const { set: _ignored, ...rest } = { ...get(), ...patch };
         void _ignored;
+        // A preference changed here replaces whatever a newer app had stored for it.
+        keep.preserved = Object.fromEntries(Object.entries(keep.preserved).filter(([key]) => !(key in patch)));
         write(rest);
         try {
             if (patch.appearance) {

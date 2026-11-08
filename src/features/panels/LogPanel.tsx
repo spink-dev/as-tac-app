@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { useT } from '../../i18n';
+import { formatTime, useT } from '../../i18n';
+import { usePrefs } from '../../core/store/prefs';
 import { useProject } from '../../core/store/project';
 import { useUi } from '../../core/store/ui';
 import { Button, Empty } from '../../ui/components';
@@ -11,6 +12,7 @@ import { elementAnchor } from '../../map/planFeatures';
 
 export function LogPanel() {
     const t = useT();
+    const locale = usePrefs((state) => state.locale);
     const project = useProject((state) => state.project);
     useProject((state) => state.readOnly);
     const mode = useUi((state) => state.mode);
@@ -48,7 +50,7 @@ export function LogPanel() {
                         const team = project.teams.find((x) => x.id === entry.teamId);
                         return (
                             <li key={entry.id} className="log-row">
-                                <time className="log-row__time num" dateTime={entry.t}>{new Date(entry.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+                                <time className="log-row__time num" dateTime={entry.t}>{formatTime(entry.t, locale)}</time>
                                 <span className="log-row__text">
                                     {team ? <span className="dot" style={{ ['--dot' as string]: team.color }} /> : null}
                                     {entry.text}

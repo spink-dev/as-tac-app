@@ -45,6 +45,10 @@ export function formatDateTime(iso: string, locale: Locale): string {
     return new Date(iso).toLocaleString(locale === 'en' ? 'en' : 'de-CH', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+export function formatTime(iso: string, locale: Locale): string {
+    return new Date(iso).toLocaleTimeString(locale === 'en' ? 'en' : 'de-CH', { hour: '2-digit', minute: '2-digit' });
+}
+
 export function formatBytes(bytes: number): string {
     if (bytes < 1024) {
         return `${bytes} B`;

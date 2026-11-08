@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { S } from '../../src/i18n/strings';
-import { migratePrefs, PREFS_VERSION } from '../../src/core/store/prefs';
+import { migratePrefs, normalizePrefs, PREFS_VERSION, storedRecord } from '../../src/core/store/prefs';
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
 
@@ -57,5 +57,31 @@ describe('preferences migration', () => {
         expect(migratePrefs('nonsense', 'de').prefs).toEqual({ v: PREFS_VERSION });
         expect(migratePrefs([1, 2], 'de').prefs).toEqual({ v: PREFS_VERSION });
         expect(migratePrefs({ v: 'x', locale: 'en' }, 'en').prefs.locale).toBe('de');
+    });
+});
+
+describe('preferences on this device', () => {
+    it('defaults to German and sane values', () => {
+        const { prefs, rejected } = normalizePrefs({}, 'day');
+        expect(prefs.locale).toBe('de');
+        expect(prefs.mediaDownload).toBe('auto');
+        expect(rejected).toEqual({});
+    });
+
+    it('drops malformed values but reports them', () => {
+        const { prefs, rejected, foreign } = normalizePrefs({ locale: 'fr', bearingUnit: 'grad', keybinds: { a: 'x', b: null }, extra: 1, v: 2 }, 'dark');
+        expect(prefs.locale).toBe('de');
+        expect(prefs.bearingUnit).toBe('deg');
+        expect(prefs.keybinds).toEqual({ a: 'x' });
+        expect(rejected).toEqual({ locale: 'fr', bearingUnit: 'grad', keybinds: { a: 'x', b: null } });
+        expect(foreign).toEqual({ extra: 1 });
+    });
+
+    it('never stores the appearance in the record and keeps what a newer app wrote', () => {
+        const { prefs } = normalizePrefs({}, 'red');
+        const record = storedRecord({ ...prefs, locale: 'en' }, { foreign: { extra: 1 }, preserved: { mediaDownload: 'never' }, version: 9 });
+        expect(record.appearance).toBeUndefined();
+        expect(record).toMatchObject({ extra: 1, mediaDownload: 'never', locale: 'en', v: 9 });
+        expect(JSON.parse(JSON.stringify(record))).not.toHaveProperty('appearance');
     });
 });

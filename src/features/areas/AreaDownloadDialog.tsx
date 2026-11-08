@@ -160,7 +160,7 @@ export function AreaDownloadDialog() {
         if (!bounds) {
             return;
         }
-        const areaName = name.trim() || query.trim() || 'Gebiet';
+        const areaName = name.trim() || query.trim() || t('area.defaultName');
         const controller = new AbortController();
         abort.current = controller;
         setBusy({ phase: 'download', bytes: 0 });
