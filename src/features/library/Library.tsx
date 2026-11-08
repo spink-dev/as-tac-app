@@ -14,6 +14,9 @@ import { BUNDLED_AREAS, installBundled, listAreas, removeArea, areaUsage } from 
 import type { AreaMeta } from '../../core/areas/types';
 import { APP_VERSION } from '../../version';
 import { usePwa } from '../../core/pwa';
+import { LegacyBanner } from './LegacyBanner';
+import { exportAreaFile } from '../../core/areas/files';
+import { saveFile } from '../../core/files/save';
 
 export function Library() {
     const t = useT();
@@ -133,6 +136,8 @@ export function Library() {
                     </div>
                 ) : null}
 
+                <LegacyBanner onImported={() => void refresh()} />
+
                 <section className="lib__actions" aria-label={t('library.title')}>
                     <Button variant="primary" onClick={() => showDialog('newPlan')} data-testid="new-plan">
                         <Plus {...ICON} /> {t('library.new')}
@@ -237,9 +242,14 @@ export function Library() {
                                             ) : null}
                                         </div>
                                         {area.meta ? (
-                                            <IconButton label={t('area.remove')} tipPos="left" onClick={() => void uninstall(area.meta as AreaMeta)}>
-                                                <Trash2 {...ICON} />
-                                            </IconButton>
+                                            <>
+                                                <IconButton label={t('area.exportFile')} tipPos="left" onClick={() => void exportAreaFile(area.id).then(({ blob, filename }) => saveFile(blob, filename))}>
+                                                    <Download {...ICON} />
+                                                </IconButton>
+                                                <IconButton label={t('area.remove')} tipPos="left" onClick={() => void uninstall(area.meta as AreaMeta)}>
+                                                    <Trash2 {...ICON} />
+                                                </IconButton>
+                                            </>
                                         ) : (
                                             <Button small onClick={() => void install(area.id)} disabled={installing[area.id] !== undefined}>
                                                 <HardDrive size={16} /> {t('area.install')}

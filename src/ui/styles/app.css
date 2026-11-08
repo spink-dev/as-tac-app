@@ -670,3 +670,99 @@
         top: calc(var(--safe-top) + 64px);
     }
 }
+
+/* ---------- Area download ---------- */
+.lib__legacy {
+    align-items: center;
+}
+
+.area-dl__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: var(--sp-3);
+    align-items: end;
+}
+
+@media (max-width: 640px) {
+    .area-dl__row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.area-dl__search {
+    position: relative;
+    display: flex;
+    gap: var(--sp-2);
+}
+
+.area-dl__results {
+    left: 0;
+    right: 0;
+    list-style: none;
+    margin: 0;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.area-dl__result {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: var(--sp-2) var(--sp-3);
+    width: 100%;
+}
+
+.area-dl__map {
+    position: relative;
+    height: min(52dvh, 520px);
+    min-height: 280px;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    border: 1px solid var(--line);
+}
+
+.area-dl__canvas {
+    position: absolute;
+    inset: 0;
+}
+
+.area-dl__frame {
+    position: absolute;
+    inset: 12% 14%;
+    border: 2.5px solid var(--accent);
+    border-radius: var(--r-sm);
+    box-shadow: 0 0 0 100vmax oklch(0.2 0.01 250 / 0.28);
+    pointer-events: none;
+    transition: border-color var(--dur-2) var(--ease-out);
+}
+
+.area-dl__frame.is-too-large {
+    border-color: var(--danger);
+    border-style: dashed;
+}
+
+.area-dl__busy {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(320px, 80%);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    align-items: stretch;
+    padding: var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-2);
+    text-align: center;
+}
+
+.area-dl__size {
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+}
+
+.area-dl__warn {
+    color: var(--danger);
+}

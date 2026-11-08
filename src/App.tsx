@@ -3,6 +3,7 @@ import { Toasts } from './ui/components';
 import { useRoute } from './core/store/route';
 import { Library } from './features/library/Library';
 import { NewPlanDialog } from './features/library/NewPlanDialog';
+import { AreaDownloadDialog } from './features/areas/AreaDownloadDialog';
 import { startAutosave } from './core/storage/projects';
 import { registerPwa } from './core/pwa';
 
@@ -27,6 +28,7 @@ export function App() {
                 </Suspense>
             )}
             <NewPlanDialog />
+            <AreaDownloadDialog />
             <Toasts />
         </>
     );

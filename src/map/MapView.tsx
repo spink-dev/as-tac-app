@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Map as MaplibreMap, setWorkerUrl, type MapMouseEvent, type Map as MlMap } from 'maplibre-gl';
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import type { MapMouseEvent, Map as MlMap } from 'maplibre-gl';
+import { MaplibreMap } from './engine';
 import { useProject } from '../core/store/project';
 import { useUi } from '../core/store/ui';
 import { usePrefs } from '../core/store/prefs';
@@ -16,8 +16,6 @@ import { PALETTES } from './palette';
 import { addPlanLayers, applyPlanPalette, setPlanData, setSourceData } from './planLayers';
 import { buildPlanCollections } from './planFeatures';
 import { syncImageOverlays } from './images';
-
-setWorkerUrl(workerUrl);
 
 export const mapRef: { current: MlMap | null } = { current: null };
 /** True once plan sources and layers exist. `isStyleLoaded()` is false while big sources parse. */
