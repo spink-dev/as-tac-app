@@ -293,6 +293,13 @@ class Session {
     private uploadQueue = new Set<string>();
     /** Uploads that failed and wait for their retry (restarted early when the link comes back). */
     private failedUploads = new Set<string>();
+    /** Pictures the user tapped «Laden» for: fetched as soon as they exist, whatever the data saver says. */
+    private requested = new Set<string>();
+    /** Picture hashes seen in rows (only a new hash resets a waiting picture's backoff). */
+    private knownPictures = new Set<string>();
+    /** Downloads that arrived but did not match their hash (two strikes before giving up). */
+    private mismatches = new Map<string, number>();
+    private notYetToastAt = 0;
     private uploading = false;
     private ensureTimer = 0;
     private progressAt = 0;
@@ -1021,6 +1028,15 @@ class Session {
                     const retry = this.assetRetry.get(`up:${hash}`);
                     const wait = retry ? Math.min(retry.wait * 2, 15 * 60 * 1000) : 15000;
                     this.assetRetry.set(`up:${hash}`, { at: Date.now() + wait, wait });
+                    if ((error as { permanent?: boolean })?.permanent || permanentError(error) || /quota|exceed|location|unauthenticated/i.test(String((error as Error)?.message ?? error))) {
+                        // Refused for a reason that won't change by itself: only its own (long) timer
+                        // tries again, never every poll.
+                        this.later(() => {
+                            this.uploadQueue.add(hash);
+                            void this.runUploads();
+                        }, 15 * 60 * 1000);
+                        continue;
+                    }
                     this.failedUploads.add(hash);
                     this.later(() => {
                         if (this.failedUploads.delete(hash)) {
@@ -1086,14 +1102,15 @@ class Session {
             return;
         }
         useLive.setState({ missing: missing.map((m) => m.hash) });
-        if (!force && !mayAutoDownload()) {
-            return;
-        }
+        const auto = force || mayAutoDownload();
         for (const { hash, mime } of missing) {
             if (this.closed) {
                 return;
             }
-            await this.ensureAsset(hash, mime, force);
+            // With the data saver on, only pictures someone asked for (a tap) are fetched.
+            if (auto || this.requested.has(hash)) {
+                await this.ensureAsset(hash, mime, force);
+            }
         }
     }
 
@@ -1122,6 +1139,9 @@ class Session {
 
     /** Download pictures now, regardless of the data-saver setting (the user asked for them). */
     loadPictures(hashes?: string[]) {
+        for (const hash of hashes ?? useLive.getState().missing) {
+            this.requested.add(hash);
+        }
         if (!hashes) {
             void this.ensureAssets(true);
             return;
@@ -1179,22 +1199,34 @@ class Session {
             // Content-addressed: anything that doesn't hash to its name is dropped.
             if (bytes && (await sha256Hex(bytes)) === hash) {
                 this.assetRetry.delete(hash);
+                this.requested.delete(hash);
+                this.mismatches.delete(hash);
                 await putVerifiedAsset(hash, bytes, safeMime(mime ?? blob?.type));
                 useLive.setState({ missing: useLive.getState().missing.filter((m) => m !== hash) });
                 renderPlan();
                 return;
             }
-            if (bytes || (blob && blob.size > 40 * 1024 * 1024)) {
-                // It arrived but is not this picture (or too large): no point fetching it again this session.
+            const strikes = (this.mismatches.get(hash) ?? 0) + 1;
+            if ((bytes && strikes >= 2) || (blob && blob.size > 40 * 1024 * 1024)) {
+                // Twice not this picture (or too large): no point fetching it again this session.
                 this.assetRetry.set(hash, { at: Number.POSITIVE_INFINITY, wait: 0 });
+                this.requested.delete(hash);
                 return;
+            }
+            if (bytes) {
+                // Once could be a captive-portal page: one more try later.
+                this.mismatches.set(hash, strikes);
             }
             // Not on the server yet (the partner is still uploading): ask again soon — that is one
             // tiny request. The link broke: back off longer. A tap never makes later tries slower.
             const cap = unreachable ? 5 * 60 * 1000 : 60 * 1000;
             const wait = force || !retry ? 15000 : Math.min(retry.wait * 2, cap);
             this.assetRetry.set(hash, { at: Date.now() + wait, wait });
-            if (force && !unreachable) {
+            // Its own timer: polls alone (60 s while realtime is up) would often miss the moment.
+            this.later(() => this.scheduleEnsureAssets(), wait + 100);
+            if (force && !unreachable && Date.now() - this.notYetToastAt > 3000) {
+                // One message per tap, however many pictures are still on their way.
+                this.notYetToastAt = Date.now();
                 toast(t('maps.imageNotYet'), { tone: 'warn' });
             }
         })().finally(() => this.assetJobs.delete(hash));
@@ -1299,8 +1331,13 @@ class Session {
             // A new or changed picture row: its picture may be ready now — no waiting out an old backoff.
             const data = entity.data as { asset?: string; logoAsset?: string } | null;
             const hash = entity.collection === 'images' ? data?.asset : data?.logoAsset;
-            if (hash && this.assetRetry.get(hash)?.at !== Number.POSITIVE_INFINITY) {
-                this.assetRetry.delete(hash);
+            // A new picture: no waiting out an old backoff. Other edits of the row (moving corners,
+            // renaming a team) change nothing about the picture and keep its schedule.
+            if (hash && !this.knownPictures.has(hash)) {
+                this.knownPictures.add(hash);
+                if (this.assetRetry.get(hash)?.at !== Number.POSITIVE_INFINITY) {
+                    this.assetRetry.delete(hash);
+                }
             }
             this.scheduleEnsureAssets();
         }
