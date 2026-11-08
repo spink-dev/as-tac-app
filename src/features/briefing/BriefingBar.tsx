@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Eraser, PenLine, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eraser, PenLine, Radio, Trash2, X } from 'lucide-react';
 import { useT } from '../../i18n';
 import { DRAW_COLORS, useUi } from '../../core/store/ui';
 import { useProject, mutate } from '../../core/store/project';
@@ -8,6 +8,8 @@ import { Button, ICON, IconButton, Swatches } from '../../ui/components';
 import { visibleInPhase } from '../../map/planFeatures';
 import { goToPhase, stepPhase } from './briefing';
 import { setMode } from '../workspace/modes';
+import { useLive } from '../../core/live/state';
+import { myClientId, setFollowing, setLeading } from '../../core/live/session';
 
 /**
  * Presentation controls: phase navigation, the phase's notes and a temporary pen.
@@ -24,6 +26,11 @@ export function BriefingBar() {
     const keep = useProject((state) => state.project?.settings.keepBriefingInk ?? false);
     const drawings = useProject((state) => state.project?.drawings);
     const [notesOpen, setNotesOpen] = useState(true);
+    const liveStatus = useLive((state) => state.status);
+    const liveRole = useLive((state) => state.role);
+    const leaderId = useLive((state) => state.leaderId);
+    const following = useLive((state) => state.following);
+    const leader = useLive((state) => state.presence.find((p) => p.clientId === state.leaderId));
     if (mode !== 'briefing') {
         return null;
     }
@@ -81,7 +88,23 @@ export function BriefingBar() {
                     </>
                 ) : null}
                 <span className="spacer" />
-                <Button variant="ghost" onClick={() => setMode('plan')}><X size={18} /> {t('briefing.end')}</Button>
+                {liveStatus === 'online' && (liveRole === 'owner' || liveRole === 'admin') && (!leaderId || leaderId === myClientId()) ? (
+                    <Button variant={leaderId === myClientId() ? 'primary' : 'secondary'} aria-pressed={leaderId === myClientId()} onClick={() => setLeading(leaderId !== myClientId())} data-testid="lead">
+                        <Radio size={18} /> {t('briefing.lead')}
+                    </Button>
+                ) : null}
+                {liveStatus === 'online' && leaderId && leaderId !== myClientId() ? (
+                    <Button variant={following ? 'primary' : 'secondary'} aria-pressed={following} onClick={() => setFollowing(!following)} data-testid="follow">
+                        <Radio size={18} /> {following && leader ? t('briefing.following', { name: leader.name }) : t('briefing.follow')}
+                    </Button>
+                ) : null}
+                <Button variant="ghost" onClick={() => {
+                    if (leaderId === myClientId()) {
+                        setLeading(false);
+                    }
+                    setFollowing(false);
+                    setMode('plan');
+                }}><X size={18} /> {t('briefing.end')}</Button>
             </div>
             {!keep && inkCount > 0 ? <p className="field__hint">{t('briefing.keepInkHint')}</p> : null}
         </div>

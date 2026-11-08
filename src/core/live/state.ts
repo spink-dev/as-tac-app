@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { LiveConflict } from './session';
 
 export type LiveStatus = 'off' | 'connecting' | 'online' | 'offline' | 'error';
 export type LiveRole = 'owner' | 'admin' | 'viewer';
@@ -32,6 +33,7 @@ interface LiveState {
     leaderId: string | null;
     following: boolean;
     error: string | null;
+    conflicts: LiveConflict[];
 }
 
 export const useLive = create<LiveState>(() => ({
@@ -46,8 +48,9 @@ export const useLive = create<LiveState>(() => ({
     leaderId: null,
     following: false,
     error: null,
+    conflicts: [],
 }));
 
 export function resetLive() {
-    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, presence: [], chat: [], unread: 0, leaderId: null, following: false, error: null });
+    useLive.setState({ status: 'off', backend: null, remoteId: null, role: null, queued: 0, presence: [], chat: [], unread: 0, leaderId: null, following: false, error: null, conflicts: [] });
 }

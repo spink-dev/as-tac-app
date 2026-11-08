@@ -6,6 +6,7 @@ import { NewPlanDialog } from './features/library/NewPlanDialog';
 import { AreaDownloadDialog } from './features/areas/AreaDownloadDialog';
 import { ShortcutsDialog } from './features/workspace/ShortcutsDialog';
 import { ImportDialog } from './features/share/ImportDialog';
+import { JoinDialog } from './features/live/JoinDialog';
 import { showDialog } from './core/store/dialogs';
 import { decodePlanLink, LINK_PREFIX } from './core/files/link';
 import { startAutosave } from './core/storage/projects';
@@ -27,6 +28,15 @@ async function receiveLaunch() {
             void handle.getFile().then((file) => showDialog('import', { file }));
         }
     });
+    const params = new URLSearchParams(location.search);
+    const join = params.get('join');
+    if (join) {
+        // Invite links carry only the code; it goes into the join dialog, never into history.
+        params.delete('join');
+        const rest = params.toString();
+        history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+        showDialog('join', { code: join.slice(0, 16) });
+    }
     if (location.hash.startsWith(LINK_PREFIX)) {
         const hash = location.hash;
         // Drop the plan from the address bar and history right away.
@@ -75,6 +85,7 @@ export function App() {
             <AreaDownloadDialog />
             <ShortcutsDialog />
             <ImportDialog />
+            <JoinDialog />
             <Toasts />
         </>
     );

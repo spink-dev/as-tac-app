@@ -231,7 +231,8 @@ export function armTool(tool: ToolId): boolean {
     const ui = useUi.getState();
     const allowed = tool === 'select' || tool === 'measure' || ((tool === 'draw' || tool === 'erase') ? inkAllowed() : canEdit());
     if (!allowed) {
-        toast(t('mode.fieldLocked'), { tone: 'warn' });
+        const readOnly = useProject.getState().readOnly;
+        toast(readOnly === 'viewer' ? t('live.viewerLock') : readOnly === 'copy' ? t('save.readOnlyCopy') : t('mode.fieldLocked'), { tone: 'warn' });
         return false;
     }
     ui.setTool(tool);

@@ -46,6 +46,8 @@ export interface LiveLinkRow {
     backend: 'supabase' | 'loopback';
     lastSeq: number;
     name: string;
+    /** Account the link belongs to: a plan is only synced (and writable) as that account. */
+    userId: string;
 }
 
 export interface OutboxRow {
@@ -54,6 +56,8 @@ export interface OutboxRow {
     collection: string;
     entityId: string;
     data: unknown | null;
+    /** Server version this change was based on (0 = new); sent for the conflict check. */
+    base: number;
     clientId: string;
     createdAt: string;
 }

@@ -16,6 +16,11 @@ const ENTITY_SCHEMAS = {
     tracks: TrackSchema,
 } as const;
 
+/** Validate one entity of a collection (live sync builds plans entity by entity). */
+export function validEntity(collection: keyof typeof ENTITY_SCHEMAS | 'meta', data: unknown): boolean {
+    return collection === 'meta' ? MetaSchema.safeParse(data).success : ENTITY_SCHEMAS[collection].safeParse(data).success;
+}
+
 const MetaSchema = z.object({
     name: z.string().min(1).max(MAX.projectName),
     areaId: z.string().max(120).nullable(),

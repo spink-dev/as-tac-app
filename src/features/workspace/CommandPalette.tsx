@@ -40,6 +40,8 @@ export function CommandPalette() {
         setActive(0);
         // Restore focus to where it was (e.g. the toolbar button) when the palette closes.
         const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        // Focus right away so fast typing after the shortcut isn't lost; rAF covers late mounts.
+        input.current?.focus();
         requestAnimationFrame(() => input.current?.focus());
         return () => {
             if (previous?.isConnected) {

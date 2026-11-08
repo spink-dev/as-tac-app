@@ -252,6 +252,6 @@ if (typeof window !== 'undefined') {
         if (!project) {
             return {};
         }
-        return { elements: project.elements.length, drawings: project.drawings.length, tracks: project.tracks.length, phases: project.phases.length };
+        return { elements: project.elements.length, drawings: project.drawings.length, tracks: project.tracks.length, phases: project.phases.length, readOnly: useProject.getState().readOnly ? 1 : 0 };
     };
 }

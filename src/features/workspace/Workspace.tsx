@@ -13,6 +13,10 @@ import { FieldPanel, useFieldLayers } from '../field/FieldHud';
 import '../maps/MapsPanel';
 import '../briefing/PhasesPanel';
 import '../share/SharePanel';
+import '../live/LivePanel';
+import { useEffect } from 'react';
+import { connectLive, disconnectLive } from '../../core/live/session';
+import { useProject } from '../../core/store/project';
 
 export function Workspace() {
     const mode = useUi((state) => state.mode);
@@ -20,6 +24,16 @@ export function Workspace() {
     const appearance = usePrefs((state) => state.appearance);
     useShortcuts();
     useFieldLayers();
+    const projectId = useProject((state) => state.project?.id);
+    useEffect(() => {
+        if (!projectId) {
+            return;
+        }
+        void connectLive(projectId);
+        return () => {
+            void disconnectLive();
+        };
+    }, [projectId]);
     return (
         <div className="ws" data-mode={mode} data-streamer={streamer} data-appearance-map={appearance}>
             <MapView />
