@@ -1,3 +1,4 @@
+import type { TransferProgress } from './transfer';
 import type { LiveRole, Presence, ChatMessage } from './state';
 
 /** Server-side collections: plan collections plus `meta` (name, area, settings) and `order` (id sequences). */
@@ -36,6 +37,11 @@ export interface BriefingMessage {
     to?: string;
     phaseIndex: number;
     camera: { center: [number, number]; zoom: number; bearing: number } | null;
+}
+
+export interface TransferOptions {
+    signal?: AbortSignal;
+    onProgress?: (progress: TransferProgress) => void;
 }
 
 export interface PullOptions {
@@ -79,8 +85,10 @@ export interface LiveTransport {
     createInvite(role: 'admin' | 'viewer'): Promise<string>;
     chatHistory(): Promise<ChatMessage[]>;
     sendChat(body: string): Promise<void>;
-    uploadAsset(hash: string, blob: Blob): Promise<void>;
-    downloadAsset(hash: string): Promise<Blob | null>;
+    /** Resumable where the backend allows; retries over weak links. */
+    uploadAsset(hash: string, blob: Blob, options?: TransferOptions): Promise<void>;
+    /** `null` when the server doesn't have it (yet); throws on network trouble. */
+    downloadAsset(hash: string, options?: TransferOptions): Promise<Blob | null>;
     close(): void;
 }
 

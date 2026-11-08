@@ -13,6 +13,8 @@ export interface Prefs {
     keybinds: Record<string, string>;
     displayName: string;
     onboarded: boolean;
+    /** When image maps and logos from live partners are downloaded (mobile data). */
+    mediaDownload: 'auto' | 'wifi' | 'manual';
 }
 
 const KEY = 'as-tac.prefs';
@@ -56,6 +58,7 @@ function initial(): Prefs {
         keybinds: stored?.keybinds ?? {},
         displayName: stored?.displayName ?? '',
         onboarded: stored?.onboarded ?? false,
+        mediaDownload: stored?.mediaDownload === 'wifi' || stored?.mediaDownload === 'manual' ? stored.mediaDownload : 'auto',
     };
 }
 

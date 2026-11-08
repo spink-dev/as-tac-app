@@ -1,5 +1,5 @@
 import type { ChatMessage, LiveRole, Presence } from './state';
-import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PullOptions, PushOp, PushResult, RemoteEntity, TransportHandlers } from './types';
+import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PullOptions, PushOp, PushResult, RemoteEntity, TransferOptions, TransportHandlers } from './types';
 import { getAsset } from '../storage/assets';
 
 /**
@@ -420,12 +420,62 @@ class LoopbackTransport implements LiveTransport {
         this.handlers?.chat(message);
     }
 
-    async uploadAsset(): Promise<void> {
-        // Tabs share this origin's IndexedDB: nothing to transfer.
+    /*
+     * Test mode keeps a "server copy" of pictures in Cache Storage, so transfers cross the
+     * simulated link like on a real server (and a test can remove a device's own copy).
+     */
+    private async assetCache(): Promise<Cache | null> {
+        return typeof caches === 'undefined' ? null : caches.open(`${PREFIX}:assets`).catch(() => null);
     }
 
-    async downloadAsset(hash: string): Promise<Blob | null> {
-        return (await getAsset(hash))?.blob ?? null;
+    private assetUrl(hash: string): string {
+        return `https://loopback.invalid/${this.planId}/${hash}`;
+    }
+
+    async uploadAsset(hash: string, blob: Blob, options: TransferOptions = {}): Promise<void> {
+        const cache = await this.assetCache();
+        if (!cache || await cache.match(this.assetUrl(hash))) {
+            options.onProgress?.({ done: blob.size, total: blob.size });
+            return;
+        }
+        await this.travelPieces(blob.size, 'up', options);
+        await cache.put(this.assetUrl(hash), new Response(blob, { headers: { 'content-type': blob.type } }));
+    }
+
+    async downloadAsset(hash: string, options: TransferOptions = {}): Promise<Blob | null> {
+        const cache = await this.assetCache();
+        const response = cache ? await cache.match(this.assetUrl(hash)) : undefined;
+        if (!response) {
+            // Older test plans: the picture only exists in this browser's own store.
+            return (await getAsset(hash))?.blob ?? null;
+        }
+        const blob = await response.blob();
+        await this.travelPieces(blob.size, 'down', options);
+        return blob;
+    }
+
+    /** Move `size` bytes over the simulated link in 512 KB pieces (each may fail and is retried). */
+    private async travelPieces(size: number, direction: 'up' | 'down', options: TransferOptions) {
+        const piece = 512 * 1024;
+        let done = 0;
+        let failures = 0;
+        while (done < size) {
+            const length = Math.min(piece, size - done);
+            try {
+                await travel(length, options.signal, direction);
+                if (unlucky()) {
+                    throw new TypeError('Failed to fetch');
+                }
+                done += length;
+                failures = 0;
+                options.onProgress?.({ done, total: size });
+            } catch (error) {
+                failures += 1;
+                if (options.signal?.aborted || failures >= 5) {
+                    throw error;
+                }
+            }
+        }
     }
 
     close(): void {

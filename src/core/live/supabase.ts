@@ -1,6 +1,7 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import type { ChatMessage, LiveRole, Presence } from './state';
-import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PullOptions, PushOp, PushResult, RemoteCollection, RemoteEntity, TransportHandlers } from './types';
+import type { BriefingMessage, JoinInfo, LiveBackend, LiveTransport, PullOptions, PushOp, PushResult, RemoteCollection, RemoteEntity, TransferOptions, TransportHandlers } from './types';
+import { rangeDownload, TUS_PIECE, tusUpload } from './transfer';
 
 /**
  * Supabase backend. Only the public URL and the publishable key reach the browser (build-time
@@ -284,18 +285,43 @@ class SupabaseTransport implements LiveTransport {
         }
     }
 
-    async uploadAsset(hash: string, blob: Blob): Promise<void> {
+    async uploadAsset(hash: string, blob: Blob, options: TransferOptions = {}): Promise<void> {
         const sb = await supabaseClient();
-        const { error } = await sb.storage.from('live-assets').upload(`${this.planId}/${hash}`, blob, { contentType: blob.type, upsert: false });
+        const path = `${this.planId}/${hash}`;
+        if (blob.size > TUS_PIECE) {
+            // Large pictures go up resumably: a dropped connection continues at the last 6 MB.
+            const token = (await sb.auth.getSession()).data.session?.access_token;
+            await tusUpload({
+                endpoint: `${URL_}/storage/v1/upload/resumable`,
+                headers: { authorization: `Bearer ${token ?? KEY}`, apikey: KEY ?? '', 'x-upsert': 'false' },
+                bucket: 'live-assets',
+                object: path,
+                contentType: blob.type || 'application/octet-stream',
+            }, blob, options);
+            return;
+        }
+        const { error } = await sb.storage.from('live-assets').upload(path, blob, { contentType: blob.type, upsert: false });
         if (error && !/exist|duplicate/i.test(error.message)) {
             throw error;
         }
+        options.onProgress?.({ done: blob.size, total: blob.size });
     }
 
-    async downloadAsset(hash: string): Promise<Blob | null> {
+    async downloadAsset(hash: string, options: TransferOptions = {}): Promise<Blob | null> {
         const sb = await supabaseClient();
-        const { data, error } = await sb.storage.from('live-assets').download(`${this.planId}/${hash}`);
-        return error ? null : data;
+        const { data, error } = await sb.storage.from('live-assets').createSignedUrl(`${this.planId}/${hash}`, 3600);
+        if (error || !data?.signedUrl) {
+            // Not uploaded (yet): try again later.
+            return null;
+        }
+        try {
+            return new Blob([await rangeDownload(data.signedUrl, hash, options)]);
+        } catch (failure) {
+            if ((failure as { permanent?: boolean }).permanent) {
+                return null;
+            }
+            throw failure;
+        }
     }
 
     close(): void {
