@@ -256,8 +256,10 @@ export function MapView() {
             if (state.tool !== prev.tool && planReady) {
                 renderEdit(map);
             }
-            if (state.streamer !== prev.streamer) {
+            if (state.streamer !== prev.streamer && planReady) {
                 renderGrid();
+                renderDraft(map);
+                renderEdit(map);
             }
         });
         const unsubPrefs = usePrefs.subscribe((state, prev) => {

@@ -1,7 +1,7 @@
 import type { Map as MlMap, MapMouseEvent, MapTouchEvent, PointLike } from 'maplibre-gl';
-import { useUi, DRAW_COLORS, type ToolId } from '../core/store/ui';
+import { useUi, DRAW_COLORS, toast, type ToolId } from '../core/store/ui';
 import { mutate, useProject } from '../core/store/project';
-import { addElement, canEdit, replaceElement, activeLayerId } from '../core/actions';
+import { addElement, canEdit, activeLayerId } from '../core/actions';
 import { uid, nowIso } from '../core/model/factory';
 import type { Element, LngLat, Project, Stroke } from '../core/model/schema';
 import { insertVertex, isLocked, moveVertex, setRadius, simplify, translateElement } from '../core/model/geometry';
@@ -9,11 +9,14 @@ import { distanceM } from '../core/geo/geo';
 import { t } from '../i18n';
 import { HIT_LAYERS, INK_LAYER } from './planLayers';
 import { mapRef } from './MapView';
+import { visibleInPhase } from './planFeatures';
 
 type Pt = { x: number; y: number };
 type DragKind = 'element' | 'vertex' | 'mid' | 'radius';
+type InkTarget = 'streamer' | 'briefing' | 'plan';
 
-interface DragState {
+interface DragGesture {
+    type: 'drag';
     kind: DragKind;
     id: string;
     index: number;
@@ -23,8 +26,26 @@ interface DragState {
     moved: boolean;
 }
 
+interface InkGesture {
+    type: 'ink';
+    target: InkTarget;
+    screen: [number, number][];
+    points: LngLat[];
+}
+
+interface EraseGesture {
+    type: 'erase';
+    target: InkTarget;
+    session: Set<string>;
+    persisted: Set<string>;
+}
+
+type Gesture = DragGesture | InkGesture | EraseGesture;
+
 const CREATION: ToolId[] = ['marker', 'route', 'zone', 'text', 'bearing', 'measure'];
 const MULTI_POINT: ToolId[] = ['route', 'zone', 'measure', 'bearing'];
+/** Zone fills are never grabbed: a press inside an AO must pan the map. */
+const DRAG_LAYERS = ['plan-markers', 'plan-text', 'plan-line-hit', 'plan-zone-line-hit'];
 
 function ll(event: { lngLat: { lng: number; lat: number } }): LngLat {
     return [event.lngLat.lng, event.lngLat.lat];
@@ -43,9 +64,8 @@ function box(point: Pt, r: number): [PointLike, PointLike] {
 }
 
 /** Plan element / stroke ids under the pointer, topmost first. */
-export function hitIds(map: MlMap, point: Pt, includeInk = true, radius = 10): string[] {
-    const layers = existingLayers(map, includeInk ? [...HIT_LAYERS, INK_LAYER] : HIT_LAYERS);
-    const features = map.queryRenderedFeatures(box(point, radius), { layers });
+export function hitIds(map: MlMap, point: Pt, includeInk = true, radius = 10, layers = includeInk ? [...HIT_LAYERS, INK_LAYER] : HIT_LAYERS): string[] {
+    const features = map.queryRenderedFeatures(box(point, radius), { layers: existingLayers(map, layers) });
     const ids: string[] = [];
     for (const feature of features) {
         const id = feature.properties?.id as string | undefined;
@@ -67,7 +87,8 @@ function hitHandle(map: MlMap, point: Pt): { role: string; index: number; id: st
     return { role: String(feature.properties.role), index: Number(feature.properties.index ?? 0), id: String(feature.properties.id) };
 }
 
-function inkTarget(): 'streamer' | 'briefing' | 'plan' | null {
+/** Where ink drawn right now would go. `null`: drawing is not allowed. */
+export function inkTarget(): InkTarget | null {
     const { streamer, mode } = useUi.getState();
     if (streamer !== 'off') {
         return 'streamer';
@@ -81,15 +102,19 @@ function inkTarget(): 'streamer' | 'briefing' | 'plan' | null {
     return null;
 }
 
+function currentPhaseId(project: Project): string | null {
+    const ui = useUi.getState();
+    return ui.mode === 'briefing' && project.phases.length > 0 ? project.phases[Math.min(ui.phaseIndex, project.phases.length - 1)].id : null;
+}
+
 function finishCreated(id: string, shiftKey: boolean) {
+    if (!id) {
+        return;
+    }
     const project = useProject.getState().project;
     const ui = useUi.getState();
     const back = (project?.settings.returnToSelect ?? true) !== shiftKey;
-    if (back) {
-        ui.set({ tool: 'select', draft: null });
-    } else {
-        ui.set({ draft: null });
-    }
+    ui.set(back ? { tool: 'select', draft: null } : { draft: null });
     ui.select([id]);
 }
 
@@ -105,6 +130,10 @@ export function finishDraft(shiftKey = false) {
         ui.set({ measure: points, draft: null });
         return;
     }
+    if (!canEdit()) {
+        ui.set({ draft: null });
+        return;
+    }
     if (draft.tool === 'route' && points.length >= 2) {
         const style = ui.routeStyle;
         const id = addElement({
@@ -116,8 +145,7 @@ export function finishDraft(shiftKey = false) {
     }
     if (draft.tool === 'zone' && ui.zoneShape === 'polygon' && points.length >= 3) {
         const id = addElement({
-            kind: 'zone', id: uid('el'), shape: { type: 'polygon', points }, category: ui.zoneCategory, fillOpacity: 0.18,
-            label: t(`zone.${ui.zoneCategory}`),
+            kind: 'zone', id: uid('el'), shape: { type: 'polygon', points }, category: ui.zoneCategory, fillOpacity: 0.18, label: t(`zone.${ui.zoneCategory}`),
         }, t('tool.zone'));
         finishCreated(id, shiftKey);
         return;
@@ -186,49 +214,42 @@ function createPointElement(p: LngLat, shiftKey: boolean) {
     }
 }
 
-function strokeFrom(map: MlMap, screen: [number, number][], points: LngLat[], extra: Partial<Stroke> = {}): Stroke | null {
-    if (points.length < 2) {
-        return null;
-    }
-    const keep = simplify(screen, 1.2).slice(0, 4000);
-    const ui = useUi.getState();
-    void map;
-    return {
-        id: uid('ink'), points: keep.map((i) => points[i]), color: DRAW_COLORS[ui.drawColor] ?? DRAW_COLORS[0], width: ui.drawWidth, opacity: 0.95,
-        createdAt: nowIso(), ...extra,
-    };
-}
-
-function commitStroke(stroke: Stroke) {
-    const target = inkTarget();
+function commitStroke(target: InkTarget, stroke: Stroke) {
     const ui = useUi.getState();
     const project = useProject.getState().project;
-    if (!target || !project) {
+    if (!project || inkTarget() !== target) {
         return;
     }
     if (target === 'streamer') {
         ui.set({ streamerInk: [...ui.streamerInk, stroke] });
     } else if (target === 'briefing') {
-        const phase = project.phases[Math.min(ui.phaseIndex, project.phases.length - 1)];
+        const phase = currentPhaseId(project);
         if (project.settings.keepBriefingInk && !useProject.getState().readOnly) {
             mutate(t('briefing.ink'), (draft) => {
-                draft.drawings.push({ ...stroke, briefingOnly: true, phaseIds: phase ? [phase.id] : undefined });
+                draft.drawings.push({ ...stroke, briefingOnly: true, phaseIds: phase ? [phase] : undefined });
             });
         } else {
             ui.set({ briefingInk: [...ui.briefingInk, stroke] });
         }
     } else {
+        const layer = activeLayerId(project);
+        if (!layer) {
+            toast(t('common.locked'), { tone: 'warn' });
+            return;
+        }
         mutate(t('tool.draw'), (draft) => {
-            draft.drawings.push({ ...stroke, layerId: activeLayerId(project) });
+            draft.drawings.push({ ...stroke, layerId: layer });
         });
     }
 }
 
-/** Strokes within `radius` screen px of the pointer that the current mode may erase. */
-function erasableAt(map: MlMap, point: Pt, radius: number): { session: string[]; persisted: string[] } {
-    const target = inkTarget();
+/** Strokes within `radius` screen px that the gesture's target may erase (visible ones only). */
+function erasableAt(map: MlMap, point: Pt, radius: number, target: InkTarget): { session: string[]; persisted: string[] } {
     const ui = useUi.getState();
     const project = useProject.getState().project;
+    if (!project) {
+        return { session: [], persisted: [] };
+    }
     const near = (stroke: Stroke) => {
         for (let i = 1; i < stroke.points.length; i++) {
             const a = map.project(stroke.points[i - 1]);
@@ -243,32 +264,73 @@ function erasableAt(map: MlMap, point: Pt, radius: number): { session: string[];
         }
         return false;
     };
-    if (!project || !target) {
-        return { session: [], persisted: [] };
-    }
+    const layers = new Map(project.layers.map((layer) => [layer.id, layer]));
+    const usable = (stroke: Stroke) => {
+        const layer = layers.get(stroke.layerId ?? project.layers[0].id);
+        return !layer || (layer.visible && !layer.locked);
+    };
     if (target === 'streamer') {
         return { session: ui.streamerInk.filter(near).map((s) => s.id), persisted: [] };
     }
     if (target === 'briefing') {
-        return { session: ui.briefingInk.filter(near).map((s) => s.id), persisted: project.drawings.filter((s) => s.briefingOnly && near(s)).map((s) => s.id) };
+        const phase = currentPhaseId(project);
+        const keep = project.settings.keepBriefingInk && !useProject.getState().readOnly;
+        return {
+            session: ui.briefingInk.filter(near).map((s) => s.id),
+            persisted: keep ? project.drawings.filter((s) => s.briefingOnly && visibleInPhase(s.phaseIds, phase) && usable(s) && near(s)).map((s) => s.id) : [],
+        };
     }
-    return { session: [], persisted: project.drawings.filter((s) => !s.briefingOnly && near(s)).map((s) => s.id) };
+    return { session: [], persisted: project.drawings.filter((s) => !s.briefingOnly && usable(s) && near(s)).map((s) => s.id) };
+}
+
+/** Only geometry is written back, so a peer's concurrent label or style edit survives a drag. */
+function commitGeometry(next: Element) {
+    mutate(t('common.edit'), (draft) => {
+        const target = draft.elements.find((item) => item.id === next.id) as Record<string, unknown> | undefined;
+        if (!target) {
+            return;
+        }
+        switch (next.kind) {
+            case 'marker':
+            case 'text':
+                target.pos = next.pos;
+                break;
+            case 'route':
+                target.points = next.points;
+                break;
+            case 'bearing':
+                target.start = next.start;
+                target.end = next.end;
+                break;
+            case 'zone':
+                target.shape = next.shape;
+                if (next.labelPos) {
+                    target.labelPos = next.labelPos;
+                }
+                break;
+        }
+    });
+}
+
+let abortActive: (() => void) | null = null;
+
+/** Cancel any in-progress drag, stroke or erase without committing it. */
+export function abortGesture() {
+    abortActive?.();
 }
 
 export function installInteraction(map: MlMap): () => void {
-    let drag: DragState | null = null;
-    let ink: { screen: [number, number][]; points: LngLat[] } | null = null;
-    let erase: { session: Set<string>; persisted: Set<string> } | null = null;
-    let suppressClick = false;
+    let gesture: Gesture | null = null;
+    let releasedAt = 0;
     let lastClick: { x: number; y: number; ids: string[]; index: number } | null = null;
     let spacePan = false;
 
     const canvas = map.getCanvasContainer();
 
     function applyToolState() {
-        const { tool, mode, streamer } = useUi.getState();
-        const inking = (tool === 'draw' || tool === 'erase') && (mode !== 'field' || streamer !== 'off');
-        if (inking && !spacePan) {
+        const { tool } = useUi.getState();
+        const inking = (tool === 'draw' || tool === 'erase') && inkTarget() !== null;
+        if ((inking && !spacePan) || gesture?.type === 'drag' && gesture.moved) {
             map.dragPan.disable();
         } else {
             map.dragPan.enable();
@@ -281,21 +343,46 @@ export function installInteraction(map: MlMap): () => void {
         canvas.style.cursor = CREATION.includes(tool) ? 'crosshair' : inking ? 'cell' : '';
     }
 
+    function abort() {
+        if (!gesture) {
+            return;
+        }
+        const ui = useUi.getState();
+        gesture = null;
+        ui.set({ override: null, draft: ui.draft?.tool === 'draw' ? null : ui.draft });
+        stopWindowWatch();
+        applyToolState();
+    }
+    abortActive = abort;
+
+    const onWindowUp = () => endPress();
+    const onWindowBlur = () => abort();
+    function startWindowWatch() {
+        window.addEventListener('pointerup', onWindowUp);
+        window.addEventListener('blur', onWindowBlur);
+    }
+    function stopWindowWatch() {
+        window.removeEventListener('pointerup', onWindowUp);
+        window.removeEventListener('blur', onWindowBlur);
+    }
+
     function startPress(event: MapMouseEvent | MapTouchEvent): boolean {
         const ui = useUi.getState();
         const project = useProject.getState().project;
-        if (!project) {
+        if (!project || gesture) {
             return false;
         }
         const point = event.point;
         const p = ll(event);
-        if ((ui.tool === 'draw' || ui.tool === 'erase') && inkTarget() && !spacePan) {
+        const target = inkTarget();
+        if ((ui.tool === 'draw' || ui.tool === 'erase') && target && !spacePan) {
             if (ui.tool === 'draw') {
-                ink = { screen: [[point.x, point.y]], points: [p] };
+                gesture = { type: 'ink', target, screen: [[point.x, point.y]], points: [p] };
             } else {
-                erase = { session: new Set(), persisted: new Set() };
-                collectErase(point);
+                gesture = { type: 'erase', target, session: new Set(), persisted: new Set() };
+                collectErase(gesture, point);
             }
+            startWindowWatch();
             return true;
         }
         if (!canEdit() || ui.override) {
@@ -303,79 +390,83 @@ export function installInteraction(map: MlMap): () => void {
         }
         const locked = lockedLayers(project);
         const defaultLayer = project.layers[0]?.id;
-        if (ui.tool === 'select' && ui.selection.length === 1) {
+        const selectedWithHandles = ui.tool === 'select' && ui.selection.length === 1;
+        if (selectedWithHandles) {
             const handle = hitHandle(map, point);
             const element = handle ? project.elements.find((e) => e.id === handle.id) : undefined;
             if (handle && element && !isLocked(element, locked, defaultLayer)) {
                 const kind: DragKind = handle.role === 'mid' ? 'mid' : handle.role === 'radius' ? 'radius' : handle.role === 'move' ? 'element' : 'vertex';
-                drag = { kind, id: element.id, index: handle.index, start: p, startPoint: point, original: element, moved: false };
+                gesture = { type: 'drag', kind, id: element.id, index: handle.index, start: p, startPoint: point, original: element, moved: false };
+                startWindowWatch();
                 return true;
             }
         }
         const drafting = Boolean(ui.draft && ui.draft.points.length > 0);
-        const direct = project.settings.directManipulation;
-        if (drafting || (ui.tool !== 'select' && !direct)) {
+        if (drafting || (ui.tool !== 'select' && !project.settings.directManipulation)) {
             return false;
         }
-        const ids = hitIds(map, point, false, 8);
-        const element = ids.map((id) => project.elements.find((e) => e.id === id)).find((e): e is Element => Boolean(e));
+        const ids = hitIds(map, point, false, 8, DRAG_LAYERS);
+        // Prefer the element the user selected (e.g. after tap-cycling to a lower one).
+        const preferred = ids.find((id) => ui.selection.includes(id)) ?? ids[0];
+        const element = project.elements.find((e) => e.id === preferred);
         if (!element || isLocked(element, locked, defaultLayer)) {
             return false;
         }
         if (ui.tool !== 'select' && element.kind !== 'marker' && element.kind !== 'text') {
             return false;
         }
-        drag = { kind: 'element', id: element.id, index: 0, start: p, startPoint: point, original: element, moved: false };
+        // A selected line/zone shows precision handles; those own its geometry.
+        if (selectedWithHandles && ui.selection[0] === element.id && (element.kind === 'route' || element.kind === 'zone' || element.kind === 'bearing')) {
+            return false;
+        }
+        gesture = { type: 'drag', kind: 'element', id: element.id, index: 0, start: p, startPoint: point, original: element, moved: false };
+        startWindowWatch();
         return true;
     }
 
-    function collectErase(point: Pt) {
-        if (!erase) {
-            return;
-        }
-        const hits = erasableAt(map, point, useUi.getState().eraserPx);
-        hits.session.forEach((id) => erase?.session.add(id));
-        hits.persisted.forEach((id) => erase?.persisted.add(id));
-        const ui = useUi.getState();
+    function collectErase(state: EraseGesture, point: Pt) {
+        const hits = erasableAt(map, point, useUi.getState().eraserPx, state.target);
+        hits.session.forEach((id) => state.session.add(id));
+        hits.persisted.forEach((id) => state.persisted.add(id));
         if (hits.session.length > 0) {
-            ui.set({ briefingInk: ui.briefingInk.filter((s) => !erase?.session.has(s.id)), streamerInk: ui.streamerInk.filter((s) => !erase?.session.has(s.id)) });
+            const ui = useUi.getState();
+            ui.set({ briefingInk: ui.briefingInk.filter((s) => !state.session.has(s.id)), streamerInk: ui.streamerInk.filter((s) => !state.session.has(s.id)) });
         }
     }
 
     function moveTo(event: MapMouseEvent | MapTouchEvent) {
         const p = ll(event);
         const point = event.point;
-        if (ink) {
-            const last = ink.screen[ink.screen.length - 1];
+        if (gesture?.type === 'ink') {
+            const last = gesture.screen[gesture.screen.length - 1];
             if (Math.hypot(point.x - last[0], point.y - last[1]) >= 2) {
-                ink.screen.push([point.x, point.y]);
-                ink.points.push(p);
-                const ui = useUi.getState();
-                ui.set({ draft: { tool: 'draw', points: [...ink.points] } });
+                gesture.screen.push([point.x, point.y]);
+                gesture.points.push(p);
+                useUi.getState().set({ draft: { tool: 'draw', points: [...gesture.points] } });
             }
             return;
         }
-        if (erase) {
-            collectErase(point);
+        if (gesture?.type === 'erase') {
+            collectErase(gesture, point);
             return;
         }
-        if (drag) {
-            if (!drag.moved && Math.hypot(point.x - drag.startPoint.x, point.y - drag.startPoint.y) < 4) {
+        if (gesture?.type === 'drag') {
+            if (!gesture.moved && Math.hypot(point.x - gesture.startPoint.x, point.y - gesture.startPoint.y) < 4) {
                 return;
             }
-            if (!drag.moved) {
-                drag.moved = true;
+            if (!gesture.moved) {
+                gesture.moved = true;
                 map.dragPan.disable();
             }
             let next: Element;
-            if (drag.kind === 'element') {
-                next = translateElement(drag.original, p[0] - drag.start[0], p[1] - drag.start[1]);
-            } else if (drag.kind === 'vertex') {
-                next = moveVertex(drag.original, drag.index, p);
-            } else if (drag.kind === 'mid') {
-                next = insertVertex(drag.original, drag.index, p);
+            if (gesture.kind === 'element') {
+                next = translateElement(gesture.original, p[0] - gesture.start[0], p[1] - gesture.start[1]);
+            } else if (gesture.kind === 'vertex') {
+                next = moveVertex(gesture.original, gesture.index, p);
+            } else if (gesture.kind === 'mid') {
+                next = insertVertex(gesture.original, gesture.index, p);
             } else {
-                next = setRadius(drag.original, p);
+                next = setRadius(gesture.original, p);
             }
             useUi.getState().set({ override: next });
             return;
@@ -387,78 +478,81 @@ export function installInteraction(map: MlMap): () => void {
     }
 
     function endPress() {
-        if (ink) {
-            const stroke = strokeFrom(map, ink.screen, ink.points);
-            ink = null;
-            useUi.getState().set({ draft: null });
-            if (stroke) {
-                commitStroke(stroke);
-            }
-            suppressClick = true;
+        const state = gesture;
+        if (!state) {
             return;
         }
-        if (erase) {
-            const persisted = [...erase.persisted];
-            erase = null;
-            suppressClick = true;
-            if (persisted.length > 0) {
-                const set = new Set(persisted);
-                mutate(t('tool.erase'), (draft) => {
-                    draft.drawings = draft.drawings.filter((stroke) => !set.has(stroke.id));
+        gesture = null;
+        stopWindowWatch();
+        releasedAt = performance.now();
+        const ui = useUi.getState();
+        if (state.type === 'ink') {
+            ui.set({ draft: null });
+            if (state.points.length >= 2) {
+                const keep = simplify(state.screen, 1.2).slice(0, 4000);
+                commitStroke(state.target, {
+                    id: uid('ink'), points: keep.map((i) => state.points[i]), color: DRAW_COLORS[ui.drawColor] ?? DRAW_COLORS[0], width: ui.drawWidth, opacity: 0.95, createdAt: nowIso(),
                 });
             }
-            return;
-        }
-        if (drag) {
-            const state = drag;
-            drag = null;
-            applyToolState();
-            const next = useUi.getState().override;
-            useUi.getState().set({ override: null });
-            if (state.moved && next) {
-                suppressClick = true;
-                replaceElement(next, t('common.edit'));
-                if (useUi.getState().tool === 'select' || !useUi.getState().selection.includes(state.id)) {
-                    useUi.getState().select([state.id]);
+        } else if (state.type === 'erase') {
+            const ids = new Set(state.persisted);
+            if (ids.size > 0 && inkTarget() === state.target) {
+                mutate(t('tool.erase'), (draft) => {
+                    draft.drawings = draft.drawings.filter((stroke) => !ids.has(stroke.id));
+                });
+            }
+        } else {
+            const next = ui.override;
+            ui.set({ override: null });
+            if (state.moved && next && canEdit()) {
+                commitGeometry(next);
+                if (!ui.selection.includes(state.id)) {
+                    ui.select([state.id]);
                 }
+            } else if (!state.moved) {
+                releasedAt = 0;
             }
         }
+        applyToolState();
     }
 
     const onDown = (event: MapMouseEvent) => {
         if (event.originalEvent.button !== 0) {
             return;
         }
+        releasedAt = 0;
         if (startPress(event)) {
             event.preventDefault();
         }
     };
     const onTouchStart = (event: MapTouchEvent) => {
+        releasedAt = 0;
         if (event.points.length > 1) {
-            ink = null;
-            erase = null;
-            if (drag) {
-                drag = null;
-                useUi.getState().set({ override: null, draft: useUi.getState().draft?.tool === 'draw' ? null : useUi.getState().draft });
-            }
-            map.dragPan.enable();
+            abort();
             return;
         }
         if (startPress(event)) {
             event.preventDefault();
         }
     };
-    const onMove = (event: MapMouseEvent) => moveTo(event);
+    const onMove = (event: MapMouseEvent) => {
+        if (gesture && (event.originalEvent as MouseEvent).buttons === 0) {
+            endPress();
+            return;
+        }
+        moveTo(event);
+    };
     const onTouchMove = (event: MapTouchEvent) => {
         if (event.points.length === 1) {
             moveTo(event);
         }
     };
     const onUp = () => endPress();
+    const onTouchCancel = () => abort();
 
     const onClick = (event: MapMouseEvent) => {
-        if (suppressClick) {
-            suppressClick = false;
+        if (releasedAt && performance.now() - releasedAt < 350) {
+            releasedAt = 0;
             return;
         }
         const ui = useUi.getState();
@@ -472,8 +566,7 @@ export function installInteraction(map: MlMap): () => void {
         if (tool === 'draw' || tool === 'erase') {
             return;
         }
-        const editable = canEdit();
-        if (tool !== 'select' && tool !== 'measure' && !editable) {
+        if (tool !== 'select' && tool !== 'measure' && !canEdit()) {
             return;
         }
         if (tool === 'select' || ((tool === 'marker' || tool === 'text') && project.settings.directManipulation && !ui.draft)) {
@@ -520,9 +613,17 @@ export function installInteraction(map: MlMap): () => void {
         if (event.code !== 'Space' || (event.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable]')) {
             return;
         }
+        // Keep space from activating a focused button while it is used for panning.
+        event.preventDefault();
         const down = event.type === 'keydown';
         if (down !== spacePan) {
             spacePan = down;
+            applyToolState();
+        }
+    };
+    const onBlur = () => {
+        if (spacePan) {
+            spacePan = false;
             applyToolState();
         }
     };
@@ -533,38 +634,53 @@ export function installInteraction(map: MlMap): () => void {
     map.on('touchmove', onTouchMove);
     map.on('mouseup', onUp);
     map.on('touchend', onUp);
-    map.on('touchcancel', onUp);
+    map.on('touchcancel', onTouchCancel);
     map.on('click', onClick);
     map.on('dblclick', onDblClick);
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKey);
-    const unsub = useUi.subscribe((state, prev) => {
+    window.addEventListener('blur', onBlur);
+    const unsubUi = useUi.subscribe((state, prev) => {
         if (state.tool !== prev.tool || state.mode !== prev.mode || state.streamer !== prev.streamer) {
+            // A gesture never survives a change of what it is allowed to do.
+            abort();
             applyToolState();
             seedRoute(state.tool, prev.tool);
+        }
+    });
+    const unsubProject = useProject.subscribe((state, prev) => {
+        if (state.readOnly !== prev.readOnly) {
+            abort();
+            applyToolState();
         }
     });
     applyToolState();
 
     return () => {
+        abort();
+        if (abortActive === abort) {
+            abortActive = null;
+        }
         map.off('mousedown', onDown);
         map.off('touchstart', onTouchStart);
         map.off('mousemove', onMove);
         map.off('touchmove', onTouchMove);
         map.off('mouseup', onUp);
         map.off('touchend', onUp);
-        map.off('touchcancel', onUp);
+        map.off('touchcancel', onTouchCancel);
         map.off('click', onClick);
         map.off('dblclick', onDblClick);
         window.removeEventListener('keydown', onKey);
         window.removeEventListener('keyup', onKey);
-        unsub();
+        window.removeEventListener('blur', onBlur);
+        unsubUi();
+        unsubProject();
     };
 }
 
 /** Arming Route with a friendly unit selected seeds the first waypoint at that unit. */
 function seedRoute(tool: ToolId, prevTool: ToolId) {
-    if (tool !== 'route' || prevTool === 'route') {
+    if (tool !== 'route' || prevTool === 'route' || !canEdit()) {
         return;
     }
     const ui = useUi.getState();
@@ -590,7 +706,8 @@ export function removeLastDraftPoint() {
 export function cancelDraft() {
     const ui = useUi.getState();
     if (ui.override) {
-        ui.set({ override: null });
+        abortGesture();
+        return true;
     }
     if (ui.draft) {
         ui.set({ draft: null });
@@ -607,11 +724,3 @@ export function mapCenter(): LngLat | null {
     const center = mapRef.current?.getCenter();
     return center ? [center.lng, center.lat] : null;
 }
-
-export function editingElement(project: Project, ids: string[]): Element | null {
-    if (ids.length !== 1) {
-        return null;
-    }
-    return project.elements.find((e) => e.id === ids[0]) ?? null;
-}
-

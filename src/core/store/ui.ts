@@ -149,3 +149,8 @@ export const useUi = create<UiState>((set, get) => ({
 export function toast(text: string, options?: Omit<Toast, 'id' | 'text'>) {
     useUi.getState().toast(text, options);
 }
+
+// Test hook for the browser suites (read-only view of the selection).
+if (typeof window !== 'undefined') {
+    (window as unknown as { __asTacSelection: () => string[] }).__asTacSelection = () => useUi.getState().selection;
+}

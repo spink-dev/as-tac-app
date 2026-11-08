@@ -9,6 +9,7 @@ import type { LngLat } from '../core/model/schema';
 import { EMPTY_FC } from './basemap';
 import { setSourceData } from './planLayers';
 import { DRAW_COLORS } from '../core/store/ui';
+import { isElementVisible } from './planFeatures';
 
 type F = GeoJSON.Feature;
 const point = (coordinates: LngLat, properties: Record<string, unknown> = {}): F => ({ type: 'Feature', properties, geometry: { type: 'Point', coordinates } });
@@ -25,9 +26,11 @@ export function renderDraft(map: MlMap) {
     const ui = useUi.getState();
     const features: F[] = [];
     const draft = ui.draft;
+    // Under Streamer Safe only ink previews show; planning drafts keep their state but stay off-stream.
+    const hidePlanning = ui.streamer !== 'off';
     if (draft && draft.tool === 'draw') {
         features.push(line(draft.points, { color: DRAW_COLORS[ui.drawColor], width: ui.drawWidth }));
-    } else if (draft) {
+    } else if (draft && !hidePlanning) {
         const pts = draft.hover ? [...draft.points, draft.hover] : draft.points;
         if (draft.tool === 'zone' && ui.zoneShape === 'circle' && draft.points.length === 1 && draft.hover) {
             const radius = distanceM(draft.points[0], draft.hover);
@@ -48,7 +51,7 @@ export function renderDraft(map: MlMap) {
         }
         draft.points.forEach((p, i) => features.push(point(p, { first: i === 0 ? 1 : 0 })));
     }
-    if (ui.measure && ui.measure.length >= 2) {
+    if (ui.measure && ui.measure.length >= 2 && !hidePlanning) {
         const pts = ui.measure;
         features.push(line(pts));
         pts.forEach((p, i) => features.push(point(p, { first: i === 0 ? 1 : 0 })));
@@ -62,11 +65,12 @@ export function renderEdit(map: MlMap) {
     const ui = useUi.getState();
     const project = useProject.getState().project;
     const features: F[] = [];
-    if (project && ui.tool === 'select' && ui.selection.length === 1 && canEdit()) {
+    if (project && ui.tool === 'select' && ui.selection.length === 1 && canEdit() && ui.streamer === 'off') {
         const base = project.elements.find((e) => e.id === ui.selection[0]);
         const element = ui.override && ui.override.id === base?.id ? ui.override : base;
         const layerLocked = project.layers.find((l) => l.id === (element?.layerId ?? project.layers[0]?.id))?.locked;
-        if (element && !element.locked && !layerLocked) {
+        const visible = element ? isElementVisible(element, project, { mode: ui.mode, phaseId: null, streamer: ui.streamer, selection: new Set(), bearingUnit: 'deg', briefingInk: [], streamerInk: [] }) : false;
+        if (element && visible && !element.locked && !layerLocked) {
             const id = element.id;
             const addVertices = (pts: LngLat[], closed: boolean) => {
                 pts.forEach((p, index) => features.push(point(p, { id, role: 'vertex', index })));

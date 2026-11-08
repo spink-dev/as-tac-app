@@ -93,7 +93,7 @@ export function stopGps() {
     useGps.setState({ active: false, follow: false });
 }
 
-/** Toggle: first press starts and centres, second press stops following, third stops GPS. */
+/** First press starts GPS and follows; later presses toggle following. GPS stops only explicitly. */
 export function locateOnce() {
     const state = useGps.getState();
     if (!state.active) {
@@ -103,14 +103,11 @@ export function locateOnce() {
         }
         return;
     }
-    if (!state.follow) {
-        useGps.setState({ follow: true });
-        if (state.fix) {
-            mapRef.current?.easeTo({ center: state.fix.p, duration: 400 });
-        }
-        return;
+    const follow = !state.follow;
+    useGps.setState({ follow });
+    if (follow && state.fix) {
+        mapRef.current?.easeTo({ center: state.fix.p, duration: 400 });
     }
-    stopGps();
 }
 
 export function startRecording() {
@@ -118,16 +115,26 @@ export function startRecording() {
     useGps.setState({ recording: { startedAt: nowIso(), points: [] } });
 }
 
-export function stopRecording(save: boolean) {
+export function stopRecording(save: boolean): boolean {
     const recording = useGps.getState().recording;
-    useGps.setState({ recording: null });
-    if (!recording || !save || recording.points.length < 2) {
-        return;
+    if (!recording) {
+        return false;
     }
-    mutate(t('field.track'), (draft) => {
+    if (!save || recording.points.length < 2) {
+        useGps.setState({ recording: null });
+        return false;
+    }
+    const saved = mutate(t('field.track'), (draft) => {
         draft.tracks.push({ id: uid('trk'), name: new Date(recording.startedAt).toLocaleString(), startedAt: recording.startedAt, endedAt: nowIso(), points: recording.points.slice(0, 50000) });
     });
+    if (!saved) {
+        // Read-only copy or viewer: keep the recording so it can be exported instead of losing it.
+        toast(t('save.readOnlyCopy'), { tone: 'warn' });
+        return false;
+    }
+    useGps.setState({ recording: null });
     toast(t('field.trackSaved', { n: recording.points.length }), { tone: 'ok' });
+    return true;
 }
 
 /** Pause GPS while the app is hidden (battery, privacy) and resume only if it was on. */

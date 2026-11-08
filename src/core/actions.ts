@@ -4,7 +4,7 @@ import { toast, useUi, type ToolId } from './store/ui';
 import { APPEARANCE_ORDER, usePrefs } from './store/prefs';
 import { uid, nowIso } from './model/factory';
 import type { Element, LngLat, MarkerType, Project, RouteStyle, ZoneCategory } from './model/schema';
-import { translateElement } from './model/geometry';
+import { isLocked, translateElement } from './model/geometry';
 import { t } from '../i18n';
 import { elementAnchor } from '../map/planFeatures';
 
@@ -18,13 +18,23 @@ export function canEdit(): boolean {
     return Boolean(project) && !readOnly && mode === 'plan';
 }
 
-export function activeLayerId(project: Project): string {
+/** Drawing layer for new objects; `null` when every layer is locked. */
+export function activeLayerId(project: Project): string | null {
     const wanted = useUi.getState().activeLayerId;
     const unlocked = project.layers.filter((layer) => !layer.locked);
     if (wanted && unlocked.some((layer) => layer.id === wanted)) {
         return wanted;
     }
-    return (unlocked[unlocked.length - 1] ?? project.layers[project.layers.length - 1]).id;
+    const visible = unlocked.filter((layer) => layer.visible);
+    return (visible[visible.length - 1] ?? unlocked[unlocked.length - 1])?.id ?? null;
+}
+
+function layerLocks(project: Project): Set<string> {
+    return new Set(project.layers.filter((layer) => layer.locked).map((layer) => layer.id));
+}
+
+export function elementLocked(project: Project, element: Element): boolean {
+    return isLocked(element, layerLocks(project), project.layers[0]?.id);
 }
 
 export function typeLabel(element: Element): string {
@@ -44,10 +54,15 @@ export function typeLabel(element: Element): string {
 
 export function addElement(element: Element, label: string): string {
     const project = useProject.getState().project;
-    if (!project) {
-        return element.id;
+    if (!project || !canEdit()) {
+        return '';
     }
-    const withLayer = { ...element, layerId: element.layerId ?? activeLayerId(project) };
+    const layerId = element.layerId ?? activeLayerId(project);
+    if (!layerId) {
+        toast(t('common.locked'), { tone: 'warn' });
+        return '';
+    }
+    const withLayer = { ...element, layerId };
     mutate(label, (draft) => {
         draft.elements.push(withLayer as Draft<Element>);
     });
@@ -84,8 +99,9 @@ export function deleteSelection() {
         return;
     }
     const ids = new Set(selection);
-    const removable = project.elements.filter((element) => ids.has(element.id) && !element.locked);
-    const strokes = project.drawings.filter((stroke) => ids.has(stroke.id));
+    const locks = layerLocks(project);
+    const removable = project.elements.filter((element) => ids.has(element.id) && !elementLocked(project, element));
+    const strokes = project.drawings.filter((stroke) => ids.has(stroke.id) && !locks.has(stroke.layerId ?? project.layers[0]?.id));
     if (removable.length + strokes.length === 0) {
         toast(t('common.locked'), { tone: 'warn' });
         return;
@@ -108,12 +124,15 @@ export function duplicateSelection() {
     if (!project || !canEdit()) {
         return;
     }
+    const fallback = activeLayerId(project);
+    const usable = new Set(project.layers.filter((layer) => !layer.locked && layer.visible).map((layer) => layer.id));
     const copies = project.elements.filter((element) => selection.includes(element.id)).map((element) => ({
         ...translateElement(element, 0.00012, -0.00008),
         id: uid('el'),
         locked: undefined,
         sourceId: undefined,
-    }) as Element);
+        layerId: usable.has(element.layerId ?? project.layers[0]?.id) ? element.layerId : fallback ?? undefined,
+    }) as Element).filter((element) => element.layerId);
     if (copies.length === 0) {
         return;
     }
@@ -126,7 +145,7 @@ export function duplicateSelection() {
 export function toggleLockSelection() {
     const project = useProject.getState().project;
     const { selection } = useUi.getState();
-    if (!project || selection.length === 0 || useProject.getState().readOnly) {
+    if (!project || selection.length === 0 || !canEdit()) {
         return;
     }
     const targets = project.elements.filter((element) => selection.includes(element.id));
@@ -159,36 +178,65 @@ export function nudgeSelection(dxPx: number, dyPx: number, unproject: (px: [numb
     const target = unproject([screen[0] + dxPx, screen[1] + dyPx]);
     const dLng = target[0] - anchor[0];
     const dLat = target[1] - anchor[1];
+    const movable = new Set(project.elements.filter((element) => selection.includes(element.id) && !elementLocked(project, element)).map((element) => element.id));
+    if (movable.size === 0) {
+        return;
+    }
     mutate(t('common.edit'), (draft) => {
         draft.elements.forEach((element, i) => {
-            if (selection.includes(element.id) && !element.locked) {
+            if (movable.has(element.id)) {
                 draft.elements[i] = translateElement(element as Element, dLng, dLat) as Draft<Element>;
             }
         });
     }, { key: `nudge:${selection.join(',')}` });
 }
 
-export function armTool(tool: ToolId) {
+function inkAllowed(): boolean {
+    const { mode, streamer } = useUi.getState();
+    return streamer !== 'off' || mode === 'briefing' || canEdit();
+}
+
+export function armTool(tool: ToolId): boolean {
     const ui = useUi.getState();
-    if (!canEdit() && !(tool === 'draw' || tool === 'erase' || tool === 'select' || tool === 'measure')) {
+    const allowed = tool === 'select' || tool === 'measure' || ((tool === 'draw' || tool === 'erase') ? inkAllowed() : canEdit());
+    if (!allowed) {
         toast(t('mode.fieldLocked'), { tone: 'warn' });
-        return;
+        return false;
     }
     ui.setTool(tool);
+    return true;
 }
 
 /** Apply a numeric subtype after a tool key (M→1–8, R→1–4, Z→1–8, D→1–5, U→1–9). */
 export function applySubtype(tool: ToolId | 'unit', digit: number) {
     const ui = useUi.getState();
     const project = useProject.getState().project;
+    if ((tool === 'marker' || tool === 'route' || tool === 'zone') && !canEdit()) {
+        return;
+    }
+    if (tool === 'draw' && !inkAllowed()) {
+        return;
+    }
     if (tool === 'marker' && MARKER_TYPES[digit - 1]) {
-        ui.set({ markerType: MARKER_TYPES[digit - 1], tool: 'marker' });
+        ui.set({ markerType: MARKER_TYPES[digit - 1] });
+        if (ui.tool !== 'marker') {
+            ui.setTool('marker');
+        }
     } else if (tool === 'route' && ROUTE_STYLES[digit - 1]) {
-        ui.set({ routeStyle: ROUTE_STYLES[digit - 1], tool: 'route' });
+        ui.set({ routeStyle: ROUTE_STYLES[digit - 1] });
+        if (ui.tool !== 'route') {
+            ui.setTool('route');
+        }
     } else if (tool === 'zone' && ZONE_CATEGORIES[digit - 1]) {
-        ui.set({ zoneCategory: ZONE_CATEGORIES[digit - 1], tool: 'zone' });
+        ui.set({ zoneCategory: ZONE_CATEGORIES[digit - 1] });
+        if (ui.tool !== 'zone') {
+            ui.setTool('zone');
+        }
     } else if (tool === 'draw' && digit <= 5) {
-        ui.set({ drawColor: digit - 1, tool: 'draw' });
+        ui.set({ drawColor: digit - 1 });
+        if (ui.tool !== 'draw') {
+            ui.setTool('draw');
+        }
     } else if (tool === 'unit' && project) {
         const friendly = project.teams.filter((team) => team.side !== 'enemy');
         const team = friendly[digit - 1];

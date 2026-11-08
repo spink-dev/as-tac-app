@@ -105,5 +105,14 @@ await page.mouse.move(handle.x + 20, handle.y - 40, { steps: 6 });
 await page.mouse.up();
 await page.waitForTimeout(500);
 await page.screenshot({ path: `${out}/tools-edit.png` });
+// The first click after a drag must not be swallowed: clicking empty map clears the selection.
+await click(0.15, 0.2);
+await page.waitForTimeout(250);
+const handlesLeft = await page.evaluate(() => document.querySelectorAll('[data-testid="inspector"]').length);
+void handlesLeft;
+const selectionAfter = await page.evaluate(() => window.__asTacSelection?.() ?? null);
+if (selectionAfter && selectionAfter.length !== 0) {
+    fail(`click after drag was swallowed; selection still ${selectionAfter}`);
+}
 console.log(errors.length ? `errors:\n${errors.join('\n')}` : 'no page errors');
 await browser.close();

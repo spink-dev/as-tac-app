@@ -19,6 +19,12 @@ function typing(target: EventTarget | null): boolean {
     return Boolean(element?.closest?.('input, textarea, select, [contenteditable="true"], dialog[open]'));
 }
 
+/** Enter/Space on a focused control belong to that control. */
+function onControl(target: EventTarget | null): boolean {
+    const element = target as HTMLElement | null;
+    return Boolean(element?.closest?.('button, a[href], [role="menuitem"], [role="option"], [role="tab"], summary'));
+}
+
 /** Global keyboard handling for the workspace. Keys come from the registry only. */
 export function useShortcuts() {
     useEffect(() => {
@@ -68,18 +74,30 @@ export function useShortcuts() {
             if (!action) {
                 return;
             }
+            if (action.id === 'edit.finish' && (onControl(event.target) || !ui.draft)) {
+                return;
+            }
+            if (action.id.startsWith('briefing.') && ui.mode !== 'briefing') {
+                return;
+            }
             event.preventDefault();
             window.clearTimeout(layerTimer);
-            layer = SUBTYPE_LAYERS[action.id] ?? null;
-            if (layer) {
-                layerTimer = window.setTimeout(() => {
-                    layer = null;
-                }, 1600);
+            layer = null;
+            if (action.id.startsWith('tool.') || action.id === 'unit.pick') {
+                const armed = action.id === 'unit.pick' || armTool(action.id.slice(5) as ToolId);
+                layer = armed ? SUBTYPE_LAYERS[action.id] ?? null : null;
+                if (layer) {
+                    layerTimer = window.setTimeout(() => {
+                        layer = null;
+                    }, 1600);
+                }
+                return;
             }
             switch (action.id) {
-                case 'unit.pick':
-                    break;
                 case 'edit.undo': {
+                    if (ui.mode !== 'plan') {
+                        break;
+                    }
                     const label = useProject.getState().undo();
                     if (label) {
                         ui.toast(`${t('common.undo')}: ${label}`);
@@ -88,7 +106,9 @@ export function useShortcuts() {
                 }
                 case 'edit.redo':
                 case 'edit.redoAlt':
-                    useProject.getState().redo();
+                    if (ui.mode === 'plan') {
+                        useProject.getState().redo();
+                    }
                     break;
                 case 'edit.delete':
                 case 'edit.deleteAlt':
@@ -153,9 +173,7 @@ export function useShortcuts() {
                     }
                     break;
                 default:
-                    if (action.id.startsWith('tool.')) {
-                        armTool(action.id.slice(5) as ToolId);
-                    }
+                    break;
             }
         };
         window.addEventListener('keydown', onKey);
