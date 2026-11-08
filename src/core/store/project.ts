@@ -99,6 +99,15 @@ function lastOpFor(ops: EntityOp[], op: EntityOp): EntityOp | undefined {
     return undefined;
 }
 
+/** Peer adds/deletes do not block an order restore; only a changed relative order of shared ids does. */
+function sameRelativeOrder(expected: string[], current: string[]): boolean {
+    const currentSet = new Set(current);
+    const expectedSet = new Set(expected);
+    const a = expected.filter((id) => currentSet.has(id));
+    const b = current.filter((id) => expectedSet.has(id));
+    return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
 /** Keep only ops whose entity still has the value this history step left behind. */
 function applicable(project: Project, ops: EntityOp[], expectedState: EntityOp[]): EntityOp[] {
     return ops.filter((op) => {
@@ -107,6 +116,9 @@ function applicable(project: Project, ops: EntityOp[], expectedState: EntityOp[]
             return true;
         }
         const current = entityOf(project, op);
+        if (op.entityId === ORDER_ID) {
+            return sameRelativeOrder(expected.data as string[], current as string[]);
+        }
         return expected.data === null ? current === undefined : equal(current, expected.data);
     });
 }

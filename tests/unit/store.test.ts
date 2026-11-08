@@ -206,3 +206,21 @@ describe('review regressions (P0-fix2)', () => {
         expect(useProject.getState().project!.elements.map((e) => e.id)).toEqual(['x', 'c', 'a', 'b']);
     });
 });
+
+describe('review regressions (P0-fix3)', () => {
+    it('restores draw order after a peer append', () => {
+        useProject.getState().load(createProject({ name: 'R3', areaId: null }));
+        const store = useProject.getState();
+        store.mutate('seed', (draft) => {
+            draft.elements.push(marker('a'), marker('b'), marker('c'));
+        });
+        store.mutate('delete b', (draft) => {
+            draft.elements.splice(1, 1);
+        });
+        store.mutate('peer add d', (draft) => {
+            draft.elements.push(marker('d'));
+        }, { remote: true });
+        useProject.getState().undo();
+        expect(useProject.getState().project!.elements.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd']);
+    });
+});
