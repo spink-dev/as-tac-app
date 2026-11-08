@@ -179,6 +179,8 @@ export interface DeletedPlan {
     link?: LiveLinkRow;
     outbox: OutboxRow[];
     versions?: KvRow;
+    /** Live list orders and queued changes set aside (kv `live:o:…`, `live:stuck:…`). */
+    liveKv?: KvRow[];
     backups: BackupRow[];
 }
 
@@ -190,6 +192,10 @@ export async function deleteProject(id: string): Promise<DeletedPlan> {
             link: await db.liveLinks.get(id),
             outbox: await db.liveOutbox.where('projectId').equals(id).toArray(),
             versions: await db.kv.get(`live:v:${id}`),
+            liveKv: [
+                ...(await db.kv.where('key').equals(`live:o:${id}`).toArray()),
+                ...(await db.kv.where('key').startsWith(`live:stuck:${id}|`).toArray()),
+            ],
             backups: await db.backups.where('projectId').equals(id).toArray(),
         };
         await db.projects.delete(id);
@@ -198,6 +204,8 @@ export async function deleteProject(id: string): Promise<DeletedPlan> {
         await db.liveLinks.delete(id);
         await db.liveOutbox.where('projectId').equals(id).delete();
         await db.kv.delete(`live:v:${id}`);
+        await db.kv.delete(`live:o:${id}`);
+        await db.kv.where('key').startsWith(`live:stuck:${id}|`).delete();
         return snapshot;
     });
 }
@@ -217,6 +225,7 @@ export async function restoreDeleted(snapshot: DeletedPlan): Promise<void> {
         if (snapshot.versions) {
             await db.kv.put(snapshot.versions);
         }
+        await db.kv.bulkPut(snapshot.liveKv ?? []);
         await db.liveOutbox.bulkPut(snapshot.outbox);
         await db.backups.bulkPut(snapshot.backups);
     });

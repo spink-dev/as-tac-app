@@ -275,6 +275,9 @@ function permanentError(error: unknown): boolean {
 }
 
 const versionsKey = (projectId: string) => `live:v:${projectId}`;
+/** List orders kept across sessions: a catch-up may end between an order list and an object it places. */
+const ordersKey = (projectId: string) => `live:o:${projectId}`;
+type StoredOrders = { last: Record<string, string[]>; applied: Record<string, number> };
 
 class Session {
     readonly clientId = uid('c');
@@ -374,6 +377,17 @@ class Session {
         for (const [key, version] of Object.entries(stored)) {
             this.versions.set(key, version);
         }
+        const orders = await kvGet<StoredOrders>(ordersKey(this.link.projectId), { last: {}, applied: {} });
+        for (const [collection, ids] of Object.entries(orders.last ?? {})) {
+            if (Array.isArray(ids)) {
+                this.lastOrder.set(collection, ids.filter((id) => typeof id === 'string'));
+            }
+        }
+        for (const [collection, seq] of Object.entries(orders.applied ?? {})) {
+            if (typeof seq === 'number') {
+                this.appliedOrder.set(collection, seq);
+            }
+        }
         for (const stored of (await db.liveOutbox.where('projectId').equals(this.link.projectId).toArray()).sort((a, b) => a.order - b.order)) {
             this.order = Math.max(this.order, stored.order);
             // Queued before an app update: bring it to this format (or hold it, if a newer app queued it).
@@ -438,7 +452,9 @@ class Session {
                 const op = toLocal({ collection: row.collection as RemoteCollection, entityId: row.entityId, data: row.data })
                     ?? (row.data === null ? { collection: row.collection as DiffCollection, entityId: row.entityId, data: null } : null);
                 const saved = this.lastSaved && op ? entityOf(this.lastSaved, op) : undefined;
-                if (!this.lastSaved || !op || (saved === undefined && row.base === 0)) {
+                // Absent from the last save: a deletion made here stays one (if the server has the
+                // object); anything else may simply be newer than that save — withdrawn, not deleted.
+                if (!this.lastSaved || !op || (saved === undefined && (row.data !== null || row.base === 0))) {
                     this.pending.delete(key);
                     this.forget(row);
                     continue;
@@ -901,6 +917,7 @@ class Session {
             return;
         }
         await kvSet(versionsKey(this.link.projectId), versions).catch(() => undefined);
+        await kvSet(ordersKey(this.link.projectId), { last: Object.fromEntries(this.lastOrder), applied: Object.fromEntries(this.appliedOrder) } satisfies StoredOrders).catch(() => undefined);
         await db.liveLinks.update(this.link.projectId, { lastSeq }).catch(() => undefined);
     }
     private versionTimer = 0;
@@ -1800,6 +1817,8 @@ export async function unlinkLive(projectId: string): Promise<void> {
     await db.liveLinks.delete(projectId);
     await db.liveOutbox.where('projectId').equals(projectId).delete();
     await db.kv.delete(versionsKey(projectId));
+    await db.kv.delete(ordersKey(projectId));
+    await db.kv.where('key').startsWith(`live:stuck:${projectId}|`).delete();
     if (useProject.getState().readOnly === 'viewer') {
         useProject.getState().setReadOnly(false);
     }

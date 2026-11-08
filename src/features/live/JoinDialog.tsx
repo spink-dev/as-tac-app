@@ -51,7 +51,7 @@ export function JoinDialog() {
             toast(alreadyMember ? t('live.alreadyMember', { name: info.name, role: t(`live.role.${info.role}`) }) : t('live.joined', { name: info.name }), { tone: 'ok' });
         } catch (err) {
             console.warn('join failed', err);
-            setError(err instanceof Error && err.message === 'invite' ? t('live.codeInvalid') : err instanceof Error && err.message === 'live-newer' ? t('live.joinNewer') : err instanceof Error && err.message === 'live-migration' ? t('live.migrationFailed') : err instanceof Error && err.message === 'newer' ? t('library.errorNewer') : t('live.failed'));
+            setError(err instanceof Error && err.message === 'invite' ? t('live.codeInvalid') : err instanceof Error && err.message === 'live-newer' ? t('live.joinNewer') : err instanceof Error && err.message === 'live-migration' ? t('live.joinMigration') : err instanceof Error && err.message === 'newer' ? t('library.errorNewer') : t('live.failed'));
         } finally {
             setBusy(false);
             setLoaded(null);

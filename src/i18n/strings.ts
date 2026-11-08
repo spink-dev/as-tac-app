@@ -495,6 +495,7 @@ export const S = {
     'live.outdatedNoUpdate': ['Für dieses Gerät gibt es noch keine neuere Version. Deine Änderungen bleiben gespeichert und gehen raus, sobald die App aktualisiert ist.', 'There is no newer version for this device yet. Your changes stay saved and go out once the app is updated.'],
     'live.queuedUnusable': ['Eine wartende Live-Änderung liess sich nicht ins neue Format bringen und wird nicht gesendet. Sie bleibt in diesem Plan.', 'A queued live change could not be brought to the new format and is not sent. It stays in this plan.'],
     'live.stoppedCopy': ['Live-Abgleich gestoppt: Eine neuere AS-TAC-Version hat diesen Plan übernommen; deine Änderungen liegen in der Kopie.', 'Live sync stopped: a newer AS-TAC version took this plan over; your changes are in the copy.'],
+    'live.joinMigration': ['Ein Objekt dieses Live-Plans lässt sich mit dieser AS-TAC-Version nicht übernehmen. Beitritt abgebrochen; mit einer korrigierten Version erneut versuchen.', 'An object of this live plan cannot be taken over by this AS-TAC version. Joining was cancelled; try again with a fixed version.'],
     'live.joinNewer': ['Dieser Live-Plan wird mit einer neueren AS-TAC-Version bearbeitet. Bitte zuerst die App aktualisieren.', 'This live plan is edited with a newer AS-TAC version. Please update the app first.'],
     'live.receiving': ['Empfange Änderungen · {n}', 'Receiving changes · {n}'],
     'live.sending': ['Sende {n} Änderungen …', 'Sending {n} changes …'],
