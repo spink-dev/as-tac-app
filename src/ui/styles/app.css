@@ -449,7 +449,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-height: calc(var(--tap) - 4px);
+    min-height: var(--tap);
     padding: 0 var(--sp-3);
     border: 0;
     border-radius: var(--r-sm);
@@ -985,5 +985,18 @@
 
     .hintbar {
         font-size: var(--fs-xs);
+    }
+}
+
+.choice--standalone {
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-top: var(--sp-2);
+}
+
+@media (pointer: coarse) {
+    .readout,
+    .live-badge {
+        min-height: 48px;
     }
 }

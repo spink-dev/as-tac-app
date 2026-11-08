@@ -18,9 +18,9 @@ export async function exportAreaFile(id: string): Promise<{ blob: Blob; filename
 /** Import an area package. Same id and hash: reuse. Same id, different data: keep both. */
 export async function importAreaPackage(raw: unknown): Promise<AreaMeta> {
     const pkg = await sanitizeArea(await verifyArea(raw));
-    const existing = await db.areas.get(pkg.id);
-    if (existing && existing.meta.sha256 === pkg.sha256) {
-        return existing.meta;
+    const existing = (await db.areaMeta.get(pkg.id))?.meta;
+    if (existing && existing.sha256 === pkg.sha256) {
+        return existing;
     }
     const id = existing ? `${pkg.id.slice(0, 100)}-${Date.now().toString(36)}` : pkg.id;
     return saveArea({ ...pkg, id, origin: 'import' });

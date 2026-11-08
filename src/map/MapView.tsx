@@ -103,7 +103,7 @@ export function renderGrid() {
         return;
     }
     const grid = project?.settings.grid ?? 'off';
-    if (grid === 'off' || map.getZoom() < (grid === '100m' ? 14 : 11)) {
+    if (grid === 'off' || useUi.getState().streamer !== 'off' || map.getZoom() < (grid === '100m' ? 14 : 11)) {
         setSourceData(map, 'grid', EMPTY_FC);
         return;
     }
@@ -192,10 +192,17 @@ export function MapView() {
         let disposed = false;
         let stopInteraction: (() => void) | null = null;
         map.on('load', async () => {
+            if (disposed || mapRef.current !== map) {
+                return;
+            }
             addPlanLayers(map, palette);
             planReady = true;
             stopInteraction = installInteraction(map);
             renderPlan();
+            for (const fn of readyCallbacks) {
+                fn(map);
+            }
+            readyCallbacks.clear();
             const current = useProject.getState().project;
             if (current) {
                 const saved = await kvGet<Camera | null>(`view:${current.id}`, null);
@@ -207,12 +214,11 @@ export function MapView() {
                 }
                 await loadArea(current, !saved && !current.view);
             }
+            if (disposed || mapRef.current !== map) {
+                return;
+            }
             renderPlan();
             renderGrid();
-            for (const fn of readyCallbacks) {
-                fn(map);
-            }
-            readyCallbacks.clear();
         });
 
         let saveTimer = 0;
@@ -249,6 +255,9 @@ export function MapView() {
             }
             if (state.tool !== prev.tool && planReady) {
                 renderEdit(map);
+            }
+            if (state.streamer !== prev.streamer) {
+                renderGrid();
             }
         });
         const unsubPrefs = usePrefs.subscribe((state, prev) => {

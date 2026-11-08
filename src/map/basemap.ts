@@ -92,7 +92,7 @@ export function basemapLayers(p: Palette): LayerSpecification[] {
             paint: { 'line-color': p.major, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.9, 15, 4, 18, 12] },
         },
         {
-            id: 'power', type: 'circle', source: 'osm', minzoom: 13, filter: ['==', tag('power'), 'generator'] as never,
+            id: 'power', type: 'circle', source: 'osm', minzoom: 13, filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', tag('power'), 'generator']] as never,
             paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2, 17, 5], 'circle-color': p.poi, 'circle-stroke-color': p.labelHalo, 'circle-stroke-width': 1 },
         },
         {

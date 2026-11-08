@@ -353,7 +353,8 @@
     font-weight: 600;
 }
 
-.chip[aria-pressed='true'] {
+.chip[aria-pressed='true'],
+.chip[aria-checked='true'] {
     border-color: var(--accent-line);
     background: var(--accent-weak);
     color: var(--ink);

@@ -251,7 +251,7 @@ export function buildPlanCollections(project: Project, ctx: RenderContext, unitS
             strokes.push({ stroke });
         }
     }
-    if (ctx.mode === 'briefing') {
+    if (ctx.mode === 'briefing' && ctx.streamer === 'off') {
         strokes.push(...ctx.briefingInk.map((stroke) => ({ stroke, session: true })));
     }
     if (ctx.streamer !== 'off') {

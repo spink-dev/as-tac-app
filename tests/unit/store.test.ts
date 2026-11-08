@@ -224,3 +224,15 @@ describe('review regressions (P0-fix3)', () => {
         expect(useProject.getState().project!.elements.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd']);
     });
 });
+
+describe('privacy filtering (P1-fix)', () => {
+    it('never renders temporary briefing ink while Streamer Safe is on', async () => {
+        const { buildPlanCollections } = await import('../../src/map/planFeatures');
+        const project = createProject({ name: 'P', areaId: null });
+        const ink = [{ id: 'i', points: [[8, 47], [8.1, 47.1]] as [number, number][], color: '#ff0000', width: 4, opacity: 1 }];
+        const base = { mode: 'briefing' as const, phaseId: null, selection: new Set<string>(), bearingUnit: 'deg' as const, briefingInk: ink, streamerInk: [] };
+        expect(buildPlanCollections(project, { ...base, streamer: 'off' }, 1, true).ink.features).toHaveLength(1);
+        expect(buildPlanCollections(project, { ...base, streamer: 'field' }, 1, true).ink.features).toHaveLength(0);
+        expect(buildPlanCollections(project, { ...base, streamer: 'public' }, 1, true).ink.features).toHaveLength(0);
+    });
+});

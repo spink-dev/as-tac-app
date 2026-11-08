@@ -63,25 +63,34 @@ export async function duplicateStored(id: string, name: string): Promise<Project
 let timer = 0;
 let pending: Project | null = null;
 
-async function flush() {
+/** Returns false when the write failed; the unsaved project stays pending for a retry. */
+async function flush(): Promise<boolean> {
     const project = pending;
     pending = null;
     if (!project) {
-        return;
+        return true;
     }
     useSaveState.setState({ state: 'saving' });
     try {
         await saveProject(project);
         useSaveState.setState({ state: pending ? 'saving' : 'saved', error: undefined });
+        return true;
     } catch (error) {
         useSaveState.setState({ state: 'error', error: error instanceof Error ? error.message : String(error) });
         pending = pending ?? project;
+        return false;
     }
 }
 
-export function flushNow(): Promise<void> {
+export function flushNow(): Promise<boolean> {
     window.clearTimeout(timer);
     return flush();
+}
+
+export function resetSaveState() {
+    window.clearTimeout(timer);
+    pending = null;
+    useSaveState.setState({ state: 'idle', error: undefined });
 }
 
 /** Debounced autosave of every change (local, remote, undo) of a writable project. */

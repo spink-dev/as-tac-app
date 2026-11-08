@@ -55,8 +55,12 @@ export async function verifyArea(input: unknown): Promise<AreaPackage> {
 }
 
 export async function listAreas(): Promise<AreaMeta[]> {
-    const rows = await db.areas.toArray();
+    const rows = await db.areaMeta.toArray();
     return rows.map((row) => row.meta).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function hasArea(id: string): Promise<AreaMeta | undefined> {
+    return (await db.areaMeta.get(id))?.meta;
 }
 
 export async function getArea(id: string): Promise<AreaRow | undefined> {
@@ -66,12 +70,18 @@ export async function getArea(id: string): Promise<AreaRow | undefined> {
 export async function saveArea(pkg: AreaPackage): Promise<AreaMeta> {
     const { data, ...meta } = pkg;
     const stored: AreaMeta = { ...meta, installedAt: new Date().toISOString(), featureCount: data.features.length };
-    await db.areas.put({ id: pkg.id, meta: stored, data });
+    await db.transaction('rw', db.areas, db.areaMeta, async () => {
+        await db.areas.put({ id: pkg.id, meta: stored, data });
+        await db.areaMeta.put({ id: pkg.id, meta: stored });
+    });
     return stored;
 }
 
 export async function removeArea(id: string): Promise<void> {
-    await db.areas.delete(id);
+    await db.transaction('rw', db.areas, db.areaMeta, async () => {
+        await db.areas.delete(id);
+        await db.areaMeta.delete(id);
+    });
 }
 
 export async function areaUsage(id: string): Promise<number> {
@@ -139,9 +149,9 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
 }
 
 export async function ensureArea(id: string, onProgress?: Progress): Promise<AreaMeta | null> {
-    const existing = await db.areas.get(id);
+    const existing = await hasArea(id);
     if (existing) {
-        return existing.meta;
+        return existing;
     }
     if (BUNDLED_AREAS.some((area) => area.id === id)) {
         return installBundled(id, onProgress);

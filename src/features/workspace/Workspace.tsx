@@ -22,7 +22,7 @@ export function Workspace() {
                 <HintBar />
                 <ContextBar />
             </div>
-            <Readout />
+            {streamer === 'off' ? <Readout /> : null}
             <div className="attribution">© OpenStreetMap</div>
         </div>
     );

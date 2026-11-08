@@ -183,7 +183,7 @@ export function Library() {
                                                 event.preventDefault();
                                                 void rename(row, new FormData(event.currentTarget).get('name') as string);
                                             }}>
-                                                <input name="name" className="input" defaultValue={row.name} autoFocus onBlur={(event) => void rename(row, event.target.value)} />
+                                                <input name="name" className="input" aria-label={t('common.rename')} defaultValue={row.name} autoFocus onBlur={(event) => void rename(row, event.target.value)} />
                                                 <IconButton label={t('common.save')} type="submit"><Check {...ICON} /></IconButton>
                                             </form>
                                         ) : (

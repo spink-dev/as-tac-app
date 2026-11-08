@@ -34,7 +34,7 @@ export function TopBar() {
                     <ChevronLeft {...ICON} />
                 </IconButton>
                 <div className="topbar__title">
-                    <span className="topbar__name" title={name}>{name}</span>
+                    <span className="topbar__name" title={streamer === 'off' ? name : undefined}>{streamer === 'off' ? name : 'AS-TAC'}</span>
                     <span className={`topbar__save ${save === 'error' ? 'is-error' : ''}`} aria-live="polite">{saveText}</span>
                 </div>
             </div>

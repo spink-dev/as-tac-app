@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Large bundled OSM areas are installed into IndexedDB on demand instead of being precached.
-const ON_DEMAND = ['maps/zurich.geojson', 'maps/benglen.geojson'];
+// Their manifests too: a precached manifest from an older deploy would not match fresh data.
+const ON_DEMAND = ['maps/zurich.geojson', 'maps/benglen.geojson', 'maps/zurich.json', 'maps/benglen.json'];
 
 export default defineConfig({
     server: { port: 9000, host: true },

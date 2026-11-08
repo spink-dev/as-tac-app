@@ -75,7 +75,7 @@ export async function importLegacy(scan: LegacyScan): Promise<{ imported: number
     for (const raw of maps) {
         try {
             const pkg = await sanitizeArea(await verifyArea(raw));
-            if (!(await db.areas.get(pkg.id))) {
+            if (!(await db.areaMeta.get(pkg.id))) {
                 await saveArea({ ...pkg, origin: 'legacy' });
             }
             areaIds.set(pkg.id, pkg.id);

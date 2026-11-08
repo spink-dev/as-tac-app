@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Download, Map as MapIcon } from 'lucide-react';
 import { useT, formatBytes } from '../../i18n';
 import { Button, Dialog, Field, ICON } from '../../ui/components';
@@ -22,6 +22,7 @@ export function NewPlanDialog() {
     const [template, setTemplate] = useState<string>('');
     const [installed, setInstalled] = useState<AreaMeta[]>([]);
     const [busy, setBusy] = useState<number | null>(null);
+    const creating = useRef(false);
 
     useEffect(() => {
         if (open) {
@@ -41,14 +42,23 @@ export function NewPlanDialog() {
     ];
     const templates = areaId === 'mahlwinkel' ? MAHLWINKEL_EVENTS : [];
 
+    function chooseArea(id: string) {
+        setAreaId(id);
+        setTemplate('');
+    }
+
     async function create() {
+        if (creating.current) {
+            return;
+        }
+        creating.current = true;
         try {
             setBusy(0);
             if (areaId !== '__none') {
                 await ensureArea(areaId, (fraction) => setBusy(fraction ?? 0));
             }
             const area = areaId === '__none' ? undefined : (await listAreas()).find((candidate) => candidate.id === areaId);
-            const project = template
+            const project = template && areaId === 'mahlwinkel'
                 ? buildMahlwinkelProject(template, name.trim() || undefined)
                 : createProject({ name: name || t('library.new'), areaId: areaId === '__none' ? null : areaId, center: area ? areaCenter(area.bounds) : undefined, zoom: 14 });
             hide();
@@ -56,6 +66,8 @@ export function NewPlanDialog() {
         } catch (error) {
             setBusy(null);
             toast(t('area.failed', { reason: error instanceof Error ? error.message : String(error) }), { tone: 'danger' });
+        } finally {
+            creating.current = false;
         }
     }
 
@@ -93,10 +105,7 @@ export function NewPlanDialog() {
                 <span className="field__label">{t('new.area')}</span>
                 <div className="choice-list" role="radiogroup" aria-label={t('new.area')}>
                     {areas.map((area) => (
-                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => {
-                            setAreaId(area.id);
-                            setTemplate('');
-                        }}>
+                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => chooseArea(area.id)}>
                             <MapIcon {...ICON} />
                             <span className="choice__main">
                                 <span className="choice__title">{area.name}</span>
@@ -104,27 +113,27 @@ export function NewPlanDialog() {
                             </span>
                         </button>
                     ))}
-                    <button type="button" className="choice choice--action" onClick={() => show('areaDownload', { returnTo: 'newPlan' })}>
-                        <Download {...ICON} />
-                        <span className="choice__main">
-                            <span className="choice__title">{t('new.downloadArea')}</span>
-                        </span>
-                    </button>
-                    <button type="button" role="radio" aria-checked={areaId === '__none'} className="choice" onClick={() => setAreaId('__none')}>
+                    <button type="button" role="radio" aria-checked={areaId === '__none'} className="choice" onClick={() => chooseArea('__none')}>
                         <span className="choice__main">
                             <span className="choice__title">{t('new.noArea')}</span>
                         </span>
                     </button>
                 </div>
+                <button type="button" className="choice choice--action choice--standalone" onClick={() => show('areaDownload', { returnTo: 'newPlan' })}>
+                    <Download {...ICON} />
+                    <span className="choice__main">
+                        <span className="choice__title">{t('new.downloadArea')}</span>
+                    </span>
+                </button>
                 <span className="field__hint">{t('new.areaHint')}</span>
             </div>
             {templates.length > 0 ? (
                 <div className="field">
                     <span className="field__label">{t('new.template')}</span>
                     <div className="chip-row" role="radiogroup" aria-label={t('new.template')}>
-                        <button type="button" role="radio" className="chip" aria-pressed={template === ''} aria-checked={template === ''} onClick={() => setTemplate('')}>{t('new.templateNone')}</button>
+                        <button type="button" role="radio" className="chip" aria-checked={template === ''} onClick={() => setTemplate('')}>{t('new.templateNone')}</button>
                         {templates.map((event) => (
-                            <button key={event.id} type="button" role="radio" className="chip" aria-pressed={template === event.id} aria-checked={template === event.id} title={event.summary} onClick={() => setTemplate(event.id)}>
+                            <button key={event.id} type="button" role="radio" className="chip" aria-checked={template === event.id} title={event.summary} onClick={() => setTemplate(event.id)}>
                                 {event.name}
                             </button>
                         ))}
@@ -133,7 +142,7 @@ export function NewPlanDialog() {
                 </div>
             ) : null}
             {busy !== null ? (
-                <div className="progress" aria-label={t('new.installing')}>
+                <div className="progress" role="progressbar" aria-label={t('new.installing')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(busy * 100)}>
                     <div className="progress__bar" style={{ transform: `scaleX(${Math.max(0.04, busy)})` }} />
                 </div>
             ) : null}

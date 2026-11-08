@@ -5,6 +5,8 @@ import { FIRST_PLAN_LAYER } from './planLayers';
 
 const PREFIX = 'img-';
 const pending = new Set<string>();
+/** Images the most recent sync wants on the map; async adds re-check against it. */
+let latest = new Map<string, ImageOverlay>();
 
 function layerId(id: string) {
     return `${PREFIX}${id}`;
@@ -13,6 +15,7 @@ function layerId(id: string) {
 /** Keep MapLibre image sources in sync with the project's image maps (below every plan layer). */
 export async function syncImageOverlays(map: MlMap, images: ImageOverlay[], hidden: boolean) {
     const wanted = new Set(hidden ? [] : images.filter((image) => image.visible).map((image) => image.id));
+    latest = new Map(images.filter((image) => wanted.has(image.id)).map((image) => [image.id, image]));
     for (const layer of map.getStyle()?.layers ?? []) {
         if (layer.id.startsWith(PREFIX) && !wanted.has(layer.id.slice(PREFIX.length))) {
             map.removeLayer(layer.id);
@@ -41,12 +44,14 @@ export async function syncImageOverlays(map: MlMap, images: ImageOverlay[], hidd
         pending.add(id);
         try {
             const url = await assetUrl(image.asset);
-            if (!url || map.getSource(id)) {
+            // A newer sync may have hidden or changed it (Streamer Safe, delete, re-align).
+            const current = latest.get(image.id);
+            if (!url || !current || map.getSource(id)) {
                 continue;
             }
-            map.addSource(id, { type: 'image', url, coordinates: image.corners });
+            map.addSource(id, { type: 'image', url, coordinates: current.corners });
             map.addLayer(
-                { id, type: 'raster', source: id, paint: { 'raster-opacity': image.opacity, 'raster-fade-duration': 0, 'raster-resampling': 'linear' } },
+                { id, type: 'raster', source: id, paint: { 'raster-opacity': current.opacity, 'raster-fade-duration': 0, 'raster-resampling': 'linear' } },
                 map.getLayer(FIRST_PLAN_LAYER) ? FIRST_PLAN_LAYER : undefined,
             );
         } finally {

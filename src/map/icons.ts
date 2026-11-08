@@ -377,54 +377,46 @@ function drawArrow(color: string, head: boolean) {
     return toImage(c);
 }
 
-const logoLoading = new Set<string>();
-
-async function loadLogo(map: MlMap, id: string, hash: string, scale: number) {
-    if (logoLoading.has(id)) {
-        return;
+async function drawLogo(hash: string, scale: number) {
+    const asset = await getAsset(hash);
+    if (!asset) {
+        return null;
     }
-    logoLoading.add(id);
-    try {
-        const asset = await getAsset(hash);
-        if (!asset) {
-            return;
-        }
-        const bitmap = await createImageBitmap(asset.blob);
-        const size = Math.round(40 * scale);
-        const { c, ctx } = canvas(size);
-        const ratio = Math.min(size / bitmap.width, size / bitmap.height);
-        const w = bitmap.width * ratio;
-        const h = bitmap.height * ratio;
-        ctx.drawImage(bitmap, (size - w) / 2, (size - h) / 2, w, h);
-        bitmap.close();
-        const image = toImage(c);
-        if (map.hasImage(id)) {
-            map.updateImage(id, image);
-        } else {
-            map.addImage(id, image, { pixelRatio: RATIO });
-        }
-    } finally {
-        logoLoading.delete(id);
-    }
+    const bitmap = await createImageBitmap(asset.blob);
+    const size = Math.round(40 * scale);
+    const { c, ctx } = canvas(size);
+    const ratio = Math.min(size / bitmap.width, size / bitmap.height);
+    const w = bitmap.width * ratio;
+    const h = bitmap.height * ratio;
+    ctx.drawImage(bitmap, (size - w) / 2, (size - h) / 2, w, h);
+    bitmap.close();
+    return toImage(c);
 }
 
-/** Generate icons lazily for any `icon-image` id the plan layers reference. */
+/**
+ * Generate icons lazily for any `icon-image` id the plan layers reference. MapLibre 6 waits for
+ * the resolver (also for async team logos), so no placeholder or second tile pass is needed.
+ */
 export function installIconFactory(map: MlMap) {
-    map.on('styleimagemissing', (event) => {
-        const id = event.id;
+    map.setMissingStyleImageResolver(async (id) => {
+        if (map.hasImage(id)) {
+            return;
+        }
         const parts = id.split('|');
         try {
+            let image: ReturnType<typeof toImage> | null = null;
             if (parts[0] === 'mk') {
                 const [, type, color, symbol, status, scale] = parts;
-                map.addImage(id, drawMarker(type, color, symbol, status, Number(scale) || 1), { pixelRatio: RATIO });
+                image = drawMarker(type, color, symbol, status, Number(scale) || 1);
             } else if (parts[0] === 'pat') {
-                map.addImage(id, drawPattern(parts[1], parts[2]), { pixelRatio: RATIO });
+                image = drawPattern(parts[1], parts[2]);
             } else if (parts[0] === 'arrow' || parts[0] === 'head') {
-                map.addImage(id, drawArrow(parts[1], parts[0] === 'head'), { pixelRatio: RATIO });
+                image = drawArrow(parts[1], parts[0] === 'head');
             } else if (parts[0] === 'logo') {
-                // Transparent placeholder until the logo bitmap is decoded.
-                map.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) });
-                void loadLogo(map, id, parts[1], Number(parts[2]) || 1);
+                image = await drawLogo(parts[1], Number(parts[2]) || 1);
+            }
+            if (image && !map.hasImage(id)) {
+                map.addImage(id, image, { pixelRatio: RATIO });
             }
         } catch (error) {
             console.warn('icon generation failed', id, error);

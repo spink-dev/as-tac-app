@@ -34,6 +34,11 @@ export interface AreaRow {
     data: GeoJSON.FeatureCollection;
 }
 
+export interface AreaMetaRow {
+    id: string;
+    meta: Omit<AreaPackage, 'data'>;
+}
+
 export interface LiveLinkRow {
     projectId: string;
     remoteId: string;
@@ -63,6 +68,8 @@ export class AsTacDatabase extends Dexie {
     projectIndex!: Table<ProjectIndexRow, string>;
     assets!: Table<AssetRow, string>;
     areas!: Table<AreaRow, string>;
+    /** Metadata only, so listing areas never loads multi-megabyte GeoJSON. */
+    areaMeta!: Table<AreaMetaRow, string>;
     liveLinks!: Table<LiveLinkRow, string>;
     outbox!: Table<OutboxRow, number>;
     kv!: Table<KvRow, string>;
@@ -77,6 +84,9 @@ export class AsTacDatabase extends Dexie {
             liveLinks: 'projectId, remoteId',
             outbox: '++seq, projectId',
             kv: 'key',
+        });
+        this.version(2).stores({ areaMeta: 'id' }).upgrade(async (tx) => {
+            await tx.table('areas').each((row: AreaRow) => tx.table('areaMeta').put({ id: row.id, meta: row.meta }));
         });
     }
 }
