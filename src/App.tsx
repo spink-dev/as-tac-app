@@ -10,7 +10,7 @@ import { JoinDialog } from './features/live/JoinDialog';
 import { CreditsDialog } from './features/library/CreditsDialog';
 import { showDialog } from './core/store/dialogs';
 import { decodePlanLink, JOIN_PREFIX, LINK_PREFIX } from './core/files/link';
-import { startAutosave } from './core/storage/projects';
+import { pruneBackups, startAutosave } from './core/storage/projects';
 import { recoverFromStaleBuild, registerPwa, takeResume } from './core/pwa';
 import { WhatsNewDialog } from './features/update/Update';
 import { onMutationRejected } from './core/store/project';
@@ -117,7 +117,9 @@ export function App() {
         void registerPwa();
         void receiveLaunch();
         resumeAfterUpdate();
+        const prune = window.setTimeout(() => void pruneBackups().catch(() => undefined), 15000);
         return () => {
+            window.clearTimeout(prune);
             stop();
             stopRejected();
         };

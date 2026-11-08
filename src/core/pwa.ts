@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { APP_VERSION, BUILD, isBuildInfo, sameBuild, type BuildInfo } from '../version';
 import { flushNow } from './storage/projects';
+import { db } from './storage/db';
 import { mayAutoDownload } from './net';
 import { toast, useUi, type Mode } from './store/ui';
 import { useProject } from './store/project';
@@ -53,6 +54,17 @@ export function onBeforeUpdate(guard: Guard): () => void {
 /** Register the service worker (production builds) and start looking for updates. */
 export async function registerPwa() {
     announceUpdate();
+    // Another tab opened the database with a newer schema (a newer app): Dexie closes and reopens
+    // the connection on its own; this page's code is older and should reload.
+    db.on('versionchange', (event: IDBVersionChangeEvent) => {
+        if (!applying && event.newVersion && event.newVersion / 10 > db.verno) {
+            usePwa.setState({ status: 'reload' });
+        }
+    });
+    // Our upgrade waits for a window that still holds the old version open.
+    db.on('blocked', () => {
+        toast(t('storage.blocked'), { tone: 'warn' });
+    });
     window.addEventListener('vite:preloadError', (event) => {
         event.preventDefault();
         void recoverFromStaleBuild();

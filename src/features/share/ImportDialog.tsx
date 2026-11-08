@@ -38,7 +38,7 @@ export function importErrorText(error: unknown): string {
     if (code === 'area-too-large') {
         return translate('import.errorAreaTooLarge');
     }
-    if (code === 'project-newer') {
+    if (code === 'project-newer' || code === 'area-newer') {
         return translate('import.errorNewer');
     }
     if (code === 'format-unknown') {

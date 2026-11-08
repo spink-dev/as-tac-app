@@ -177,7 +177,8 @@
 
 @media (max-width: 860px) {
     .lib__grid {
-        grid-template-columns: 1fr;
+        /* minmax: a long plan line must shorten (ellipsis), not widen the column past the screen. */
+        grid-template-columns: minmax(0, 1fr);
         gap: var(--sp-6);
     }
 

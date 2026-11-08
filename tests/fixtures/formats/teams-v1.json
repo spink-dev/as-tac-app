@@ -1,0 +1,46 @@
+{
+ "format": "as-tac-teams",
+ "formatVersion": 1,
+ "teams": [
+  {
+   "id": "tm_alpha",
+   "name": "Alpha",
+   "color": "#2f6fc4",
+   "side": "friendly",
+   "displayMode": "logo",
+   "symbol": "chevron",
+   "callsign": "A",
+   "radioChannel": "3",
+   "strength": 12,
+   "leader": "Leiter A",
+   "planning": {
+    "role": "Sturm",
+    "mission": "Gebäude 4 nehmen",
+    "timing": "10:00–11:00"
+   },
+   "logoAsset": "96fd9c291c077985d68c63597abebe7529b71e0728c6d982de4062b6676609f5",
+   "formationId": "frm_1",
+   "formationName": "Zug 1",
+   "squadName": "Gruppe A",
+   "inheritFormationVisual": true
+  },
+  {
+   "id": "tm_bravo",
+   "name": "Bravo",
+   "color": "#c8393f",
+   "side": "friendly",
+   "displayMode": "icon",
+   "symbol": "text:BR",
+   "formationId": "frm_1",
+   "formationName": "Zug 1"
+  },
+  {
+   "id": "tm_red",
+   "name": "Rot",
+   "color": "#c8393f",
+   "side": "enemy",
+   "displayMode": "icon",
+   "symbol": "chevron"
+  }
+ ]
+}

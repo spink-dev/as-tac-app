@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Copy, Download, FileUp, HardDrive, Map as MapIcon, MoreHorizontal, Pencil, Plus, Radio, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { areaErrorText } from '../areas/areaErrors';
-import { useT, relativeTime, formatBytes } from '../../i18n';
+import { t, useT, relativeTime, formatBytes } from '../../i18n';
 import { usePrefs } from '../../core/store/prefs';
 import { Button, ICON, IconButton, useSmoothScroll, useStaggerIn } from '../../ui/components';
 import { AppearanceToggle, BrandMark, LanguageToggle } from '../../ui/Brand';
@@ -13,11 +13,24 @@ import { openProject } from '../../core/store/route';
 import { toast } from '../../core/store/ui';
 import { BUNDLED_AREAS, installBundled, listAreas, removeArea, areaUsage } from '../../core/areas/store';
 import type { AreaMeta } from '../../core/areas/types';
-import { usePwa } from '../../core/pwa';
+import { checkForUpdate, usePwa } from '../../core/pwa';
+import { FORMAT_VERSION } from '../../core/model/schema';
 import { AppInfo, UpdateBanner } from '../update/Update';
 import { LegacyBanner } from './LegacyBanner';
 import { exportAreaFile } from '../../core/areas/files';
 import { saveFile } from '../../core/files/save';
+
+/** Why a stored plan did not open, in words (never a raw error). */
+export function openFailed(error: unknown) {
+    const code = error instanceof Error ? error.message : '';
+    if (code === 'newer') {
+        toast(t('library.errorNewer'), { tone: 'warn', action: { label: t('update.check'), run: () => void checkForUpdate(true) } });
+    } else if (code === 'invalid') {
+        toast(t('library.errorInvalid'), { tone: 'danger' });
+    } else {
+        toast(t('error.generic'), { tone: 'danger' });
+    }
+}
 
 export function Library() {
     const t = useT();
@@ -33,11 +46,21 @@ export function Library() {
     const pwa = usePwa();
     const statusText = pwa.offlineReady ? t('library.offlineReady') : navigator.onLine ? t('common.online') : t('common.offline');
 
+    const [storageProblem, setStorageProblem] = useState<'newer' | 'unavailable' | null>(null);
+
     const refresh = useCallback(async () => {
-        const [p, a, s] = await Promise.all([listProjects(), listAreas(), storageEstimate()]);
-        setProjects(p);
-        setAreas(a);
-        setStorage(s);
+        try {
+            const [p, a, s] = await Promise.all([listProjects(), listAreas(), storageEstimate()]);
+            setProjects(p);
+            setAreas(a);
+            setStorage(s);
+            setStorageProblem(null);
+        } catch (error) {
+            console.error('local storage unavailable', error);
+            // A database from a newer app this one cannot open, or no storage at all (private window, disk full).
+            setStorageProblem((error as { name?: string })?.name === 'VersionError' || (error as { name?: string })?.name === 'UpgradeError' ? 'newer' : 'unavailable');
+            setProjects((current) => current ?? []);
+        }
     }, []);
 
     useEffect(() => {
@@ -66,7 +89,11 @@ export function Library() {
 
     async function duplicate(row: ProjectIndexRow) {
         setMenu(null);
-        await duplicateStored(row.id, `${row.name} (2)`);
+        try {
+            await duplicateStored(row.id, `${row.name} (2)`);
+        } catch (error) {
+            openFailed(error);
+        }
         await refresh();
     }
 
@@ -76,7 +103,13 @@ export function Library() {
         if (!trimmed || trimmed === row.name) {
             return;
         }
-        const project = await loadProject(row.id);
+        const project = await loadProject(row.id).catch((error: unknown) => {
+            openFailed(error);
+            return null;
+        });
+        if (!project) {
+            return;
+        }
         project.name = trimmed;
         project.updatedAt = new Date().toISOString();
         await saveProject(project);
@@ -133,6 +166,12 @@ export function Library() {
                 </header>
 
                 <UpdateBanner />
+                {storageProblem ? (
+                    <div className="notice notice--danger update-banner" role="alert" data-testid="storage-problem">
+                        <span className="spacer">{t(storageProblem === 'newer' ? 'storage.newer' : 'error.storage')}</span>
+                        {storageProblem === 'newer' ? <Button small onClick={() => void checkForUpdate(true)}>{t('update.check')}</Button> : null}
+                    </div>
+                ) : null}
 
                 <LegacyBanner onImported={() => void refresh()} />
 
@@ -185,7 +224,7 @@ export function Library() {
                                                 <IconButton label={t('common.save')} type="submit"><Check {...ICON} /></IconButton>
                                             </form>
                                         ) : (
-                                            <button type="button" className="plan-row__open" onClick={() => void openProject(row.id).catch(() => toast(t('error.generic'), { tone: 'danger' }))} data-testid="open-plan">
+                                            <button type="button" className="plan-row__open" onClick={() => void openProject(row.id).catch(openFailed)} data-testid="open-plan">
                                                 <span className="plan-row__title">{row.name}</span>
                                                 <span className="plan-row__meta">
                                                     {[
@@ -197,6 +236,7 @@ export function Library() {
                                             </button>
                                         )}
                                         {row.live ? <span className="badge badge--accent">{t('library.live')}</span> : null}
+                                        {(row.formatVersion ?? 1) > FORMAT_VERSION ? <span className="badge badge--warn" title={t('library.errorNewer')}>{t('library.newer')}</span> : null}
                                         <div className="plan-row__menu">
                                             <IconButton label={t('common.more')} tipPos="left" aria-expanded={menu === row.id} onClick={() => setMenu(menu === row.id ? null : row.id)}>
                                                 <MoreHorizontal {...ICON} />

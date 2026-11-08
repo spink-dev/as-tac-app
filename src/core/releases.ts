@@ -18,6 +18,10 @@ export const RELEASES: readonly Release[] = [
                 'German is the first language. English can be chosen on the start screen, in the settings and in the command search.',
             ],
             [
+                'Pläne, Dateien und Einstellungen aus älteren Versionen werden beim Öffnen automatisch übernommen; Daten aus einer neueren Version bleiben unangetastet, bis die App aktualisiert ist.',
+                'Plans, files and settings from older versions are brought up to date when opened; data from a newer version stays untouched until the app is updated.',
+            ],
+            [
                 'Versionsanzeige und «Nach Updates suchen». Ein Update wird erst auf Tippen eingespielt; vorher wird alles gespeichert, danach öffnet sich derselbe Plan im selben Modus.',
                 'Version display and "Check for updates". An update is only applied when you tap it; everything is saved first, then the same plan reopens in the same mode.',
             ],

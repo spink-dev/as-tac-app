@@ -1,6 +1,6 @@
 import { deflateSync } from 'fflate';
 import type { Project } from '../model/schema';
-import { migrateProject } from './astac';
+import { migrateProject } from '../model/migrations';
 import { inflateCapped } from './zip';
 
 /**

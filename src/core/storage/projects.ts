@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { db, type ProjectIndexRow } from './db';
-import { ProjectSchema, type Project } from '../model/schema';
+import { FORMAT_VERSION, ProjectSchema, type Project } from '../model/schema';
+import { migrateProject, versionOf } from '../model/migrations';
+import { APP_VERSION } from '../../version';
 import { onProjectChange, useProject } from '../store/project';
 import { duplicateProject } from '../model/factory';
 
@@ -17,6 +19,7 @@ function indexRow(project: Project, live = false): ProjectIndexRow {
         elementCount: project.elements.length,
         eventLabel: project.event ? `${project.event.eventId}` : undefined,
         live,
+        formatVersion: project.formatVersion,
     };
 }
 
@@ -32,22 +35,59 @@ export async function listProjects(): Promise<ProjectIndexRow[]> {
     return db.projectIndex.orderBy('updatedAt').reverse().toArray();
 }
 
-export async function loadProject(id: string): Promise<Project> {
+/**
+ * A stored plan in the current format. An older record is migrated: its original goes to
+ * `backups`, the migrated plan is written back. A record from a newer app is refused ('newer')
+ * and left untouched, so going back to that version loses nothing.
+ */
+export function loadProject(id: string): Promise<Project> {
+    return loadStored(id, FORMAT_VERSION, migrateProject);
+}
+
+/** `loadProject` with the format and migration passed in (tests run the migration path with a future format). */
+export async function loadStored(id: string, current: number, migrate: (input: unknown) => Project): Promise<Project> {
     const row = await db.projects.get(id);
     if (!row) {
         throw new Error('missing');
     }
-    const parsed = ProjectSchema.safeParse(row.data);
-    if (!parsed.success) {
-        console.warn('stored project failed validation', parsed.error.issues.slice(0, 5));
+    const version = versionOf(row.data);
+    if (version > current) {
+        throw new Error('newer');
+    }
+    if (version === current) {
+        const parsed = ProjectSchema.safeParse(row.data);
+        if (!parsed.success) {
+            console.warn('stored project failed validation', parsed.error.issues.slice(0, 5));
+            throw new Error('invalid');
+        }
+        return parsed.data as Project;
+    }
+    let project: Project;
+    try {
+        project = migrate(row.data);
+    } catch (error) {
+        console.warn('stored project could not be migrated', error);
         throw new Error('invalid');
     }
-    return parsed.data as Project;
+    await db.transaction('rw', db.projects, db.projectIndex, db.backups, async () => {
+        await db.backups.put({ id: `${id}@${version}`, projectId: id, formatVersion: version, appVersion: APP_VERSION, createdAt: new Date().toISOString(), data: row.data });
+        await db.projects.put({ id, data: project });
+        const index = await db.projectIndex.get(id);
+        await db.projectIndex.put({ ...indexRow(project, Boolean(index?.live)), updatedAt: index?.updatedAt ?? project.updatedAt });
+    });
+    return project;
+}
+
+/** Drop migration backups older than 60 days. */
+export async function pruneBackups(now = Date.now()): Promise<void> {
+    const cutoff = new Date(now - 60 * 24 * 3600 * 1000).toISOString();
+    await db.backups.where('createdAt').below(cutoff).delete();
 }
 
 export async function deleteProject(id: string): Promise<void> {
-    await db.transaction('rw', [db.projects, db.projectIndex, db.liveLinks, db.liveOutbox, db.kv], async () => {
+    await db.transaction('rw', [db.projects, db.projectIndex, db.liveLinks, db.liveOutbox, db.kv, db.backups], async () => {
         await db.projects.delete(id);
+        await db.backups.where('projectId').equals(id).delete();
         await db.projectIndex.delete(id);
         await db.liveLinks.delete(id);
         await db.liveOutbox.where('projectId').equals(id).delete();

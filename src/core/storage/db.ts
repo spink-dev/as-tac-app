@@ -15,6 +15,8 @@ export interface ProjectIndexRow {
     elementCount: number;
     eventLabel?: string;
     live?: boolean;
+    /** Plan format of the stored record; a newer one than this app knows is shown, not opened. */
+    formatVersion?: number;
 }
 
 export interface AssetRow {
@@ -69,6 +71,18 @@ export interface OutboxRow {
     unacked?: unknown[];
 }
 
+/** A stored plan as it was before a format migration rewrote it (kept 60 days, removed with the plan). */
+export interface BackupRow {
+    /** `projectId@formatVersion` */
+    id: string;
+    projectId: string;
+    formatVersion: number;
+    /** App version that migrated it. */
+    appVersion: string;
+    createdAt: string;
+    data: unknown;
+}
+
 export interface KvRow {
     key: string;
     value: unknown;
@@ -84,6 +98,7 @@ export class AsTacDatabase extends Dexie {
     liveLinks!: Table<LiveLinkRow, string>;
     liveOutbox!: Table<OutboxRow, string>;
     kv!: Table<KvRow, string>;
+    backups!: Table<BackupRow, string>;
 
     constructor(name = 'as-tac-v2') {
         super(name);
@@ -101,6 +116,9 @@ export class AsTacDatabase extends Dexie {
         });
         // v3: one outbox row per entity, replaced in place (no leftovers from interleaved edits).
         this.version(3).stores({ outbox: null, liveOutbox: 'id, projectId' });
+        // v4 (1.0.0-alpha.2): originals of plans rewritten by a format migration.
+        // Schema changes: add a version here (never edit an old one) and a test in tests/unit/migrations.test.ts.
+        this.version(4).stores({ backups: 'id, projectId, createdAt' });
     }
 }
 

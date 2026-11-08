@@ -40,6 +40,12 @@ npm run e2e                       # alle Szenarien, Screenshots unter tests/e2e/
 
 Das Szenario `update` baut dafür selbst zwei Versionen und spielt ein echtes Update durch (eigener kleiner Server, unabhängig von der Vorschau).
 
+## Kompatibilität und Migrationen
+
+Jeder gespeicherte oder verschickte Datensatz trägt die Formatversion, in der er geschrieben wurde: Pläne (`formatVersion`), `.astac`-Container, Teamvorlagen, Gebietspakete, Geräteeinstellungen (`v`) und die IndexedDB (Dexie-Versionen). Ältere Daten werden beim Lesen Schritt für Schritt auf das aktuelle Format gebracht; im Gerät gespeicherte Pläne werden dabei einmal neu geschrieben, das Original bleibt 60 Tage als Sicherung (`backups`). Daten aus einer **neueren** App werden nie geraten oder überschrieben: Die App sagt «neuere Version – bitte aktualisieren» und lässt den Datensatz unverändert, damit nach dem Update nichts fehlt.
+
+Formatänderung: `FORMAT_VERSION` in `src/core/model/schema.ts` erhöhen, Schritt in `src/core/model/migrations.ts` ergänzen (pro Objekt, damit Live-Daten denselben Weg nehmen), neue Datenbankversion nur anhängen, nie eine alte ändern. Die eingefrorenen Beispieldateien in `tests/fixtures/formats` (mit Prüfsummen) müssen weiterhin öffnen.
+
 ## Live-Zusammenarbeit einrichten (optional)
 
 Ohne Konfiguration bietet die App einen **lokalen Testmodus** zwischen Tabs desselben Browsers an (jeder Tab ist eine eigene Person). Für echte Geräte wird ein Supabase-Projekt gebraucht:

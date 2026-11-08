@@ -17,6 +17,9 @@ export function areaErrorText(error: unknown, kept = 0, total = 0): string {
     if (message === 'area-too-large' || message === 'area-too-many-features') {
         return t('area.tooDetailed');
     }
+    if (message === 'area-newer') {
+        return t('import.errorNewer');
+    }
     if (message === 'area-checksum') {
         return t('area.damaged');
     }

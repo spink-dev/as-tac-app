@@ -1,8 +1,9 @@
 import presets from '../../config/maps.json';
+import { isJson, migrateRecord, versionOf } from '../model/migrations';
 import { db, type AreaRow } from '../storage/db';
 import { sha256Hex } from '../storage/assets';
 import type { Bounds } from '../geo/geo';
-import type { AreaMeta, AreaPackage, BundledArea } from './types';
+import { AREA_FORMAT_VERSION, AREA_STEPS, type AreaMeta, type AreaPackage, type BundledArea } from './types';
 
 const DESCRIPTIONS: Record<string, string> = {
     mahlwinkel: 'Airsoft-Gelände Mahlwinkel (DE) mit FieldMaps-Eventvorlagen',
@@ -32,8 +33,11 @@ export function validateBounds(bounds: unknown): asserts bounds is Bounds {
 
 /** Validate an untrusted area package (download, file import, legacy database). */
 export async function verifyArea(input: unknown): Promise<AreaPackage> {
-    const value = input as AreaPackage;
-    if (!value || typeof value !== 'object' || value.format !== 'as-tac-map' || value.formatVersion !== 1
+    if (!isJson(input) || input.format !== 'as-tac-map') {
+        throw new Error('area-invalid');
+    }
+    const value = migrateRecord(input, versionOf(input), AREA_FORMAT_VERSION, AREA_STEPS, 'area') as unknown as AreaPackage;
+    if (value.formatVersion !== AREA_FORMAT_VERSION
         || typeof value.id !== 'string' || !/^[\w.-]{1,120}$/.test(value.id) || typeof value.name !== 'string' || value.name.length > 160
         || typeof value.sha256 !== 'string' || !value.data || value.data.type !== 'FeatureCollection' || !Array.isArray(value.data.features)) {
         throw new Error('area-invalid');

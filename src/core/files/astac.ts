@@ -1,7 +1,8 @@
 import { db } from '../storage/db';
 import { getAsset, isRenderableImage, putVerifiedAsset, sha256Hex } from '../storage/assets';
 import { saveProject } from '../storage/projects';
-import { ProjectSchema, FORMAT_VERSION, type Project } from '../model/schema';
+import { ProjectSchema, type Project } from '../model/schema';
+import { migrateProject } from '../model/migrations';
 import { duplicateProject } from '../model/factory';
 import { importAreaPackage } from '../areas/files';
 import { hasArea } from '../areas/store';
@@ -145,37 +146,8 @@ async function storeAsset(hash: string, bytes: Uint8Array, declaredMime: unknown
 
 const decode = (bytes: Uint8Array) => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown;
 
-/** Project format migrations, keyed by source version. formatVersion 1 is the first 1.0 format. */
-const MIGRATIONS: Record<number, (project: Record<string, unknown>) => Record<string, unknown>> = {};
-
-export function migrateProject(input: unknown): Project {
-    if (!input || typeof input !== 'object') {
-        throw new Error('project-invalid');
-    }
-    let current = structuredClone(input) as Record<string, unknown>;
-    let version = Number(current.formatVersion);
-    if (!Number.isInteger(version) || version < 1) {
-        throw new Error('project-invalid');
-    }
-    if (version > FORMAT_VERSION) {
-        throw new Error('project-newer');
-    }
-    while (version < FORMAT_VERSION) {
-        const step = MIGRATIONS[version];
-        if (!step) {
-            throw new Error('project-invalid');
-        }
-        current = step(current);
-        version += 1;
-        current.formatVersion = version;
-    }
-    const parsed = ProjectSchema.safeParse(current);
-    if (!parsed.success) {
-        console.warn('imported project failed validation', parsed.error.issues.slice(0, 5));
-        throw new Error('project-invalid');
-    }
-    return parsed.data as Project;
-}
+/** Re-exported for importers of this module; the migrations live in model/migrations.ts. */
+export { migrateProject };
 
 async function readAstacV2(files: Map<string, Uint8Array>, manifest: Record<string, unknown>, signal?: AbortSignal): Promise<ImportResult> {
     const project = migrateProject(decode(await verifyEntry(files, manifest.project)));

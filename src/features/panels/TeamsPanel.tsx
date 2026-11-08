@@ -6,17 +6,16 @@ import { useUi, toast } from '../../core/store/ui';
 import { Button, Empty, Field, IconButton, NameInput, Segmented, Swatches, Switch } from '../../ui/components';
 import { createTeam, uid, TEAM_COLORS } from '../../core/model/factory';
 import { canEdit, addElement, toastUndoable } from '../../core/actions';
-import { LIMITS, MAX, TeamSchema, type Team } from '../../core/model/schema';
+import { LIMITS, MAX, type Team } from '../../core/model/schema';
+import { presetFile, presetTeams } from '../../core/files/presets';
 import { UNIT_SYMBOLS } from '../../map/icons';
 import { getAsset, isRenderableImage, putAsset, prepareImage } from '../../core/storage/assets';
 import { pickFile, saveFile } from '../../core/files/save';
 import { mapCenter } from '../../map/interaction';
-import { z } from 'zod';
 
 const PLANNING: (keyof NonNullable<Team['planning']>)[] = ['role', 'mission', 'task', 'objective', 'startPoint', 'rallyPoint', 'timing', 'actionsOnContact', 'contingency', 'equipment'];
 const LONG = new Set(['mission', 'task', 'actionsOnContact', 'contingency', 'equipment']);
 
-const PresetSchema = z.object({ format: z.literal('as-tac-teams'), formatVersion: z.literal(1), teams: z.array(TeamSchema).max(LIMITS.teams) });
 const PRESET_MAX_BYTES = 1024 * 1024;
 
 /** Team presets are untrusted files: size limit, JSON + schema check, count cap, dangling logos dropped. */
@@ -37,11 +36,16 @@ async function importPreset(t: ReturnType<typeof useT>) {
         toast(t('teams.importInvalid'), { tone: 'danger' });
         return;
     }
-    const parsed = PresetSchema.safeParse(data);
-    if (!parsed.success) {
+    const preset = presetTeams(data);
+    if (preset === 'newer') {
+        toast(t('import.errorNewer'), { tone: 'danger' });
+        return;
+    }
+    if (preset === 'invalid') {
         toast(t('teams.importInvalid'), { tone: 'danger' });
         return;
     }
+    const parsed = { data: preset };
     if (project.teams.length + parsed.data.teams.length > LIMITS.teams) {
         toast(t('teams.limit', { n: LIMITS.teams }), { tone: 'warn' });
         return;
@@ -143,7 +147,7 @@ function TeamEditor({ team }: { team: Team }) {
                 </Field>
             </div>
             <div className="field-row">
-                <Field label={t('teams.unit')} hint="z. B. 2-1">
+                <Field label={t('teams.unit')} hint={t('teams.unitHint')}>
                     <input className="input" maxLength={MAX.unitNumber} value={team.unitNumber ?? ''} onChange={(event) => patch({ unitNumber: event.target.value || undefined }, 'unit')} />
                 </Field>
                 <Field label={t('teams.radio')}>
@@ -269,7 +273,7 @@ export function TeamsPanel() {
             <div className="row-gap">
                 {editable ? <Button small variant="primary" onClick={add} disabled={full} title={full ? t('teams.limit', { n: LIMITS.teams }) : undefined}><Plus size={16} /> {t('teams.add')}</Button> : null}
                 <span className="spacer" />
-                <IconButton small label={t('teams.exportPreset')} onClick={() => saveFile(new Blob([JSON.stringify({ format: 'as-tac-teams', formatVersion: 1, teams: project.teams })], { type: 'application/json' }), `${project.name}.teams.json`)}><Download size={16} /></IconButton>
+                <IconButton small label={t('teams.exportPreset')} onClick={() => saveFile(new Blob([JSON.stringify(presetFile(project.teams))], { type: 'application/json' }), `${project.name}.teams.json`)}><Download size={16} /></IconButton>
                 {editable ? (
                     <IconButton small label={t('teams.importPreset')} disabled={full} onClick={() => void importPreset(t)}><Upload size={16} /></IconButton>
                 ) : null}
