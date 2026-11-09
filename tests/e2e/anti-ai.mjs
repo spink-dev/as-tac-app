@@ -63,6 +63,8 @@ events {}
 http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
+    # As in the nginx:alpine image (its nginx.conf defines "main").
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for"';
     client_body_temp_path ${dir}/body;
     proxy_temp_path ${dir}/proxy;
     fastcgi_temp_path ${dir}/fastcgi;
@@ -122,6 +124,7 @@ try {
     }
     const signed = await get('/', { ...person, 'signature-agent': '"https://chatgpt.com"', 'signature-input': 'sig1=();tag="web-bot-auth"' });
     check('signed-agent-refused', signed.status === 403 && /not permitted/.test(signed.body), String(signed.status));
+    check('refusal-keeps-security-headers', signed.headers['x-frame-options'] === 'DENY' && signed.headers['x-content-type-options'] === 'nosniff' && signed.headers['cache-control'] === 'no-store', JSON.stringify(signed.headers));
     check('ai-may-read-robots', (await get('/robots.txt', { 'user-agent': 'GPTBot/1.2' })).status === 200);
     check('ai-may-read-tdmrep', (await get('/.well-known/tdmrep.json', { 'user-agent': 'GPTBot/1.2' })).body.includes('tdm-reservation'));
 
@@ -137,6 +140,10 @@ try {
     check('search-reads-info', info.status === 200 && info.body.includes('Taktische Karten für Airsoft'), String(info.status));
     check('info-indexable', !/noindex/.test(info.headers['x-robots-tag'] ?? '') && /noai/.test(info.headers['x-robots-tag'] ?? ''), info.headers['x-robots-tag']);
     check('search-reads-icon', (await get('/icon-512.png', googlebot)).status === 200);
+    check('search-missing-info-file-404', (await get('/about/missing', googlebot)).status === 404);
+    const slash = await get('/about', googlebot);
+    check('info-redirect-relative', slash.status === 301 && slash.headers.location === '/about/', `${slash.status} ${slash.headers.location}`);
+    check('page-varies-by-client', /User-Agent/.test(shell.headers.vary ?? ''), shell.headers.vary);
 
     // Link previews (WhatsApp invite links): the info page instead of the app.
     const preview = await get('/', { 'user-agent': 'WhatsApp/2.24.20.89 A' });

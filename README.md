@@ -127,7 +127,7 @@ Regeln für Beiträge stehen in [`AGENTS.md`](AGENTS.md), die Gestaltung in [`DE
 docker build -t as-tac \
   --build-arg VITE_SUPABASE_URL=https://<projekt>.supabase.co \
   --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_... .
-docker run -p 8080:80 -v /var/log/as-tac:/var/log/nginx/anti-ai as-tac
+docker run -p 127.0.0.1:8080:80 -v /var/log/as-tac:/var/log/nginx/anti-ai as-tac
 ```
 
 Die beiden Werte werden beim Build eingebunden; ohne sie läuft die App rein lokal. Nie einen `service_role`- oder `sb_secret`-Schlüssel verwenden. Mit `--build-arg BUILD_COMMIT=$(git rev-parse --short HEAD)` zeigt die App den Build an (der Build-Kontext enthält kein `.git`).
@@ -138,9 +138,9 @@ Die beiden Werte werden beim Build eingebunden; ohne sie läuft die App rein lok
 
 as-tac.dev ist nur für Menschen gedacht. Konfiguration in `anti-ai.site.json`, der Baustein selbst (wiederverwendbar für andere Projekte) in `anti-ai/` – Einzelheiten und Grenzen in [anti-ai/README.md](anti-ai/README.md).
 
-- **Menschen im Browser:** die ganze App. **Suchmaschinen:** nur die Infoseite `/about/`. **Link-Vorschauen** (WhatsApp, Telegram, Discord): die Infoseite statt der App. **KI-Crawler, KI-Assistenten und -Agenten, Skripte, Headless-Browser, unbekannte Bots:** 403 auf allem (nur `robots.txt`, `ai.txt` und `/.well-known/tdmrep.json` bleiben lesbar).
+- **Menschen im Browser** (auch In-App-Browser von WhatsApp, Instagram usw.): die ganze App. **Suchmaschinen:** nur die Infoseite `/about/`. **Link-Vorschauen** (WhatsApp, Telegram, Discord, Facebook/Messenger/iMessage): die Infoseite statt der App. **KI-Crawler, KI-Assistenten und -Agenten, Skripte, Headless-Browser, unbekannte Bots:** 403 auf allem (nur `robots.txt`, `ai.txt` und `/.well-known/tdmrep.json` bleiben lesbar).
 - Überall `X-Robots-Tag` mit `noindex`/`noai` und `tdm-reservation: 1`; ein unsichtbarer Fallen-Link in `index.html` meldet Clients, die `robots.txt` missachten.
-- **Docker/VPS:** die Regeln stecken im Image (`docker/anti-ai/`, eingebunden in `docker/nginx.conf`). Log-Ordner auf den Host binden (siehe oben) und fail2ban mit `docker/anti-ai/fail2ban/` einrichten, damit die Falle sperrt. Steht ein Proxy davor, dessen Adressen in `trustedProxies`.
+- **Docker/VPS:** die Regeln stecken im Image (`docker/anti-ai/`, eingebunden in `docker/nginx.conf`). Der Container läuft hinter einem TLS-Proxy auf dem Host (Caddy o. ä.; `.dev` verlangt HTTPS) und ist nur lokal veröffentlicht (siehe oben). Damit Ratenbegrenzung und Falle die echte Adresse sehen: in `anti-ai.site.json` unter `trustedProxies` die Adresse eintragen, von der der Proxy im Container ankommt (meist `172.17.0.1`), `npm run anti-ai`, neu bauen. Dann fail2ban (`docker/anti-ai/fail2ban/`, Kette `INPUT`) und logrotate (`docker/anti-ai/logrotate/`) auf dem Host einrichten.
 - **Vercel:** `proxy.js` (über `vercel.json`) wendet dieselben Regeln an. Zusätzlich im Vercel-Dashboard die verwalteten Regeln «AI Bots» (Deny) und «Bot Protection» einschalten.
 - Nach jeder Änderung an `anti-ai.site.json` oder den Listen: `npm run anti-ai`; `npm run check` prüft, dass die erzeugten Dateien aktuell sind.
 - Quellcode schützt nur ein privates Repository: was öffentlich auf GitHub liegt, lesen auch KI-Crawler.

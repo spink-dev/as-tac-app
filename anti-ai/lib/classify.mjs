@@ -16,8 +16,37 @@
 // info-asset (what that page loads), html (documents, the app shell), asset (everything else).
 
 export const KINDS = ['allow', 'browser', 'preview', 'search', 'ai', 'tool', 'bot'];
-/** Order in which user-agent lists are tried; the first match decides (nginx maps work the same). */
-export const AGENT_ORDER = ['allow', 'ai', 'preview', 'search', 'tool', 'bot'];
+/**
+ * Order in which user-agent lists are tried as [pattern, kind]; the first match decides (the nginx
+ * map is generated in this order). `previewFirst`: link-preview fetchers that the AI list also
+ * names (facebookexternalhit, which Facebook, Messenger and iMessage use): they get the info page,
+ * never more.
+ */
+export const AGENT_ORDER = [
+    ['allow', 'allow'],
+    ['previewFirst', 'preview'],
+    ['ai', 'ai'],
+    ['preview', 'preview'],
+    ['search', 'search'],
+    ['tool', 'tool'],
+    ['bot', 'bot'],
+];
+
+/**
+ * Tokens of ordinary browser user agents. A list name equal to one of them, or shorter than four
+ * characters, is never matched: one careless entry upstream (e.g. «K», «wv», «Mobile») would
+ * otherwise lock every phone out.
+ */
+export const BROWSER_TOKENS = [
+    'mozilla', 'applewebkit', 'khtml', 'gecko', 'like', 'chrome', 'chromium', 'safari', 'mobile', 'version', 'android',
+    'linux', 'windows', 'macintosh', 'intel', 'iphone', 'ipad', 'ipod', 'cpu', 'x11', 'wv', 'edg', 'edge', 'edga',
+    'edgios', 'firefox', 'fxios', 'crios', 'opr', 'opera', 'samsungbrowser', 'yabrowser', 'ucbrowser', 'miuibrowser',
+    'huaweibrowser', 'instagram', 'fban', 'fbav', 'fbios', 'line', 'micromessenger', 'gsa', 'build', 'compatible',
+    'trident', 'msie', 'webview', 'browser', 'mac', 'os', 'win64', 'x64', 'arm', 'tablet', 'phone', 'mini', 'pro', 'max',
+];
+
+/** Preview names count only where no browser engine is named (in-app browsers stay browsers). */
+const NO_ENGINE = '^(?!.*(?:applewebkit|gecko/))';
 export const PATH_KINDS = ['trap', 'public', 'info', 'info-asset', 'html', 'asset'];
 
 /** A list of names as one case-insensitive pattern matching whole names only. */
@@ -25,7 +54,8 @@ export function namesPattern(names) {
     const seen = new Set();
     const unique = names
         .map((name) => name.trim())
-        .filter((name) => name && !name.startsWith('__') && !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()));
+        .filter((name) => name.length >= 4 && !name.startsWith('__') && !BROWSER_TOKENS.includes(name.toLowerCase()))
+        .filter((name) => !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()));
     if (unique.length === 0) {
         return null;
     }
@@ -66,7 +96,8 @@ export function compilePolicy(site, lists) {
         modes,
         patterns: {
             allow: namesPattern(site.allowUserAgents ?? []),
-            preview: namesPattern(lists.agents.preview ?? []),
+            previewFirst: withoutEngine(namesPattern(lists.agents.previewFirst ?? [])),
+            preview: withoutEngine(namesPattern(lists.agents.preview ?? [])),
             search: namesPattern(lists.agents.search ?? []),
             ai: namesPattern(aiNames),
             tool: namesPattern(lists.agents.tool ?? []),
@@ -82,6 +113,10 @@ export function compilePolicy(site, lists) {
             burst: Number(site.rateLimit?.burst ?? 50),
         },
     };
+}
+
+function withoutEngine(pattern) {
+    return pattern ? `${NO_ENGINE}.*?${pattern}` : null;
 }
 
 function normalisePrefix(path) {
@@ -156,8 +191,8 @@ export function agentKind(headers, policy) {
     }
     const ua = get('user-agent') ?? '';
     const re = regexes(policy);
-    for (const kind of AGENT_ORDER) {
-        if (re[kind]?.test(ua)) {
+    for (const [pattern, kind] of AGENT_ORDER) {
+        if (re[pattern]?.test(ua)) {
             return kind;
         }
     }

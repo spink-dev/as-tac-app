@@ -92,8 +92,8 @@ export function nginxHttp(policy, site) {
     }
     out.push('# Which client: the first list that matches decides (as in classify.mjs).');
     out.push('map $http_user_agent $anti_ai_ua {', '    default browser;', '    "" bot;');
-    for (const kind of AGENT_ORDER) {
-        const source = policy.patterns[kind];
+    for (const [pattern, kind] of AGENT_ORDER) {
+        const source = policy.patterns[pattern];
         if (source) {
             out.push(`    ${quote(`~*${source}`)} ${kind};`);
         }
@@ -144,10 +144,18 @@ export function nginxHttp(policy, site) {
         `    info-asset ${quote(policy.robotsTag.info)};`,
         '}',
         '',
-        '# Documents only are rate-limited (an empty key is not limited).',
-        'map $anti_ai_path $anti_ai_document_key {',
+        '# Only page navigations are rate-limited (an empty key is not limited): the service worker',
+        "# fetching index.html for its cache (Sec-Fetch-Mode: same-origin) does not use people's budget.",
+        'map "$anti_ai_path:$http_sec_fetch_mode" $anti_ai_document_key {',
         '    default "";',
-        '    html $binary_remote_addr;',
+        '    "html:" $binary_remote_addr;',
+        '    "html:navigate" $binary_remote_addr;',
+        '}',
+        '',
+        '# Pages differ by client: shared caches must not hand one client\'s answer to another.',
+        'map $anti_ai_path $anti_ai_vary {',
+        '    default "";',
+        '    html "User-Agent, Accept-Language";',
         '}',
         `limit_req_zone $anti_ai_document_key zone=anti_ai_documents:10m rate=${policy.rateLimit.documentsPerSecond}r/s;`,
         '',
@@ -155,7 +163,12 @@ export function nginxHttp(policy, site) {
         '    default 1;',
         '    allow 0;',
         '}',
-        "log_format anti_ai '$remote_addr [$time_local] \"$request\" $status action=$anti_ai_action kind=$anti_ai_kind path=$anti_ai_path ua=\"$http_user_agent\"';",
+        '# At most 200 characters of the user agent per line (refused requests are not rate-limited).',
+        'map $http_user_agent $anti_ai_ua_head {',
+        '    default "";',
+        '    "~^(.{1,200})" $1;',
+        '}',
+        "log_format anti_ai '$remote_addr [$time_local] \"$request\" $status action=$anti_ai_action kind=$anti_ai_kind path=$anti_ai_path ua=\"$anti_ai_ua_head\"';",
         '',
     );
     return out.join('\n');
@@ -165,21 +178,29 @@ export function nginxHttp(policy, site) {
 export function nginxServer(policy, site) {
     const log = site.nginx?.logFile ?? '/var/log/nginx/anti-ai/anti-ai.log';
     const accessLog = site.nginx?.accessLog ?? '/var/log/nginx/access.log';
+    const accessFormat = site.nginx?.accessLogFormat ?? 'combined';
     const headers = site.nginx?.headersInclude;
+    if (!/^[a-z_]+$/.test(accessFormat)) {
+        throw new Error('nginx.accessLogFormat: a log_format name');
+    }
     return [
         `# ${GENERATED}`,
         '# Include in the server {} block, before its locations.',
         '',
         '# A server-level access_log replaces the inherited one, so the normal log is named again.',
-        `access_log ${accessLog} combined;`,
+        `access_log ${accessLog} ${accessFormat};`,
         `access_log ${log} anti_ai if=$anti_ai_logged;`,
         '',
         `limit_req zone=anti_ai_documents burst=${policy.rateLimit.burst} nodelay;`,
         'limit_req_status 429;',
         '',
+        '# Redirects (e.g. /about → /about/) stay relative: behind a TLS proxy an absolute one says http.',
+        'absolute_redirect off;',
+        '',
         '# Server-level answers (before any location) carry the policy headers too.',
         'add_header X-Robots-Tag $anti_ai_robots always;',
         'add_header tdm-reservation 1 always;',
+        'add_header Vary $anti_ai_vary;',
         '',
         'error_page 403 @anti_ai_forbidden;',
         'location @anti_ai_forbidden {',
@@ -205,7 +226,7 @@ export function nginxServer(policy, site) {
 
 /** For every location with its own add_header (nginx then drops the server-level ones). */
 export function nginxHeaders() {
-    return [`# ${GENERATED}`, 'add_header X-Robots-Tag $anti_ai_robots always;', 'add_header tdm-reservation 1 always;', ''].join('\n');
+    return [`# ${GENERATED}`, 'add_header X-Robots-Tag $anti_ai_robots always;', 'add_header tdm-reservation 1 always;', 'add_header Vary $anti_ai_vary;', ''].join('\n');
 }
 
 export function fail2banFilter(action) {
@@ -213,7 +234,8 @@ export function fail2banFilter(action) {
         `# ${GENERATED}`,
         `# Matches requests the anti-ai nginx rules answered with action=${action}.`,
         '[Definition]',
-        `failregex = ^<HOST> \\[[^\\]]+\\] "[^"]*" \\d+ action=${action} `,
+        '# fail2ban removes the time (datepattern) before matching, so the brackets arrive empty.',
+        `failregex = ^<HOST> \\[[^\\]]*\\] "[^"]*" \\d+ action=${action} `,
         'ignoreregex =',
         'datepattern = %%d/%%b/%%Y:%%H:%%M:%%S %%z',
         '',
@@ -222,19 +244,24 @@ export function fail2banFilter(action) {
 
 export function fail2banJail(site) {
     const ban = site.ban ?? {};
-    const minutes = Number(ban.minutes ?? 60);
-    const chain = ban.chain ?? 'DOCKER-USER';
+    const minutes = Number(ban.minutes ?? 15);
+    const chain = ban.chain ?? 'INPUT';
     const log = ban.logPath ?? '/var/log/anti-ai/anti-ai.log';
     return [
         `# ${GENERATED}`,
         '# Copy to /etc/fail2ban/jail.d/ on the host and the filters to /etc/fail2ban/filter.d/.',
         `# ${log} is the host side of the container's /var/log/nginx/anti-ai/ (bind mount).`,
-        "# DOCKER-USER: published container ports bypass the host's INPUT chain; use INPUT without Docker.",
+        "# Chain: INPUT when a proxy on the host (Caddy, Traefik, nginx) receives the connections;",
+        '# DOCKER-USER only when the container port itself faces the internet. Behind Cloudflare an',
+        "# iptables ban does nothing (it would hit Cloudflare's addresses): use Cloudflare's own rules.",
+        '# A ban hits everyone on that address – on mobile networks often many people (carrier NAT).',
         '',
         '[anti-ai-trap]',
         '# Anyone who follows the hidden trap link (forbidden by robots.txt, invisible to people).',
         'enabled   = true',
         'filter    = anti-ai-trap',
+        '# Never private addresses: there the log shows a proxy, not a client.',
+        'ignoreip  = 127.0.0.1/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7',
         `logpath   = ${log}`,
         'maxretry  = 1',
         `findtime  = ${minutes}m`,
@@ -248,6 +275,7 @@ export function fail2banJail(site) {
         '# people share one address (carrier NAT), and one scraper there would lock all of them out.',
         `enabled   = ${ban.denyJail ? 'true' : 'false'}`,
         'filter    = anti-ai-deny',
+        'ignoreip  = 127.0.0.1/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7',
         `logpath   = ${log}`,
         'maxretry  = 30',
         'findtime  = 10m',
@@ -263,6 +291,12 @@ export function fail2banJail(site) {
  * The policy as an ES module: Vercel runs the proxy as native Node ESM without bundling, and Node
  * refuses a plain JSON import (it needs `with { type: 'json' }`), so a module works everywhere.
  */
+/** logrotate for the host side of the anti-ai log (nginx keeps the file open: copytruncate). */
+export function logrotate(site) {
+    const log = site.ban?.logPath ?? '/var/log/anti-ai/anti-ai.log';
+    return [`# ${GENERATED}`, '# Copy to /etc/logrotate.d/ on the host.', `${log} {`, '    daily', '    rotate 7', '    maxsize 50M', '    missingok', '    notifempty', '    compress', '    delaycompress', '    copytruncate', '}', ''].join('\n');
+}
+
 export function vercelPolicy(policy) {
     return `// ${GENERATED}\nexport default ${JSON.stringify(policy, null, 4)};\n`;
 }

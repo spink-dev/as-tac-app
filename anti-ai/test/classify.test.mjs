@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { compilePolicy, decide, namesPattern, normalisePath } from '../lib/classify.mjs';
 import { createProxy } from '../lib/vercel.mjs';
 import { loadLists } from '../bin/anti-ai.mjs';
-import { CLIENTS, PATHS, expected, site } from './fixtures.mjs';
+import { CLIENTS, PATHS, REAL_BROWSERS, expected, site } from './fixtures.mjs';
 
 const lists = await loadLists();
 const policy = compilePolicy(site, lists);
@@ -20,6 +20,27 @@ test('every client gets the expected answer on every path', () => {
         }
     }
     assert.deepEqual(failures, []);
+});
+
+test('real browsers and in-app browsers are people', () => {
+    const wrong = REAL_BROWSERS.map((ua) => [ua, decide({ path: '/', headers: { 'user-agent': ua, 'accept-language': 'de-CH' } }, policy)]).filter(([, d]) => d.kind !== 'browser' || d.action !== 'allow');
+    assert.deepEqual(wrong.map(([ua, d]) => `${d.kind}: ${ua}`), []);
+});
+
+test('short or browser-like names in the lists never match', () => {
+    const re = new RegExp(namesPattern(['K', 'wv', 'Mobile', 'Version', 'Dot', 'Spider']), 'i');
+    assert.ok(!re.test('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/141 Mobile Safari/537.36'));
+    assert.ok(re.test('Spider/1.0'));
+    assert.equal(namesPattern(['K', 'wv']), null);
+});
+
+test('link previews: fetchers get the info page, in-app browsers stay browsers', () => {
+    const kind = (ua) => decide({ path: '/', headers: { 'user-agent': ua, 'accept-language': 'de' } }, policy).kind;
+    assert.equal(kind('facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'), 'preview');
+    assert.equal(kind('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) facebookexternalhit/1.1 Facebot Twitterbot/1.0'), 'preview');
+    assert.equal(kind('WhatsApp/2.24.20.89 A'), 'preview');
+    assert.equal(kind('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 WhatsApp/2.25.20.1'), 'browser');
+    assert.equal(kind('meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)'), 'ai');
 });
 
 test('names match whole names only, case-insensitively', () => {

@@ -42,6 +42,7 @@ export function outputs(site, lists) {
     add('fail2banTrapFilter', render.fail2banFilter('trap'));
     add('fail2banDenyFilter', render.fail2banFilter('deny'));
     add('fail2banJail', render.fail2banJail(site));
+    add('logrotate', render.logrotate(site));
     add('vercelPolicy', render.vercelPolicy(policy));
     return files;
 }

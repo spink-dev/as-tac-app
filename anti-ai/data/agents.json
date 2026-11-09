@@ -1,5 +1,5 @@
 {
-    "$comment": "Own lists next to data/ai-robots.json (the community list of AI crawlers and agents). Matching is case-insensitive on whole names (a name must not be glued to other letters or digits). Order of precedence: allow (site), preview, search, ai, tool, generic bot.",
+    "$comment": "Own lists next to data/ai-robots.json (the community list of AI crawlers and agents). Matching is case-insensitive on whole names (a name must not be glued to other letters or digits); names shorter than 4 characters or equal to a browser token (lib/classify.mjs BROWSER_TOKENS) are never matched. Order: allow (site), previewFirst, ai, preview, search, tool, bot. Preview names count only in user agents without a browser engine (AppleWebKit, Gecko/), so in-app browsers of messengers stay browsers.",
     "search": [
         "Googlebot",
         "Googlebot-Image",
@@ -35,10 +35,12 @@
         "redditbot",
         "Pinterestbot",
         "vkShare",
-        "Viber",
         "Mastodon",
-        "Bluesky Cardyb",
-        "Signal"
+        "Bluesky Cardyb"
+    ],
+    "previewFirst": [
+        "facebookexternalhit",
+        "Facebot"
     ],
     "ai": [
         "Claude",
@@ -99,7 +101,6 @@
         "Playwright",
         "Selenium",
         "webdriver",
-        "Electron",
         "PostmanRuntime",
         "insomnia",
         "Deno",

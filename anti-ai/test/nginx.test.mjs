@@ -144,7 +144,7 @@ test('nginx answers every client on every path like classify.mjs', { skip: !ngin
     assert.deepEqual(failures, []);
 });
 
-test('the log feeds fail2ban: trap hits match the filter, allowed requests are not logged', { skip: !nginx && 'nginx not installed' }, async () => {
+test('trap hits match the filter regex, allowed requests are not logged', { skip: !nginx && 'nginx not installed' }, async () => {
     await get(server.port, '/_/trap01/x', { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de' });
     await new Promise((resolve) => setTimeout(resolve, 200));
     const log = readFileSync(join(server.dir, 'anti-ai.log'), 'utf8').trim().split('\n');
@@ -160,19 +160,58 @@ test('the log feeds fail2ban: trap hits match the filter, allowed requests are n
     assert.ok(log.some((line) => line.includes('action=deny kind=ai')));
 });
 
-test('documents are rate-limited per address, files are not', { skip: !nginx && 'nginx not installed' }, async () => {
+test('the real fail2ban matches the log: traps and refusals, never allowed requests', { skip: (!nginx && 'nginx not installed') || (spawnSync('fail2ban-regex', ['--version']).error && 'fail2ban not installed') }, async () => {
+    // Fresh lines: one trap, two refusals, one person (not logged at all).
+    writeFileSync(join(server.dir, 'anti-ai.log'), '');
+    spawnSync('kill', ['-USR1', readFileSync(join(server.dir, 'nginx.pid'), 'utf8').trim()]);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await get(server.port, '/_/trap01/', { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de' });
+    await get(server.port, '/', { 'user-agent': 'GPTBot/1.2' });
+    await get(server.port, '/', { 'user-agent': 'curl/8.5.0', 'x-forwarded-for': '203.0.113.77' });
+    await get(server.port, '/', { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de' });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const log = join(server.dir, 'anti-ai.log');
+    const lines = readFileSync(log, 'utf8').trim().split('\n');
+    assert.equal(lines.length, 3, lines.join('\n'));
+    // No trusted proxies: X-Forwarded-For changes nothing (nobody picks the address that gets banned).
+    assert.ok(lines.every((line) => line.startsWith('127.0.0.1 ')), lines.join('\n'));
+    for (const [action, matches] of [['trap', 1], ['deny', 2]]) {
+        const filter = join(server.dir, `filter-${action}.conf`);
+        writeFileSync(filter, render.fail2banFilter(action));
+        const run = spawnSync('fail2ban-regex', [log, filter], { encoding: 'utf8' });
+        const matched = Number(/Lines: \d+ lines, \d+ ignored, (\d+) matched/.exec(run.stdout)?.[1]);
+        assert.equal(matched, matches, run.stdout);
+        assert.match(run.stdout, /127\.0\.0\.1/);
+    }
+});
+
+test('relative redirects, Vary on pages', { skip: !nginx && 'nginx not installed' }, async () => {
+    const redirect = await get(server.port, '/about', { 'user-agent': 'Googlebot/2.1' });
+    assert.equal(redirect.status, 301);
+    assert.equal(redirect.headers.location, '/about/');
+    const page = await get(server.port, '/', { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de' });
+    assert.match(page.headers.vary ?? '', /User-Agent/);
+    const file = await get(server.port, '/assets/app.js', { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de' });
+    assert.doesNotMatch(file.headers.vary ?? '', /User-Agent/);
+});
+
+test('page navigations are rate-limited per address, files and service-worker fetches are not', { skip: !nginx && 'nginx not installed' }, async () => {
     const limited = await startNginx({ ...site, rateLimit: { documentsPerSecond: 1, burst: 2 } });
     try {
-        const browser = { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de' };
+        const browser = { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de', 'sec-fetch-mode': 'navigate' };
+        const worker = { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de', 'sec-fetch-mode': 'same-origin' };
         const pages = [];
         const files = [];
+        const precache = [];
         for (let i = 0; i < 6; i++) {
             pages.push((await get(limited.port, '/', browser)).status);
             files.push((await get(limited.port, '/assets/app.js', browser)).status);
+            precache.push((await get(limited.port, '/index.html', worker)).status);
         }
         assert.ok(pages.includes(429), pages.join(','));
         assert.ok(pages.slice(0, 3).every((status) => status === 200), pages.join(','));
         assert.ok(files.every((status) => status === 200), files.join(','));
+        assert.ok(precache.every((status) => status === 200), precache.join(','));
     } finally {
         limited.proc.kill();
         rmSync(limited.dir, { recursive: true, force: true });
