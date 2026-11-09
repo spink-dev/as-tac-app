@@ -12,7 +12,7 @@ import { requestPersistence, storageEstimate } from '../../core/storage/db';
 import { openProject } from '../../core/store/route';
 import { toast } from '../../core/store/ui';
 import { bundledArea, installBundled, listAreas, removeArea, areaUsage } from '../../core/areas/store';
-import { defaultCountry, startField } from '../../core/areas/catalog';
+import { defaultCountry, startChoice } from '../../core/areas/catalog';
 import { areaLabel, CountrySelect, useCountries } from '../areas/AreaCatalog';
 import type { AreaMeta } from '../../core/areas/types';
 import { checkForUpdate, usePwa } from '../../core/pwa';
@@ -45,12 +45,14 @@ export function Library() {
     const [installing, setInstalling] = useState<Record<string, number>>({});
     const countries = useCountries();
     const [country, setCountry] = useState(() => defaultCountry());
-    // The empty library's first suggestion: the start field of the country the catalog shows.
-    const start = startField(country, locale);
+    // The empty library's first suggestion: the start field of the country the catalog shows (offline
+    // with none of its fields on the device, Mahlwinkel).
+    const online = useOnline();
+    const start = bundledArea(startChoice(country, locale, new Set(areas.map((area) => area.id)), online).areaId);
     const scroller = useSmoothScroll<HTMLDivElement>();
     const listRef = useStaggerIn<HTMLUListElement>([projects === null]);
     const pwa = usePwa();
-    const statusText = pwa.offlineReady ? t('library.offlineReady') : navigator.onLine ? t('common.online') : t('common.offline');
+    const statusText = pwa.offlineReady ? t('library.offlineReady') : online ? t('common.online') : t('common.offline');
 
     const [storageProblem, setStorageProblem] = useState<'newer' | 'unavailable' | null>(null);
     const [backups, setBackups] = useState<Set<string>>(new Set());
@@ -174,7 +176,7 @@ export function Library() {
                     </div>
                     <div className="spacer" />
                     <span className={`badge lib__status ${pwa.offlineReady ? 'badge--ok' : ''}`} title={statusText}>
-                        {navigator.onLine ? <Wifi size={14} strokeWidth={2} aria-hidden="true" /> : <WifiOff size={14} strokeWidth={2} aria-hidden="true" />}
+                        {online ? <Wifi size={14} strokeWidth={2} aria-hidden="true" /> : <WifiOff size={14} strokeWidth={2} aria-hidden="true" />}
                         <span className="lib__status-text">{statusText}</span>
                     </span>
                     <LanguageToggle />
@@ -217,7 +219,7 @@ export function Library() {
                                 <p>{t('library.empty.body', { n: countries.reduce((sum, group) => sum + group.areas.length, 0), countries: countries.length })}</p>
                                 <div className="row-gap">
                                     {start ? (
-                                        <Button variant="primary" onClick={() => showDialog('newPlan', { areaId: start.id })}>
+                                        <Button variant="primary" aria-label={t('library.startOn', { name: start.name })} onClick={() => showDialog('newPlan', { areaId: start.id })}>
                                             <MapIcon {...ICON} /> {start.name.split(' · ')[0]}
                                         </Button>
                                     ) : null}
@@ -368,4 +370,19 @@ export function Library() {
             </div>
         </div>
     );
+}
+
+/** `navigator.onLine`, kept current. */
+function useOnline(): boolean {
+    const [online, setOnline] = useState(() => navigator.onLine);
+    useEffect(() => {
+        const update = () => setOnline(navigator.onLine);
+        window.addEventListener('online', update);
+        window.addEventListener('offline', update);
+        return () => {
+            window.removeEventListener('online', update);
+            window.removeEventListener('offline', update);
+        };
+    }, []);
+    return online;
 }

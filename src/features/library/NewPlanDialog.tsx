@@ -5,7 +5,7 @@ import { useT, formatBytes } from '../../i18n';
 import { Button, Dialog, Field, ICON } from '../../ui/components';
 import { useDialogs } from '../../core/store/dialogs';
 import { bundledArea, ensureArea, isBundled, listAreas, areaCenter } from '../../core/areas/store';
-import { defaultCountry, startField, START_FIELD } from '../../core/areas/catalog';
+import { defaultCountry, startChoice, startField } from '../../core/areas/catalog';
 import { CountrySelect, useCountries } from '../areas/AreaCatalog';
 import { usePrefs } from '../../core/store/prefs';
 import type { AreaMeta } from '../../core/areas/types';
@@ -23,14 +23,17 @@ export function NewPlanDialog() {
     const nameId = useId();
     const [name, setName] = useState('');
     const locale = usePrefs((state) => state.locale);
-    // The user's country and its start field (Mahlwinkel in Germany, elsewhere the first by name).
+    // The user's country and its start field; refined once the installed areas are known.
     const [country, setCountry] = useState(() => defaultCountry());
-    const [areaId, setAreaId] = useState<string>(() => startField(country, locale)?.id ?? START_FIELD);
+    const [areaId, setAreaId] = useState<string>(() => startChoice(country, locale, new Set(), true).areaId);
     const [template, setTemplate] = useState<string>('');
     const [installed, setInstalled] = useState<AreaMeta[] | null>(null);
     const countries = useCountries();
     const [busy, setBusy] = useState<number | null>(null);
     const creating = useRef(false);
+    // Until someone chooses an area or a country, the dialog keeps to the default choice.
+    const picked = useRef(false);
+    const installedIds = (list: AreaMeta[] | null) => new Set((list ?? []).map((area) => area.id));
 
     useEffect(() => {
         if (open) {
@@ -40,16 +43,18 @@ export function NewPlanDialog() {
             setTemplate('');
             setBusy(null);
             if (payload?.areaId) {
+                picked.current = true;
                 setAreaId(payload.areaId);
                 setCountry(defaultCountry(payload.areaId));
             } else if (payload?.country) {
                 // «Feld wählen»: a field of that country, whatever was chosen last time.
+                picked.current = true;
                 setCountry(payload.country);
-                const first = countries.find((group) => group.country === payload.country)?.areas[0];
+                const first = startField(payload.country, locale, installedIds(installed));
                 if (first) {
                     chooseArea(first.id);
                 }
-            } else {
+            } else if (picked.current) {
                 setCountry(defaultCountry(areaId));
             }
         }
@@ -58,11 +63,19 @@ export function NewPlanDialog() {
     }, [open, payload]);
 
     useEffect(() => {
-        // A remembered own area removed since: back to the start field instead of an unseen, missing choice.
-        if (open && installed && areaId !== '__none' && !isBundled(areaId) && !installed.some((area) => area.id === areaId)) {
-            const home = defaultCountry();
-            chooseArea(startField(home, locale)?.id ?? START_FIELD);
-            setCountry(home);
+        if (!open || !installed) {
+            return;
+        }
+        // The default: the user's country, a field of it already on the device first; offline with
+        // none there, Mahlwinkel (it ships with the app). Also after a remembered own area was
+        // removed, instead of an unseen, missing choice.
+        const missing = areaId !== '__none' && !isBundled(areaId) && !installed.some((area) => area.id === areaId);
+        if (!picked.current || missing) {
+            const choice = startChoice(defaultCountry(), locale, installedIds(installed), navigator.onLine);
+            setCountry(choice.country);
+            if (choice.areaId !== areaId) {
+                chooseArea(choice.areaId);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, installed, areaId]);
@@ -82,13 +95,19 @@ export function NewPlanDialog() {
         setTemplate('');
     }
 
+    function pickArea(id: string) {
+        picked.current = true;
+        chooseArea(id);
+    }
+
     /**
-     * Another country. A field chosen in the old one gives way to the new country's first field, so
+     * Another country. A field chosen in the old one gives way to the new country's start field, so
      * the choice stays visible; an own area or «Ohne Grundkarte» stays chosen (both are always shown).
      */
     function pickCountry(next: string) {
+        picked.current = true;
         setCountry(next);
-        const first = countries.find((group) => group.country === next)?.areas[0];
+        const first = startField(next, locale, installedIds(installed));
         const chosen = bundledArea(areaId);
         if (first && chosen && chosen.country !== next) {
             chooseArea(first.id);
@@ -154,7 +173,7 @@ export function NewPlanDialog() {
                 <CountrySelect value={country} onChange={pickCountry} />
                 <div className="choice-list" role="radiogroup" aria-label={t('new.area')} data-testid="new-plan-areas">
                     {fields.map((area) => (
-                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => chooseArea(area.id)}>
+                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => pickArea(area.id)}>
                             <MapIcon {...ICON} />
                             <span className="choice__main">
                                 <span className="choice__title">{area.name}</span>
@@ -164,7 +183,7 @@ export function NewPlanDialog() {
                     ))}
                     {own.length ? <div className="choice-list__label" id={ownLabel} aria-hidden="true">{t('area.own')}</div> : null}
                     {own.map((area) => (
-                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} aria-describedby={ownLabel} className="choice" onClick={() => chooseArea(area.id)}>
+                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} aria-describedby={ownLabel} className="choice" onClick={() => pickArea(area.id)}>
                             <MapIcon {...ICON} />
                             <span className="choice__main">
                                 <span className="choice__title">{area.name}</span>
@@ -172,7 +191,7 @@ export function NewPlanDialog() {
                             </span>
                         </button>
                     ))}
-                    <button type="button" role="radio" aria-checked={areaId === '__none'} className="choice" onClick={() => chooseArea('__none')}>
+                    <button type="button" role="radio" aria-checked={areaId === '__none'} className="choice" onClick={() => pickArea('__none')}>
                         <span className="choice__main">
                             <span className="choice__title">{t('new.noArea')}</span>
                         </span>
