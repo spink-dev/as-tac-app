@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -218,5 +218,26 @@ test('pages are rate-limited per address whatever the client says, files are not
     } finally {
         limited.proc.kill();
         rmSync(limited.dir, { recursive: true, force: true });
+    }
+});
+
+test('fail2ban accepts the jail on a stock configuration', { skip: (spawnSync('fail2ban-client', ['--version']).error || !existsSync('/etc/fail2ban/jail.conf')) && 'fail2ban not installed' }, () => {
+    const dir = mkdtempSync(join(tmpdir(), 'anti-ai-f2b-'));
+    try {
+        // The distribution's own files only (no local jails), plus ours.
+        spawnSync('cp', ['-r', '/etc/fail2ban/.', dir]);
+        rmSync(join(dir, 'jail.d'), { recursive: true, force: true });
+        mkdirSync(join(dir, 'jail.d'));
+        writeFileSync(join(dir, 'anti-ai.log'), '');
+        writeFileSync(join(dir, 'filter.d', 'anti-ai-trap.conf'), render.fail2banFilter('trap'));
+        writeFileSync(join(dir, 'filter.d', 'anti-ai-deny.conf'), render.fail2banFilter('deny'));
+        writeFileSync(join(dir, 'jail.d', 'anti-ai.conf'), render.fail2banJail({ ban: { logPath: join(dir, 'anti-ai.log') } }));
+        const check = spawnSync('fail2ban-client', ['-c', dir, '-t'], { encoding: 'utf8' });
+        assert.equal(check.status, 0, check.stdout + check.stderr);
+        const dump = spawnSync('fail2ban-client', ['-c', dir, '-d'], { encoding: 'utf8' }).stdout;
+        assert.match(dump, /anti-ai-trap/);
+        assert.doesNotMatch(dump, /dports http/);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
     }
 });
