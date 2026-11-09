@@ -33,9 +33,10 @@ export const AGENT_ORDER = [
 ];
 
 /**
- * Tokens of ordinary browser user agents. A list name equal to one of them, or shorter than four
- * characters, is never matched: one careless entry upstream (e.g. «K», «wv», «Mobile») would
- * otherwise lock every phone out.
+ * Tokens of ordinary browser user agents. A name equal to one of them is never matched, nor a name
+ * from the community list shorter than four characters: one careless entry upstream (e.g. «K»,
+ * «wv», «Mobile») would otherwise lock every phone out. The kit's own lists are curated and may
+ * hold short names (Bun, got, PHP).
  */
 export const BROWSER_TOKENS = [
     'mozilla', 'applewebkit', 'khtml', 'gecko', 'like', 'chrome', 'chromium', 'safari', 'mobile', 'version', 'android',
@@ -54,7 +55,7 @@ export function namesPattern(names) {
     const seen = new Set();
     const unique = names
         .map((name) => name.trim())
-        .filter((name) => name.length >= 4 && !name.startsWith('__') && !BROWSER_TOKENS.includes(name.toLowerCase()))
+        .filter((name) => name && !name.startsWith('__') && !BROWSER_TOKENS.includes(name.toLowerCase()))
         .filter((name) => !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()));
     if (unique.length === 0) {
         return null;
@@ -82,7 +83,7 @@ export function compilePolicy(site, lists) {
         previews: oneOf(site.previews ?? 'info', ['info', 'deny'], 'previews'),
         ai: oneOf(site.ai ?? 'deny', ['info', 'deny'], 'ai'),
     };
-    const aiNames = [...Object.keys(lists.aiRobots ?? {}), ...(lists.agents.ai ?? [])];
+    const aiNames = [...Object.keys(lists.aiRobots ?? {}).filter((name) => name.trim().length >= 4), ...(lists.agents.ai ?? [])];
     return {
         format: 'anti-ai-policy',
         version: 1,
@@ -96,7 +97,9 @@ export function compilePolicy(site, lists) {
         modes,
         patterns: {
             allow: namesPattern(site.allowUserAgents ?? []),
-            previewFirst: withoutEngine(namesPattern(lists.agents.previewFirst ?? [])),
+            // No engine check: Apple's iMessage preview names Safari and facebookexternalhit; no
+            // in-app browser calls itself facebookexternalhit.
+            previewFirst: namesPattern(lists.agents.previewFirst ?? []),
             preview: withoutEngine(namesPattern(lists.agents.preview ?? [])),
             search: namesPattern(lists.agents.search ?? []),
             ai: namesPattern(aiNames),

@@ -15,8 +15,8 @@
     "requireAcceptLanguage": true,
     "allowUserAgents": [],
     "rateLimit": {
-        "documentsPerSecond": 10,
-        "burst": 120
+        "documentsPerSecond": 20,
+        "burst": 300
     },
     "trustedProxies": [],
     "nginx": {

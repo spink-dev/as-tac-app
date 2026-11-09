@@ -195,23 +195,26 @@ test('relative redirects, Vary on pages', { skip: !nginx && 'nginx not installed
     assert.doesNotMatch(file.headers.vary ?? '', /User-Agent/);
 });
 
-test('page navigations are rate-limited per address, files and service-worker fetches are not', { skip: !nginx && 'nginx not installed' }, async () => {
+test('pages are rate-limited per address whatever the client says, files are not', { skip: !nginx && 'nginx not installed' }, async () => {
     const limited = await startNginx({ ...site, rateLimit: { documentsPerSecond: 1, burst: 2 } });
     try {
         const browser = { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de', 'sec-fetch-mode': 'navigate' };
         const worker = { 'user-agent': 'Mozilla/5.0 Chrome/141', 'accept-language': 'de', 'sec-fetch-mode': 'same-origin' };
         const pages = [];
         const files = [];
-        const precache = [];
         for (let i = 0; i < 6; i++) {
             pages.push((await get(limited.port, '/', browser)).status);
             files.push((await get(limited.port, '/assets/app.js', browser)).status);
-            precache.push((await get(limited.port, '/index.html', worker)).status);
         }
-        assert.ok(pages.includes(429), pages.join(','));
         assert.ok(pages.slice(0, 3).every((status) => status === 200), pages.join(','));
+        assert.ok(pages.includes(429), pages.join(','));
         assert.ok(files.every((status) => status === 200), files.join(','));
-        assert.ok(precache.every((status) => status === 200), precache.join(','));
+        // Sec-Fetch-Mode is set by the client: it must not open a way around the limit.
+        const sneaky = [];
+        for (let i = 0; i < 3; i++) {
+            sneaky.push((await get(limited.port, '/index.html', worker)).status);
+        }
+        assert.ok(sneaky.includes(429), sneaky.join(','));
     } finally {
         limited.proc.kill();
         rmSync(limited.dir, { recursive: true, force: true });

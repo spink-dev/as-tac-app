@@ -43,7 +43,11 @@ export const UA = {
     googlebotMobile: 'Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.7390.122 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
     bingbot: 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
     whatsapp: 'WhatsApp/2.24.20.89 A',
-    imessage: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) facebookexternalhit/1.1 Facebot Twitterbot/1.0',
+    // Apple iMessage link preview (real string: 24ways.org, «Microbrowsers are everywhere»).
+    imessage: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0',
+    bun: 'Bun/1.1.34',
+    got: 'got (https://github.com/sindresorhus/got)',
+    php: 'PHP/8.3',
     telegram: 'TelegramBot (like TwitterBot)',
     discord: 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)',
     curl: 'curl/8.5.0',
@@ -72,7 +76,7 @@ export const CLIENTS = [
     ...['gptbot', 'chatgptUser', 'claudebot', 'claudeUser', 'claudeDesktop', 'perplexity', 'ccbot', 'bytespider', 'metaAgent', 'applebot', 'googleOther', 'amazonbot', 'scrapy'].map((name) => [name, { 'user-agent': UA[name], ...LANG }, 'ai']),
     ...['googlebot', 'googlebotMobile', 'bingbot'].map((name) => [name, { 'user-agent': UA[name] }, 'search']),
     ...['whatsapp', 'telegram', 'discord', 'facebookHit', 'imessage'].map((name) => [name, { 'user-agent': UA[name] }, 'preview']),
-    ...['curl', 'wget', 'requests', 'go', 'node', 'axios', 'headless', 'postman', 'java', 'okhttp'].map((name) => [name, { 'user-agent': UA[name], ...LANG }, 'tool']),
+    ...['curl', 'wget', 'requests', 'go', 'node', 'axios', 'headless', 'postman', 'java', 'okhttp', 'bun', 'got', 'php'].map((name) => [name, { 'user-agent': UA[name], ...LANG }, 'tool']),
     ...['unknownBot', 'unknownCrawler', 'empty', 'spaces'].map((name) => [name, { 'user-agent': UA[name] }, 'bot']),
 ];
 

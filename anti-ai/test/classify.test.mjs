@@ -28,16 +28,23 @@ test('real browsers and in-app browsers are people', () => {
 });
 
 test('short or browser-like names in the lists never match', () => {
-    const re = new RegExp(namesPattern(['K', 'wv', 'Mobile', 'Version', 'Dot', 'Spider']), 'i');
+    const re = new RegExp(namesPattern(['wv', 'Mobile', 'Version', 'Spider']), 'i');
     assert.ok(!re.test('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/141 Mobile Safari/537.36'));
     assert.ok(re.test('Spider/1.0'));
-    assert.equal(namesPattern(['K', 'wv']), null);
+    assert.equal(namesPattern(['wv', 'Mobile']), null);
+    // Short names from the community list are dropped, the kit's own short names stay.
+    const strict = compilePolicy(site, { aiRobots: { K: {}, YaK: {}, GPTBot: {} }, agents: { ...lists.agents } });
+    assert.equal(decide({ path: '/', headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) Chrome/141 Mobile', 'accept-language': 'de' } }, strict).kind, 'browser');
+    assert.equal(decide({ path: '/', headers: { 'user-agent': 'GPTBot/1.2' } }, strict).kind, 'ai');
+    for (const ua of ['Bun/1.1.34', 'got (https://github.com/sindresorhus/got)', 'PHP/8.3']) {
+        assert.equal(decide({ path: '/assets/app.js', headers: { 'user-agent': ua } }, policy).action, 'deny', ua);
+    }
 });
 
 test('link previews: fetchers get the info page, in-app browsers stay browsers', () => {
     const kind = (ua) => decide({ path: '/', headers: { 'user-agent': ua, 'accept-language': 'de' } }, policy).kind;
     assert.equal(kind('facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'), 'preview');
-    assert.equal(kind('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) facebookexternalhit/1.1 Facebot Twitterbot/1.0'), 'preview');
+    assert.equal(kind('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0'), 'preview');
     assert.equal(kind('WhatsApp/2.24.20.89 A'), 'preview');
     assert.equal(kind('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 WhatsApp/2.25.20.1'), 'browser');
     assert.equal(kind('meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)'), 'ai');
