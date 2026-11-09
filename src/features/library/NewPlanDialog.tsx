@@ -36,15 +36,26 @@ export function NewPlanDialog() {
     const creating = useRef(false);
     // Until someone chooses an area or a country, the dialog keeps to the default choice.
     const picked = useRef(false);
-    // Per opening: the installed areas have been looked at once; a country asked for by «Feld wählen».
+    // Per opening: its number, the opening the installed list belongs to (the dialog stays mounted,
+    // so a list from an earlier opening must not count), the list looked at once, a country asked
+    // for by «Feld wählen».
+    const opening = useRef(0);
+    const loadedFor = useRef(-1);
     const refined = useRef(false);
     const pendingCountry = useRef<string | null>(null);
+    const areasRef = useRef<HTMLDivElement>(null);
     const installedIds = (list: AreaMeta[] | null) => new Set((list ?? []).map((area) => area.id));
 
     useEffect(() => {
         if (open) {
+            const current = ++opening.current;
             setInstalled(null);
-            void listAreas().then(setInstalled);
+            void listAreas().then((list) => {
+                if (opening.current === current) {
+                    loadedFor.current = current;
+                    setInstalled(list);
+                }
+            });
             setName('');
             setTemplate('');
             setBusy(null);
@@ -73,7 +84,7 @@ export function NewPlanDialog() {
     }, [open, payload]);
 
     useEffect(() => {
-        if (!open || !installed) {
+        if (!open || !installed || loadedFor.current !== opening.current) {
             return;
         }
         const ids = installedIds(installed);
@@ -202,7 +213,7 @@ export function NewPlanDialog() {
             <div className="field">
                 <span className="field__label">{t('new.area')}</span>
                 <CountrySelect value={country} onChange={pickCountry} />
-                <div className="choice-list" role="radiogroup" aria-label={t('new.area')} data-testid="new-plan-areas">
+                <div className="choice-list" role="radiogroup" aria-label={t('new.area')} data-testid="new-plan-areas" ref={areasRef}>
                     {fields.map((area) => (
                         <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => pickArea(area.id)}>
                             <MapIcon {...ICON} />
@@ -243,6 +254,8 @@ export function NewPlanDialog() {
                             picked.current = true;
                             setCountry(defaultCountry(START_FIELD));
                             chooseArea(START_FIELD);
+                            // The notice goes away with this button: focus moves to the chosen field.
+                            requestAnimationFrame(() => areasRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
                         }}>
                             {t('new.useStartField')}
                         </Button>
