@@ -18,7 +18,7 @@ const check = (name, ok) => {
         errors.push(`check failed: ${name}`);
     }
 };
-const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH' });
+const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin' });
 const watch = (page, name) => {
     page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));
     page.on('console', (msg) => msg.type() === 'error' && errors.push(`${name}: ${msg.text()}`));

@@ -22,7 +22,7 @@ const check = (name, ok) => {
 async function run(name, viewport) {
     const mobile = viewport.width < 800;
     // Simulated position inside the Mahlwinkel area; no real location is used.
-    const context = await browser.newContext({ viewport, locale: 'de-CH', hasTouch: mobile, isMobile: mobile, geolocation: { latitude: 52.3832, longitude: 11.8187, accuracy: 8 }, permissions: ['geolocation'] });
+    const context = await browser.newContext({ viewport, locale: 'de-CH', timezoneId: 'Europe/Berlin', hasTouch: mobile, isMobile: mobile, geolocation: { latitude: 52.3832, longitude: 11.8187, accuracy: 8 }, permissions: ['geolocation'] });
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));
     page.on('console', (msg) => msg.type() === 'error' && errors.push(`${name}: ${msg.text()}`));
@@ -86,7 +86,7 @@ async function run(name, viewport) {
 }
 /** Privacy and compass behaviour on desktop with simulated sensors (no real device). */
 async function privacy() {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', geolocation: { latitude: 52.3832, longitude: 11.8187, accuracy: 8 }, permissions: ['geolocation', 'accelerometer', 'gyroscope', 'magnetometer'] });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin', geolocation: { latitude: 52.3832, longitude: 11.8187, accuracy: 8 }, permissions: ['geolocation', 'accelerometer', 'gyroscope', 'magnetometer'] });
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(`privacy: ${error.message}`));
     await page.goto(base);

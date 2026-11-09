@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BUNDLED_AREAS, byCountry, countryName, defaultCountry, isBundled } from '../../src/core/areas/catalog';
+import { BUNDLED_AREAS, byCountry, countryName, defaultCountry, homeCountry, isBundled, startField, ZONE_COUNTRY } from '../../src/core/areas/catalog';
 import { areaKm2 } from '../../src/core/areas/overpass';
 import { validateBounds } from '../../src/core/areas/store';
 
@@ -83,10 +83,56 @@ describe('field catalog', () => {
         expect(countryName('not a code', 'de')).toBe('not a code');
     });
 
-    it('opens on the chosen field’s country, then the browser region, then Germany', () => {
-        expect(defaultCountry('fr-baerenkopf', ['de-CH'])).toBe('FR');
-        expect(defaultCountry(null, ['de-CH', 'de'])).toBe('CH');
-        expect(defaultCountry('my-own-area', ['en-US', 'en'])).toBe('DE');
-        expect(defaultCountry(undefined, [])).toBe('DE');
+    it('no longer contains Riedikon', () => {
+        expect(isBundled('ch-riedikon')).toBe(false);
+        expect(BUNDLED_AREAS.filter((area) => area.country === 'CH').map((area) => area.id)).toEqual(['ch-steinmaur']);
+    });
+
+    it('opens on the chosen field’s country, then the user’s country, then Germany', () => {
+        const at = (timeZone: string, ...languages: string[]) => ({ timeZone, languages });
+        // The chosen field wins.
+        expect(defaultCountry('fr-baerenkopf', at('Europe/Zurich', 'de-CH'))).toBe('FR');
+        // The device's time zone names the country.
+        expect(defaultCountry(null, at('Europe/Zurich', 'en-US'))).toBe('CH');
+        expect(defaultCountry(null, at('Europe/Rome', 'de-CH'))).toBe('IT');
+        expect(defaultCountry(null, at('Europe/Busingen', 'de-CH'))).toBe('DE');
+        expect(defaultCountry(null, at('Atlantic/Canary', 'es-ES'))).toBe('ES');
+        expect(defaultCountry(null, at('Europe/Berlin', 'de-CH'))).toBe('DE');
+        // A country without fields: Germany, whatever the languages say.
+        expect(defaultCountry(null, at('America/New_York', 'de-CH'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Vaduz', 'de-CH'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Prague', 'fr-FR'))).toBe('DE');
+        // A zone without a place (UTC, CET): the first browser region that has fields.
+        expect(defaultCountry(null, at('UTC', 'en-US', 'de-CH'))).toBe('CH');
+        expect(defaultCountry(null, at('Etc/GMT-1', 'fr-BE'))).toBe('BE');
+        expect(defaultCountry(null, at('', 'zh-Hant-TW', 'it-IT'))).toBe('IT');
+        expect(defaultCountry('my-own-area', at('UTC', 'en-US', 'en'))).toBe('DE');
+        expect(defaultCountry(undefined, at('', 'not a language'))).toBe('DE');
+        expect(homeCountry(at('Asia/Tokyo', 'de-CH'))).toBeNull();
+        // Inherited object keys are not time zones.
+        expect(homeCountry(at('constructor', 'de-AT'))).toBe('AT');
+    });
+
+    it('knows the time zones of every catalogue country', () => {
+        const countries = new Set(BUNDLED_AREAS.map((area) => area.country));
+        expect(new Set(ZONE_COUNTRY.values())).toEqual(countries);
+        // IANA's own list, where the system has one: every zone of a catalogue country is in the table.
+        const tab = '/usr/share/zoneinfo/zone.tab';
+        if (existsSync(tab)) {
+            const zones = readFileSync(tab, 'utf8').split('\n').filter((line) => line && !line.startsWith('#')).map((line) => line.split('\t'));
+            for (const [code, , zone] of zones) {
+                if (countries.has(code)) {
+                    expect([zone, ZONE_COUNTRY.get(zone)]).toEqual([zone, code]);
+                }
+            }
+        }
+    });
+
+    it('starts a new plan on Mahlwinkel in Germany, elsewhere on the first field by name', () => {
+        expect(startField('DE')?.id).toBe('mahlwinkel');
+        expect(startField('CH')?.id).toBe('ch-steinmaur');
+        const fr = byCountry(BUNDLED_AREAS, 'de').find((group) => group.country === 'FR');
+        expect(startField('FR')?.id).toBe(fr?.areas[0].id);
+        expect(startField('US')).toBeUndefined();
     });
 });

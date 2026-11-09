@@ -63,7 +63,7 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://localhost:${server.address().port}`;
 
 const browser = await playwright.chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH' });
+const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin' });
 const watch = (page, name) => {
     page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));
 };

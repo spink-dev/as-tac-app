@@ -1,7 +1,9 @@
 # Changelog
 
-## Unveröffentlicht
+## 1.0.0-alpha.4 — 2026-11-09
 
+- **Riedikon entfernt:** Das «Ausbildungszentrum Riedikon» ist nicht mehr im Katalog (Eintrag und Datei `public/maps/ch/riedikon.926d41a7.geojson`); die Schweiz hat noch den Steinbruch Dielsdorf. 35 Felder in 13 Ländern. Wer das Feld schon gespeichert hat, behält es als eigenes Gebiet; Pläne darauf öffnen weiter.
+- **Land des Nutzers zuerst:** Feldkatalog, «Neuer Plan» und der erste Vorschlag der leeren Startseite öffnen auf dem Land, in dem das Gerät steht, sofern es dort Felder gibt, sonst auf Deutschland. Massgeblich ist die Zeitzone des Geräts (Europe/Zurich → Schweiz; America/New_York → keine Felder, also Deutschland); nur wo sie keinen Ort nennt (UTC), die erste Region der Browsersprachen mit Feldern (de-CH → Schweiz). Keine Standortabfrage, keine IP-Abfrage, nichts verlässt das Gerät. «Neuer Plan» startet in Deutschland auf Mahlwinkel (vorab gespeichert, Eventvorlagen), anderswo auf dem ersten Feld des Landes. Browser-Szenarien legen ihre Zeitzone fest.
 - **KI-Schutz (anti-ai):** wiederverwendbarer Baustein in `anti-ai/` für nginx und Vercel, für as-tac.dev in `anti-ai.site.json` eingestellt. KI-Crawler, KI-Assistenten und signierte KI-Agenten (Web Bot Auth), Skripte, HTTP-Bibliotheken, Headless-Browser und unbekannte Bots erhalten 403 auf allem; Suchmaschinen nur die neue Infoseite `/about/` (Deutsch/Englisch), Link-Vorschauen die Infoseite statt der App; Seitenaufrufe ohne `Accept-Language` werden abgelehnt; In-App-Browser von Messengern gelten als Menschen. `robots.txt`, `ai.txt`, `/.well-known/tdmrep.json`, `X-Robots-Tag` (`noindex`, `noai`), `tdm-reservation` und `Vary` überall; unsichtbarer Fallen-Link mit fail2ban-Filter und -Jail (15 Minuten, nie private Adressen) und logrotate; Ratenbegrenzung für Seitenaufrufe je Adresse (nginx), nicht für Dateien. Der Docker-Container wird nur lokal hinter dem TLS-Proxy veröffentlicht. Vercel: `proxy.js` (Routing Middleware) mit derselben Entscheidung, `vercel.json` stellt das Projekt auf Vite. KI-Namensliste von ai.robots.txt (MIT), Stand 2026-11-09.
 
 ## 1.0.0-alpha.3 — 2026-11-09

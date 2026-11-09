@@ -1,7 +1,8 @@
-// Field catalog by country: no Zürich areas, the catalog opens on the browser's region, a field
-// installs from the server and a plan on it opens there; a plan whose basemap is neither a
-// prepared field nor on the device says so instead of showing an empty map. Offline after the first
-// visit, Mahlwinkel still installs (precached), other fields ask for the network.
+// Field catalog by country: no Zürich areas and no Riedikon, the catalog and a new plan open on the
+// user's country (time zone; Germany where the catalog has no fields), a field installs from the
+// server and a plan on it opens there; a plan whose basemap is neither a prepared field nor on the
+// device says so instead of showing an empty map. Offline after the first visit, Mahlwinkel still
+// installs (precached), other fields ask for the network.
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 let playwright;
@@ -23,7 +24,7 @@ const check = (name, ok, detail = '') => {
 };
 const settle = (ms = 800) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH' });
+const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Zurich' });
 const page = await context.newPage();
 page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
 page.on('console', (msg) => {
@@ -34,11 +35,12 @@ page.on('console', (msg) => {
 await page.goto(base);
 await page.getByTestId('area-catalog').waitFor();
 
-// The library: no Zürich anywhere, the catalog opens on Switzerland (browser region de-CH).
-check('no-zurich-in-library', !(await page.locator('.lib').getByText(/Zürich|Benglen/).count()));
+// The library: no Zürich and no Riedikon anywhere, the catalog opens on Switzerland (time zone).
+check('no-zurich-in-library', !(await page.locator('.lib').getByText(/Zürich|Benglen|Riedikon/).count()));
 const country = page.locator('.lib').getByTestId('area-country');
-check('catalog-opens-on-region', (await country.inputValue()) === 'CH', await country.inputValue());
-check('swiss-fields-listed', /Riedikon/.test(await page.getByTestId('area-catalog').textContent()));
+check('catalog-opens-on-home-country', (await country.inputValue()) === 'CH', await country.inputValue());
+check('swiss-field-listed', /Steinbruch Dielsdorf/.test(await page.getByTestId('area-catalog').textContent()));
+check('empty-library-suggests-home-field', await page.locator('.lib__empty').getByRole('button', { name: 'Steinbruch Dielsdorf' }).isVisible());
 const countries = await country.locator('option').count();
 check('several-countries', countries >= 10, String(countries));
 check('nothing-installed-yet', await page.getByText('Noch kein Gebiet offline gespeichert.').isVisible());
@@ -53,9 +55,11 @@ check('baerenkopf-installed', installed);
 check('catalog-marks-installed', /Auf dem Gerät/.test(await row.textContent()));
 await page.screenshot({ path: `${out}/fields-library.png` });
 
-// New plan on a field in another country: the list follows the chosen country.
+// New plan: opens on the home country's field; on a field in another country, the list follows the chosen country.
 await page.getByTestId('new-plan').click();
 const dialog = page.locator('.dialog');
+check('new-plan-opens-on-home-country', (await dialog.getByTestId('area-country').inputValue()) === 'CH');
+check('new-plan-starts-on-home-field', (await dialog.getByRole('radio', { name: /Steinbruch Dielsdorf/ }).getAttribute('aria-checked')) === 'true');
 await dialog.getByTestId('area-country').selectOption('AT');
 const firstAt = dialog.getByTestId('new-plan-areas').getByRole('radio').first();
 check('country-switch-selects-a-visible-field', (await firstAt.getAttribute('aria-checked')) === 'true');
@@ -110,20 +114,20 @@ check('maps-panel-names-missing-area', (await select.count()) === 1 && (await se
 check('maps-panel-groups-by-country', (await select.locator('optgroup').count()) >= 10, String(await select.locator('optgroup').count()));
 await page.screenshot({ path: `${out}/fields-missing.png` });
 
-// Phone: the catalog in the library.
-const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'de-DE' });
+// Phone, Swiss German, in New York: no fields in the user's country, so the catalog opens on Germany.
+const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'de-CH', timezoneId: 'America/New_York' });
 const small = await phone.newPage();
 small.on('pageerror', (error) => errors.push(`phone: ${error.message}`));
 await small.goto(base);
 await small.getByTestId('area-catalog').scrollIntoViewIfNeeded();
-check('phone-opens-on-germany', (await small.getByTestId('area-country').inputValue()) === 'DE');
+check('phone-abroad-opens-on-germany', (await small.getByTestId('area-country').inputValue()) === 'DE');
 const link = small.getByTestId('area-catalog').getByRole('link').first();
 const linkBox = await link.boundingBox();
 check('website-link-tappable', Boolean(linkBox) && linkBox.width >= 48 && linkBox.height >= 48 && (await link.isVisible()), JSON.stringify(linkBox));
 await small.screenshot({ path: `${out}/fields-phone.png` });
 
 // Offline after the first visit: Mahlwinkel comes from the precache, other fields need the network.
-const offline = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', serviceWorkers: 'allow' });
+const offline = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin', serviceWorkers: 'allow' });
 const away = await offline.newPage();
 away.on('pageerror', (error) => errors.push(`offline: ${error.message}`));
 await away.goto(base);
@@ -132,7 +136,7 @@ await away.reload();
 await away.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 30000 });
 await offline.setOffline(true);
 await away.getByTestId('area-catalog').waitFor();
-await away.getByTestId('area-catalog').locator('.area-row').filter({ hasText: 'Riedikon' }).getByTestId('area-install').click();
+await away.getByTestId('area-catalog').locator('.area-row').filter({ hasText: 'Blackfield' }).getByTestId('area-install').click();
 const refused = await away.getByText('Für den Download ist eine Internetverbindung nötig.').waitFor({ timeout: 15000 }).then(() => true, () => false);
 check('offline-field-needs-network', refused);
 await away.getByTestId('new-plan').click();

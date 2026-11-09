@@ -25,7 +25,7 @@ const check = (name, ok) => {
     }
 };
 
-const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
+const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
 const page = await context.newPage();
 page.on('pageerror', (error) => errors.push(error.message));
 page.on('console', (msg) => msg.type() === 'error' && errors.push(msg.text()));

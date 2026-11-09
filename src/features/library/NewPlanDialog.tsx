@@ -5,8 +5,9 @@ import { useT, formatBytes } from '../../i18n';
 import { Button, Dialog, Field, ICON } from '../../ui/components';
 import { useDialogs } from '../../core/store/dialogs';
 import { bundledArea, ensureArea, isBundled, listAreas, areaCenter } from '../../core/areas/store';
-import { defaultCountry } from '../../core/areas/catalog';
+import { defaultCountry, startField, START_FIELD } from '../../core/areas/catalog';
 import { CountrySelect, useCountries } from '../areas/AreaCatalog';
+import { usePrefs } from '../../core/store/prefs';
 import type { AreaMeta } from '../../core/areas/types';
 import { createProject } from '../../core/model/factory';
 import { createAndOpen } from '../../core/store/route';
@@ -21,11 +22,13 @@ export function NewPlanDialog() {
     const show = useDialogs((state) => state.show);
     const nameId = useId();
     const [name, setName] = useState('');
-    const [areaId, setAreaId] = useState<string>('mahlwinkel');
+    const locale = usePrefs((state) => state.locale);
+    // The user's country and its start field (Mahlwinkel in Germany, elsewhere the first by name).
+    const [country, setCountry] = useState(() => defaultCountry());
+    const [areaId, setAreaId] = useState<string>(() => startField(country, locale)?.id ?? START_FIELD);
     const [template, setTemplate] = useState<string>('');
     const [installed, setInstalled] = useState<AreaMeta[] | null>(null);
     const countries = useCountries();
-    const [country, setCountry] = useState(() => defaultCountry('mahlwinkel'));
     const [busy, setBusy] = useState<number | null>(null);
     const creating = useRef(false);
 
@@ -55,10 +58,11 @@ export function NewPlanDialog() {
     }, [open, payload]);
 
     useEffect(() => {
-        // A remembered own area removed since: back to Mahlwinkel instead of an unseen, missing choice.
+        // A remembered own area removed since: back to the start field instead of an unseen, missing choice.
         if (open && installed && areaId !== '__none' && !isBundled(areaId) && !installed.some((area) => area.id === areaId)) {
-            chooseArea('mahlwinkel');
-            setCountry(defaultCountry('mahlwinkel'));
+            const home = defaultCountry();
+            chooseArea(startField(home, locale)?.id ?? START_FIELD);
+            setCountry(home);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, installed, areaId]);

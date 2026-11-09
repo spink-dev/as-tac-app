@@ -12,7 +12,7 @@ const base = process.env.BASE_URL ?? 'http://localhost:4000';
 const browser = await playwright.chromium.launch();
 const errors = [];
 async function run(name, viewport, appearance) {
-    const context = await browser.newContext({ viewport, deviceScaleFactor: 1, hasTouch: viewport.width < 800, isMobile: viewport.width < 800 });
+    const context = await browser.newContext({ viewport, deviceScaleFactor: 1, hasTouch: viewport.width < 800, isMobile: viewport.width < 800, timezoneId: 'Europe/Berlin' });
     await context.addInitScript((mode) => localStorage.setItem('as-tac.appearance', mode), appearance);
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));
