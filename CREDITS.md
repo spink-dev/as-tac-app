@@ -23,6 +23,8 @@ Sobald OSM-Daten enthalten sind: auf der Karte **© OpenStreetMap contributors**
 
 Bei Aufnahme der Karten-/PWA-Abhängigkeiten ihre tatsächlichen Lizenzhinweise erfassen. Schriften, Icons, Bilder und exportierte Daten separat inventarisieren. Dieses Dokument behauptet keine allgemeine Veröffentlichungslizenz für as-tac.
 
+> Die Abschnitte AST-001 bis AST-012 und «Kartenarbeitsplatz» dokumentieren as-tac 0.x (Astro) und bleiben als Herkunftsnachweis stehen. Was für AS-TAC 1.0 gilt (Vite statt Astro, mitgelieferte Noto-Sans-Glyphen statt Systemschrift), steht im Abschnitt «AS-TAC 1.0» unten.
+
 ## AST-001 — implementierter Stand
 
 - `scripts/fetch-map.mjs`: eigene Implementierung; Overpass-JSON wird mit osmtogeojson nach WGS84-GeoJSON konvertiert, einschliesslich Multipolygon-Innenringen. Keine FieldMaps-/TacMap-Codekopie.
@@ -30,7 +32,7 @@ Bei Aufnahme der Karten-/PWA-Abhängigkeiten ihre tatsächlichen Lizenzhinweise 
 - Die beiden frischen OSM-Auszüge liegen unter `public/maps/`. Zugehörige JSON-Manifeste nennen Quelle, Datenzeit, SHA-256 und Bytezahl. OSM-Daten bleiben ODbL 1.0; lokale Lizenz unter `public/licenses/ODbL-1.0.txt`.
 - React (MIT), MapLibre GL JS (BSD-3-Clause), Astro (MIT), Astro React (MIT) und osmtogeojson (MIT): Hinweise unter `public/licenses/dependencies.txt`. MapLibre enthält zusätzliche Fremdcodehinweise in seinem Lizenztext.
 - App-Icon, einfache Gebietssymbole und Kartenstil sind eigene Arbeit. Labels nutzen die installierte Systemschrift. Keine heruntergeladenen Fonts, Sprites, fremden Logos oder Kartenbilder.
-- `CREDITS.md` wird beim Produktionsbuild nach `/licenses/CREDITS.md` kopiert und ebenfalls offline gespeichert.
+- `CREDITS.md` wird beim Produktionsbuild nach `/licenses/CREDITS.md` kopiert und ebenfalls offline gespeichert. (Seit 1.0 über das Vite-Plugin `shipCredits` in `vite.config.ts`; Schriftlizenz in `public/licenses/OFL-1.1.txt`.)
 
 ## AST-004
 
@@ -51,10 +53,10 @@ Eigene Client-Synchronisierung, Konfliktoberfläche und PostgreSQL-Briefing-Leas
 
 ## Kartenarbeitsplatz / Mahlwinkel-Eventvorlagen
 
-- Übernommene Daten: FieldMaps `2998bb6d7413a3e036412fa37443e8eead1238f3`, `src/points-of-interest.ts` und `src/scenarios/{mission24,dark-emergency,operation-tschernobyl,light-sim,airsoft-days,lost-airfield}.ts` → `src/data/mahlwinkel-fieldmaps.json`. Konverter: `scripts/import-fieldmaps.mjs`; AS-TAC-Projekte: `src/features/catalog/catalog.ts`.
+- Übernommene Daten: FieldMaps `2998bb6d7413a3e036412fa37443e8eead1238f3`, `src/points-of-interest.ts` und `src/scenarios/{mission24,dark-emergency,operation-tschernobyl,light-sim,airsoft-days,lost-airfield}.ts` → `src/data/mahlwinkel-fieldmaps.json`. Konverter: `scripts/import-fieldmaps.mjs`; AS-TAC-Projekte (ab 1.0): `src/core/templates/mahlwinkel.ts`.
 - Gemeinsame physische Punkte, eventspezifische Namen, Spielfeldgrenzen, Zonen, Hauptquartiere und Grenzlinien übernommen. Keine Logos, Bildkarten, Termine, CSS-Themes oder Vermarktungstexte. Koordinaten beim Projektaufbau von `[lat, lon]` nach `[lon, lat]` umgeordnet. Stabile Quell-IDs erhalten; frische Projekt-/Element-/Ebenen-IDs je Kopie.
 - Quellenhinweis des Originals: Dark Emergency nutzt die gedruckte Karte DE-39517-2026-1; Windturbinen-Kontrollpunkte schlossen dort mit 3,0 m RMS. Handgezeichnete Spiel- und Sicherheitszonengrenzen sind nur auf einige zehn Meter genau. Diese Genauigkeit wurde in AS-TAC nicht unabhängig verifiziert. Andere Eventdaten ebenfalls als Referenzstand, nicht als aktuelle offizielle Einteilung verstehen.
-- Schraffuren/Biohazard-Symbole werden als transparente Flächen mit Originalbezeichnung vereinfacht. Eine „Zivile Zone“ wird nicht als „Safe Zone“ umgedeutet. Verbindlich bleibt die Einweisung des Veranstalters.
+- Ab 1.0: Safe Zones schraffiert, «verstrahlt» (Biohazard) als schraffierte Gefahrenzone, Sperrgebiet kreuzschraffiert, jeweils mit 18 % Füllung und Originalbezeichnung. Eine „Zivile Zone“ wird nicht als „Safe Zone“ umgedeutet. Verbindlich bleibt die Einweisung des Veranstalters.
 
 ### Mahlwinkel audit and Dark Emergency correction (AS-TAC r2)
 
@@ -68,4 +70,30 @@ records an AS-TAC manual retrace of the retained organiser reference image
 revises all five safe-area contours and the event perimeter. Image/logos are not
 bundled. The measured 4.41 m control residual is not boundary accuracy; contours
 are approximate, sometimes obscured by symbols, and require on-site verification.
-See `docs/reviews/2026-10-01-fieldmaps.md` for coverage and unresolved HQ boundaries.
+See `docs/reviews/2026-10-01-fieldmaps.md` on `main` (as-tac 0.6; not carried into 1.0) for coverage and unresolved HQ boundaries.
+
+## AS-TAC 1.0 (2026-11)
+
+Neuentwicklung; Code eigens geschrieben. Übernommen bzw. neu verwendet:
+
+| Quelle | Verwendung | Lizenz |
+| --- | --- | --- |
+| FieldMaps `2998bb6d7413a3e036412fa37443e8eead1238f3` (Daten aus 0.6, `src/data/mahlwinkel-fieldmaps.json`) | Eventvorlagen `src/core/templates/mahlwinkel.ts`; POIs, Spielfelder, Zonen, HQs, Linien. `[lat,lng]` → `[lng,lat]` | Erlaubnis des Autors (siehe oben) |
+| as-tac r2 Dark-Emergency-Korrektur (`src/data/dark-emergency-correction.json`) | Vorlage «Dark Emergency»; Safe-Zone-Ecken als Passpunkte | eigenes Projekt |
+| TacMap 0.12 (`spink-dev/tacmap`, `77474d8`) | Funktionsumfang, Tastenkürzel-Hierarchie, `.tacmap`-Format für den Import. Kein Code kopiert. | eigenes Projekt |
+| Noto Sans (GoNotoKurrent) Glyphen aus `smp-noto-glyphs` 2.0.0 → `public/glyphs/Noto Sans Regular/` | Offline-Kartenbeschriftung | SIL OFL 1.1 (Schrift, Text in `public/licenses/OFL-1.1.txt`), MIT (Paket) |
+| MapLibre GL JS 6 | Kartendarstellung | BSD-3-Clause |
+| React, Zustand, Immer, Dexie, Zod, fflate, osmtogeojson, lucide-react, uqr | App-Grundlage | MIT / Apache-2.0 / ISC |
+| GSAP 3.15 | Sheet- und Zustandsanimationen | GreenSock Standard «no charge» Lizenz |
+| Lenis 1.3 | Sanftes Scrollen (nur Rad/Trackpad) | MIT |
+| Supabase JS | optionale Live-Zusammenarbeit | MIT |
+
+### Bekannte Eventkarten (nicht ausgeliefert)
+
+`src/core/templates/knownImages.ts` enthält nur SHA-256, Bildgrösse und Passpunkte der Bildkarten «Mahlwinkel – Dark Emergency 2026» (Airsoft Helden) und «Mahlwinkel – Mission 24H 2026». Die Bilder selbst sind **nicht** im Repository. Importiert ein Nutzer seine eigene Kopie (z. B. aus einem TacMap-Projekt), wird sie automatisch georeferenziert. Passpunkte: Ecken der r2-Safe-Zonen (DE) bzw. Windturbinenfundamente und HQ-Positionen (M24H), affin ausgeglichen; RMS 2,6 m bzw. 4,8 m. Keine Vermessungszusage.
+
+### Online-Dienste (nur auf ausdrücklichen Nutzerwunsch)
+
+- Overpass API (`overpass-api.de`, Ausweich: `overpass.private.coffee`) für Gebietsdownloads; OSM-Daten ODbL 1.0, Attribution in Karte und Paket.
+- Nominatim (`nominatim.openstreetmap.org`) für die Ortssuche, gemäss Nutzungsrichtlinie nur auf Absenden, ≤ 1 Anfrage/s.
+- OSM-Standardkacheln (`tile.openstreetmap.org`) ausschliesslich als Orientierungshintergrund im Download-Dialog, ohne Vorabladen oder Offline-Speicherung.

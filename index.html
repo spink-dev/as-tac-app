@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de-CH">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+        <meta name="theme-color" content="#171a1e" />
+        <meta name="description" content="AS-TAC: Offline-Karten, Planung, Feldnavigation und Live-Briefing für Airsoft." />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <title>AS-TAC</title>
+        <script>
+            // Apply the stored appearance before first paint so a night start never flashes white.
+            (function () {
+                var mode = null;
+                try {
+                    mode = localStorage.getItem('as-tac.appearance');
+                } catch (error) {
+                    mode = null;
+                }
+                if (mode !== 'day' && mode !== 'dark' && mode !== 'red') {
+                    mode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'day';
+                }
+                document.documentElement.dataset.appearance = mode;
+            })();
+        </script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+            <filter id="red-light" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="0.42 0.80 0.16 0 0  0.05 0.10 0.02 0 0  0.02 0.04 0.01 0 0  0 0 0 1 0" />
+            </filter>
+        </svg>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>

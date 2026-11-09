@@ -1,57 +1,38 @@
-# AS-TAC Online-Grundlage
+# AS-TAC Live (Supabase)
 
-AST-009–012: Auth, gemeinsamer Editor, Konflikte und Briefing. Alle Migrationen in Reihenfolge anwenden: `migrations/202610010001_online.sql`, danach `migrations/202610010002_briefing.sql` und `migrations/202610010003_workspace.sql`. Sie setzt Supabase Auth mit `auth.users`, `auth.uid()` und Rollen `anon`/`authenticated` voraus.
+Optionaler Server für die Live-Zusammenarbeit. Ohne ihn funktioniert AS-TAC vollständig lokal; der lokale Testmodus zeigt dasselbe Verhalten zwischen Browser-Tabs.
 
-## Einrichtung eines separaten Testing-Projekts
+## Sicherheitsmodell
 
-1. Supabase-Projekt festlegen. Die Migrationen zuerst gegen ein leeres Testing-Projekt über den SQL-Editor oder Supabase-Migrationsworkflow anwenden. Nicht ungeprüft gegen eine bestehende Kundendatenbank ausführen.
-2. Testkonten für Eigentümer, Admin und Mitglied über Supabase Auth einrichten. E-Mail/Passwort-Login aktivieren; echte Auth-/Passwortrichtlinien dort konfigurieren.
-3. `.env.example` nach `.env` kopieren und öffentliche Projekt-URL sowie Publishable-Key setzen. Niemals `service_role`/`sb_secret` als PUBLIC-Konfiguration verwenden.
-4. App neu bauen und auf Testing deployen. Unter „Online-Projekte & Mitglieder“ anmelden, ein leeres Online-Projekt erstellen und über die angezeigte Konto-ID weitere Konten hinzufügen.
-5. Mit zweitem Browser Konto-/Rollenwechsel und direkten abgewiesenen REST/RPC-Schreibversuch prüfen. UI-Ausblendung allein ist kein Rollenbeweis. Snapshot/Operationsabruf nach Mitgliedschaftsentzug muss scheitern bzw. keine Daten liefern.
+- Clients schreiben **nie** direkt in Tabellen. Jede Änderung ist eine `security definer`-Funktion mit festem `search_path`, die zuerst die Rolle prüft (`live_require`).
+- Lesen über RLS: nur Mitglieder eines Plans sehen Plan, Mitglieder und Objekte. Der Admin-Chat ist für Zuschauer unsichtbar. Einladungen sind ohne Funktion gar nicht lesbar.
+- Rollen: `owner` (genau einer, nicht entfernbar), `admin` (planen, Zuschauer einladen, chatten), `viewer` (nur lesen). Admin-Einladungen erstellt nur der Besitzer. Ein Code nimmt nur neue Mitglieder auf und ändert nie die Rolle eines bestehenden Mitglieds (auch nicht nach oben) und vergibt nie `owner`; er gilt nur, solange seine Erstellerin die Rolle dafür noch hat. Rollen ändert allein der Besitzer (`live_set_role`); wer zum Zuschauer wird, verliert seine offenen Einladungen. Entfernte Mitglieder werden gesperrt und kommen mit keinem Code zurück, bis der Besitzer die Sperre aufhebt (`live_unban`); einzelne Codes widerruft `live_revoke_invite`.
+- Gleichzeitigkeit: Jede Operation trägt die Version, auf der sie beruht (`base`). `live_push` wendet sie nur an, wenn diese Version noch aktuell ist, sonst kommt der aktuelle Serverwert als Konflikt zurück. Ein Objekt reist unter seiner eigenen ID (`data.id` = `entityId`, ausser `meta`/`order`). Löschungen bleiben als Grabstein (`data = null`) mit Sequenznummer sichtbar.
+- Client: Jede noch nicht bestätigte Änderung liegt pro Objekt in IndexedDB (`liveOutbox`) und übersteht Neuladen und Funklöcher. Ein Konflikt wird nur gemeldet, wenn beide Seiten wirklich Verschiedenes wollen; eine verlorene Bestätigung oder eine unveränderte Gegenseite wird still aufgelöst.
+- Schwaches Netz: Abgleich in Seiten (Grösse passt sich an, bis hinunter zu einem Objekt), jede Seite wird angewendet und gemerkt, bevor die nächste kommt. Anfragen werden abgebrochen, wenn 30 s lang nichts mehr ankommt (vor dem ersten Byte: 60 s plus Sendezeit, `stallFetch`) oder wenn sie insgesamt langsamer als etwa 0,5 KB/s für ihre geschätzte Grösse sind; dann folgen kleinere Seiten mit längerer Frist. Eigene Änderungen werden weder über Realtime zurückgeschickt noch erneut heruntergeladen. Koordinaten reisen mit 7 Nachkommastellen (≈ 1 cm).
+- Realtime-Filter: `postgres_changes` filtert auf `client_id=neq.<eigenes Gerät>` (nur ein Filter möglich), Zeilen anderer Pläne verwirft der Client. Nachteil: Realtime prüft damit jede Änderung der Tabelle gegen jeden Abonnenten (Last wächst mit allen Nutzenden, nicht pro Plan), und Änderungen in anderen eigenen Plänen gehen über die Leitung. Für einen Server mit vielen gleichzeitigen Plänen später auf Broadcast aus der Datenbank umstellen. Zeilen ohne `client_id` erreicht dieser Filter nicht (SQL-NULL); `live_push` speichert, was der Client schickt — die App schickt immer eine Geräte-ID —, und der Abgleich alle 60 s holt solche Zeilen sonst.
+- Formatversion: Objektdaten tragen das Planformat der schreibenden App im Feld `_fv` (fehlend = Format 1). Der Server speichert es unverändert mit; ältere Daten migriert der Empfänger, neuere wendet er nicht an und fordert zum Update auf (`src/core/live/format.ts`). Eine Server-Migration ist dafür nicht nötig; eine künftige Formatänderung braucht nur dann eine, wenn der Server selbst Felder der Objekte liest (heute nur `id` sowie `name`/`areaId` von `meta`).
+- Bilder: Hochladen im Hintergrund, eines nach dem anderen, ab 6 MB fortsetzbar über den TUS-Endpunkt `/storage/v1/upload/resumable`; Herunterladen in 512-KB-Stücken über eine signierte URL (abgelaufene URLs werden erneuert, empfangene Stücke behalten).
+- Grenzen: 500 Operationen pro Aufruf, 1 MB pro Objekt, 60 000 Objekte pro Plan (inkl. Grabsteine), IDs 1–80 Zeichen, 50 Pläne pro Konto, 20 offene Einladungen pro Plan, Codes 24 Stunden gültig, Chat 30 Nachrichten pro Minute und Person, die letzten 1000 pro Plan bleiben.
+- Realtime: private Kanäle `plan:<id>`. Mitglieder empfangen und senden Anwesenheit (Schlüssel = Konto-ID; die angezeigte Rolle kommt aus `live_members`, nicht aus der Anwesenheit); nur Admins dürfen Broadcasts senden. Wer eine Präsentation leitet, ergibt sich allein aus diesen Broadcasts (mit Herzschlag alle 5 s), nie aus der Anwesenheit, deren Inhalt Clients selbst bestimmen.
+- Einladungslinks tragen nur den Code und nur im Fragment (`…/#join=CODE`), er erreicht also keinen Server und wird nach dem Öffnen aus der Adresszeile entfernt. Der Browserverlauf kann den geöffneten Link trotzdem enthalten; Codes laufen nach 24 Stunden ab und lassen sich widerrufen.
+- Speicher: privater Bucket `live-assets`, Pfad `<plan-id>/<sha256>`, nur Bildtypen, 40 MB. Clients prüfen den SHA-256 jedes heruntergeladenen Bilds. Übertragen werden Bildkarten und Teamlogos; Dateianhänge an Objekten bleiben auf dem Gerät, auf dem sie angehängt wurden (Weitergabe per `.astac`).
+- Keine Spalte und keine Nachricht enthält GPS-Positionen oder eigene Pfade.
 
-Die aktuelle Migration erstellt weder Storage-Bucket noch Realtime-Publikation. Diese Zugriffswege sind kein Teil dieses Checkpoints. Kein Service-Key im Client, keine automatischen Uploads lokaler Pläne.
+## Einrichten
 
-## Prüfungen
+1. Neues Supabase-Projekt (nicht eine bestehende Datenbank) und Migration `migrations/20261108000001_live.sql` anwenden.
+2. Auth: «Anonymous sign-ins» aktivieren (Geräte-Anmeldung). Optional E-Mail mit Magic Link; als Redirect-URL die Adresse der App eintragen. Captcha-Schutz und Auth-Ratenlimits einschalten: anonyme Konten entstehen beliebig neu, die Grenzen pro Konto (z. B. 50 Pläne) liessen sich sonst vervielfachen.
+3. Realtime: in den Realtime-Einstellungen nur private Kanäle zulassen.
+4. Im App-Ordner `.env` anlegen:
+   ```
+   VITE_SUPABASE_URL=https://<projekt>.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   ```
+   Nur den Publishable Key verwenden, nie `service_role`/`sb_secret`. Die Werte werden beim Build eingebunden (`npm run build`, Docker: `--build-arg`).
 
-`npm run check`, `npm run build`, `npm test`. `tests/online-database.spec.ts` führt die echte Migration unter PGlite/PostgreSQL aus. Nur Auth-Identität/Rollen werden für den Test vorbereitet. Rollen, CAS, Idempotenz, Rollback und Referenzen werden nicht gemockt. PGlite besitzt eine einzelne Verbindung: echte konkurrierende Sessions und Supabase HTTP-/JWT-/Realtime-Integration bleiben separate Gates.
+## Prüfen
 
-Konfigurierte Oberfläche mit kontrollierten HTTP-Antworten prüfen:
+`tests/unit/live-db.test.ts` führt die echte Migration unter PGlite aus (mit nachgebildetem `auth.uid()`): Lesen nur für Mitglieder, keine Schreibrechte für Zuschauer und Fremde, Konflikt statt Überschreiben, Grabsteine, Chat nur für Admins, Rollenregeln, Einladungen und Sperren, ungültige Eingaben (falsche oder zu lange IDs). `tests/unit/loopback.test.ts` prüft, dass der lokale Testmodus dieselben Regeln durchsetzt.
 
-```sh
-PUBLIC_SUPABASE_URL=https://as-tac-test.invalid PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_test_only npm run build
-AST_ONLINE_UI_TEST=1 npx playwright test tests/online-database.spec.ts tests/online-ui.spec.ts
-npm run build
-```
-
-Der abschliessende normale Build entfernt die Testkonfiguration. Diese Fake-Konfiguration niemals deployen. Ohne Konfiguration entstehen keine Auth-/Online-Anfragen.
-
-## Betrieb dieses Checkpoints
-
-Gemeinsamen Editor über „Gemeinsam auf der Karte öffnen“ starten. Transport ist berechtigungsgeprüftes Snapshot-Polling, keine Realtime-Publikation. Reconnect publiziert Entwürfe ausschliesslich bewusst. Briefing-Leases laufen nach 20 Sekunden ohne Erneuerung aus; der Client aktualisiert etwa alle 1,5 Sekunden.
-
-Astro bindet die beiden öffentlichen Variablen **beim Build** ein. Bei Docker die gleichnamigen `--build-arg PUBLIC_SUPABASE_URL=…` und `--build-arg PUBLIC_SUPABASE_PUBLISHABLE_KEY=…` setzen; reine Container-Laufzeitvariablen ändern die bereits gebaute App nicht. Nur öffentliche Schlüssel verwenden. Der Docker-Daemon war lokal nicht verfügbar; Containerbuild nicht nachgewiesen.
-
-Konkrete Prüfgrenzen und Nutzerabläufe: `specs/001-foundation/evidence/ast-010-012-collaboration.md`. Vor produktiver Freigabe A03–A06/A08 mit echtem Supabase Auth, getrennten Datenbankverbindungen und Geräten durchführen. Hier wurden weder ein Cloud-Projekt angelegt noch Migrationen auf einen externen Server angewendet.
-
-
-## Root-Kartenstudio / Katalog (0.5.0-alpha.1)
-
-Die dritte Migration erweitert das validierte Projektschema um Ebenen und Event-Metadaten und ergänzt einen öffentlich lesbaren Katalog. Pakete liegen unveränderlich in `ast_private.catalog`, ohne direkte Client-Tabellenrechte. `ast_publish` prüft die aktuelle Root-Zuordnung separat von Projektmitgliedschaften. Owner/Admin sind dadurch **nicht** Root. Root darf vorbereitete, für öffentliche Verteilung bestimmte Kartendaten veröffentlichen; die Quellenverantwortung bleibt beim Herausgeber. Kartenpakete werden vor Upload und bei Installation vom Client vollständig auf Geometrie, Grenzen, Grösse und SHA-256 geprüft. Der Server begrenzt zusätzlich Dokument, Identität, Lizenz und Paketgrösse; er bestätigt keine fachliche Kartenqualität.
-
-Root-Zuordnung ausschliesslich mit administrativem Datenbankzugriff nach Festlegen des Kontos, z. B. im Supabase-SQL-Editor:
-
-```sql
--- Die tatsächlich vorgesehene Auth-Konto-ID einsetzen, keine E-Mail oder Projekt-ID.
-insert into ast_private.roots(user_id) values ('ROOT-AUTH-USER-UUID');
--- Entzug:
--- delete from ast_private.roots where user_id = 'ROOT-AUTH-USER-UUID';
-```
-
-Kein Client-RPC zum Ernennen weiterer Roots. Keine Root-Konten automatisch angelegt. `ast_catalog` / `ast_catalog_package` liefern ausschliesslich bereits veröffentlichte Daten. Gleiche Gelände-/Event-/Ausgabe-Kombinationen lassen sich auch durch Root nicht überschreiben. Der aktuelle Client erfasst Metadaten und editiert Geometrie lokal; Publikation geschieht ausdrücklich über „Diese Ausgabe veröffentlichen“. Backend, Auth-Konto, Migrationen und Hosting sind in dieser Arbeitsumgebung nicht bereitgestellt worden.
-
-## Darstellungsoptionen (0.6.0)
-
-Vor neuen Online-Clients zusätzlich `202610010004_symbols.sql` anwenden. Die Migration erweitert nur das validierte Styleschema; Rollen/RLS bleiben unverändert. Alte Dokumente sind weiterhin gültig, ältere App-Versionen können Dokumente mit neuen Stilfeldern jedoch nicht lesen. Client-Versionen gemeinsam aktualisieren. GPS-Aufnahme und Abgleich erzeugen keine neuen Backend-Endpunkte.
-
-Für Zürich als Online-Karte und Studio-Paket zusätzlich `202610010005_zurich.sql` anwenden. Rollen und Schreibrechte bleiben unverändert.
+Nicht geprüft wurde ein echtes Supabase-Projekt: Realtime (`postgres_changes`, private Kanäle, Anwesenheit), Storage-Richtlinien und Auth laufen hier nur gegen die Supabase-Clientbibliothek, nicht gegen einen Server. Vor dem Einsatz mit zwei Geräten prüfen: Beitritt per Code, Zuschauer kann nichts ändern (auch nicht per direktem REST/RPC-Aufruf), gleichzeitige Änderung zeigt den Konflikt, Bildkarte erscheint beim Partner.

@@ -1,6 +1,9 @@
 node_modules
 dist
+dev-dist
 .git
-.astro
+.env*
+!.env.example
 test-results
 playwright-report
+tests/e2e/screenshots

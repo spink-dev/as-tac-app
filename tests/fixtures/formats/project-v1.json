@@ -1,0 +1,1071 @@
+{
+ "id": "prj_fixture_v1",
+ "formatVersion": 1,
+ "name": "Formatprobe 1.0.0-alpha.2",
+ "createdAt": "2026-11-08T10:00:00.000Z",
+ "updatedAt": "2026-11-08T12:00:00.000Z",
+ "areaId": "probe-area",
+ "view": {
+  "center": [
+   11.823,
+   52.381
+  ],
+  "zoom": 15.5,
+  "bearing": 12
+ },
+ "layers": [
+  {
+   "id": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "name": "Gelände",
+   "visible": true,
+   "opacity": 1,
+   "locked": true
+  },
+  {
+   "id": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "name": "Event",
+   "visible": true,
+   "opacity": 1,
+   "locked": true
+  },
+  {
+   "id": "lay_plan",
+   "name": "Plan",
+   "visible": true,
+   "opacity": 1,
+   "locked": false
+  }
+ ],
+ "elements": [
+  {
+   "kind": "zone",
+   "id": "el_b217e605-d8eb-4b42-9463-51ee90542c20",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "label": "Spielfeld",
+   "category": "ao",
+   "pattern": "none",
+   "fillOpacity": 0,
+   "color": "#c8393f",
+   "locked": true,
+   "sourceId": "fieldmaps:m24:playArea",
+   "shape": {
+    "type": "polygon",
+    "points": [
+     [
+      11.822596,
+      52.385128
+     ],
+     [
+      11.823443,
+      52.385006
+     ],
+     [
+      11.832453,
+      52.385007
+     ],
+     [
+      11.83456,
+      52.384367
+     ],
+     [
+      11.834875,
+      52.384367
+     ],
+     [
+      11.835093,
+      52.384631
+     ],
+     [
+      11.835823,
+      52.384618
+     ],
+     [
+      11.835978,
+      52.384028
+     ],
+     [
+      11.835623,
+      52.383776
+     ],
+     [
+      11.83473,
+      52.381948
+     ],
+     [
+      11.835736,
+      52.382163
+     ],
+     [
+      11.836997,
+      52.38209
+     ],
+     [
+      11.837366,
+      52.380416
+     ],
+     [
+      11.837938,
+      52.380331
+     ],
+     [
+      11.838055,
+      52.379982
+     ],
+     [
+      11.838015,
+      52.379718
+     ],
+     [
+      11.837502,
+      52.379634
+     ],
+     [
+      11.837282,
+      52.37872
+     ],
+     [
+      11.836434,
+      52.378685
+     ],
+     [
+      11.836258,
+      52.378998
+     ],
+     [
+      11.831723,
+      52.378907
+     ],
+     [
+      11.828569,
+      52.379031
+     ],
+     [
+      11.827802,
+      52.379574
+     ],
+     [
+      11.827348,
+      52.379574
+     ],
+     [
+      11.82731,
+      52.379803
+     ],
+     [
+      11.827014,
+      52.379815
+     ],
+     [
+      11.825652,
+      52.379348
+     ],
+     [
+      11.825985,
+      52.378842
+     ],
+     [
+      11.825649,
+      52.378409
+     ],
+     [
+      11.824841,
+      52.378446
+     ],
+     [
+      11.824567,
+      52.379012
+     ],
+     [
+      11.824271,
+      52.379025
+     ],
+     [
+      11.822436,
+      52.378558
+     ],
+     [
+      11.821331,
+      52.378463
+     ],
+     [
+      11.821074,
+      52.378174
+     ],
+     [
+      11.820927,
+      52.381375
+     ],
+     [
+      11.815131,
+      52.381418
+     ],
+     [
+      11.814975,
+      52.381912
+     ],
+     [
+      11.812828,
+      52.382577
+     ],
+     [
+      11.81279,
+      52.382853
+     ],
+     [
+      11.812119,
+      52.38289
+     ],
+     [
+      11.8121,
+      52.383083
+     ],
+     [
+      11.812791,
+      52.383178
+     ],
+     [
+      11.812856,
+      52.385055
+     ],
+     [
+      11.821767,
+      52.385008
+     ]
+    ]
+   }
+  },
+  {
+   "kind": "zone",
+   "id": "el_c13c6596-6db0-43fb-b6c9-22f9902d54b1",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "label": "Zivile Zone",
+   "category": "civil",
+   "pattern": "solid",
+   "fillOpacity": 0.18,
+   "color": "#e8d5a8",
+   "locked": true,
+   "sourceId": "fieldmaps:m24:zone:zivile-zone",
+   "shape": {
+    "type": "polygon",
+    "points": [
+     [
+      11.823887,
+      52.38105
+     ],
+     [
+      11.826802,
+      52.3811
+     ],
+     [
+      11.826915,
+      52.380635
+     ],
+     [
+      11.826648,
+      52.380114
+     ],
+     [
+      11.826074,
+      52.37966
+     ],
+     [
+      11.82549,
+      52.379404
+     ],
+     [
+      11.824219,
+      52.3793
+     ],
+     [
+      11.823309,
+      52.379401
+     ],
+     [
+      11.822621,
+      52.379723
+     ],
+     [
+      11.822701,
+      52.380499
+     ],
+     [
+      11.823099,
+      52.380857
+     ]
+    ]
+   }
+  },
+  {
+   "kind": "route",
+   "id": "el_5b804838-a6d1-49d1-952e-965599f2b49d",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "label": "Task Force Grenze",
+   "style": "boundary",
+   "arrow": false,
+   "color": "#2f9fe0",
+   "locked": true,
+   "sourceId": "fieldmaps:m24:line:task-force-grenze",
+   "points": [
+    [
+     11.828677,
+     52.383488
+    ],
+    [
+     11.828681,
+     52.38232
+    ],
+    [
+     11.828768,
+     52.381414
+    ],
+    [
+     11.829409,
+     52.381285
+    ],
+    [
+     11.830154,
+     52.38077
+    ],
+    [
+     11.830314,
+     52.380119
+    ],
+    [
+     11.830418,
+     52.379535
+    ],
+    [
+     11.830902,
+     52.379151
+    ],
+    [
+     11.831961,
+     52.379084
+    ]
+   ]
+  },
+  {
+   "kind": "route",
+   "id": "el_7cf85ecc-2fa3-4c0a-84b2-05a479309f21",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "label": "Kartell kontrolliertes Gebiet",
+   "style": "boundary",
+   "arrow": false,
+   "color": "#d8433f",
+   "locked": true,
+   "sourceId": "fieldmaps:m24:line:kartell-gebiet",
+   "points": [
+    [
+     11.824523,
+     52.384921
+    ],
+    [
+     11.824354,
+     52.382983
+    ],
+    [
+     11.821273,
+     52.382769
+    ],
+    [
+     11.821074,
+     52.381409
+    ],
+    [
+     11.820941,
+     52.379528
+    ],
+    [
+     11.820806,
+     52.378587
+    ]
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_20b8b28b-796a-40e7-9db1-4802f7813d5c",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "type": "hq",
+   "label": "Honra Kartell",
+   "color": "#c8393f",
+   "locked": true,
+   "sourceId": "fieldmaps:m24:hq:kartell",
+   "pos": [
+    11.823325,
+    52.384138
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_08e1f26c-77bd-45dd-9bbf-6d5916154a96",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "type": "hq",
+   "label": "Task Force HQ",
+   "color": "#2f6fc4",
+   "locked": true,
+   "sourceId": "fieldmaps:m24:hq:taskforce",
+   "pos": [
+    11.834536,
+    52.383492
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_0a2161f2-a9cc-416e-88aa-a7f96f06f16c",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "type": "hq",
+   "label": "Rebellen HQ",
+   "color": "#2f9d5e",
+   "locked": true,
+   "sourceId": "fieldmaps:m24:hq:rebellen",
+   "pos": [
+    11.824478,
+    52.379629
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_dfd70013-3134-4898-b924-77bd7b316bdd",
+   "layerId": "layer_77317976-0f2c-4e88-ab4c-3544157a5724",
+   "type": "hq",
+   "label": "Esco Bar",
+   "color": "#e8862d",
+   "locked": true,
+   "sourceId": "fieldmaps:m24:hq:escobar",
+   "pos": [
+    11.8267,
+    52.380446
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_b856cfe2-ee0f-4077-baa8-93a91055b1fa",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "204 Vorratslager",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:204",
+   "pos": [
+    11.823623,
+    52.379127
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_c920a685-8609-4b80-b642-ed158b816430",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "217 Offiziersquartiere",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:217",
+   "pos": [
+    11.824319,
+    52.378079
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_4c7d29d7-d313-4c6f-b2c7-ab95afcd658f",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "502 Alter Bahnhof",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:502",
+   "pos": [
+    11.817742,
+    52.381657
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_f5cd6a96-f8dd-41a2-8d55-8dc58575348e",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "506 Rampe",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:506",
+   "pos": [
+    11.815984,
+    52.381947
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_25c371d8-d4c3-4b48-bda4-a68d6da2004b",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "600 Roter Platz",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:600",
+   "pos": [
+    11.822275,
+    52.380306
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_69a86c0e-a311-420f-b7cb-04cfec166521",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "601 Garnison Süd",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:601",
+   "pos": [
+    11.821979,
+    52.379104
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_f0b2f5dd-5376-4b07-bb6c-16fcdc6da31e",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "602 Garnison Nord",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:602",
+   "pos": [
+    11.822012,
+    52.379554
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_5a0c4787-5fa3-4314-9405-766cb222e499",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "606 Garage",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:606",
+   "pos": [
+    11.822381,
+    52.380646
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_06cf2c39-4cb8-4b51-a616-f4e653f68da2",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "607 Dorf",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:607",
+   "pos": [
+    11.824478,
+    52.379629
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_a8345278-e866-4d4f-b33b-ff1f5004a4ee",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "608 Funkstation",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:608",
+   "pos": [
+    11.825613,
+    52.379608
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_e42896f8-788b-49cb-8242-b3ca48b7d3af",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "610 Esco Bar",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:610",
+   "pos": [
+    11.8267,
+    52.380446
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_19970e14-d97b-414e-a933-3992b00c9946",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "611 Gefängnis",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:611",
+   "pos": [
+    11.825109,
+    52.380818
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_021fd1ef-7c95-4355-81a8-a446d9819bc2",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "613 Fahrzeughalle",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:613",
+   "pos": [
+    11.824952,
+    52.381097
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_8a4b9907-9511-47c1-bb6a-6b2ec5f18a9a",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "616 Forschungskeller",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:616",
+   "pos": [
+    11.824132,
+    52.381067
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_3000a03a-fe63-4f8e-83b0-205e1603f1af",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "617 Heizwerk",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:617",
+   "pos": [
+    11.822999,
+    52.381305
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_a668572e-f6c3-4f18-8dc9-6bccb4c845d0",
+   "layerId": "layer_8c003422-1ce7-4c76-9bd0-f68a74fb86a8",
+   "type": "poi",
+   "label": "620 MP Station",
+   "locked": true,
+   "sourceId": "fieldmaps:poi:620",
+   "pos": [
+    11.82322,
+    52.381803
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_m1",
+   "layerId": "lay_plan",
+   "teamId": "tm_alpha",
+   "pos": [
+    11.8235,
+    52.3812
+   ],
+   "type": "unit",
+   "label": "Alpha",
+   "phaseIds": [
+    "ph_1"
+   ],
+   "rotation": 45,
+   "symbol": "recon",
+   "color": "#2f6fc4",
+   "locked": true,
+   "sourceId": "fm-poi-12",
+   "attachments": [
+    {
+     "id": "att_1",
+     "asset": "a4e35ca4ad8561560ce1805145497256cf113c3494367e67bba31e124b7481e7",
+     "name": "auftrag.pdf",
+     "mime": "application/pdf",
+     "addedAt": "2026-11-08T09:00:00.000Z"
+    }
+   ]
+  },
+  {
+   "kind": "marker",
+   "id": "el_m2",
+   "layerId": "lay_plan",
+   "pos": [
+    11.824,
+    52.3815
+   ],
+   "type": "objective",
+   "label": "Ziel",
+   "objectiveStatus": "contested",
+   "anchorImageId": "img_scan",
+   "notes": "Fahne"
+  },
+  {
+   "kind": "route",
+   "id": "el_r1",
+   "layerId": "lay_plan",
+   "teamId": "tm_alpha",
+   "points": [
+    [
+     11.8235,
+     52.3812
+    ],
+    [
+     11.8238,
+     52.3814
+    ],
+    [
+     11.824,
+     52.3815
+    ]
+   ],
+   "style": "planned",
+   "arrow": true,
+   "width": 4
+  },
+  {
+   "kind": "zone",
+   "id": "el_z1",
+   "layerId": "lay_plan",
+   "shape": {
+    "type": "circle",
+    "center": [
+     11.822,
+     52.38
+    ],
+    "radiusM": 40
+   },
+   "category": "danger",
+   "fillOpacity": 0.18,
+   "pattern": "hatch",
+   "label": "Minen"
+  },
+  {
+   "kind": "zone",
+   "id": "el_z2",
+   "layerId": "lay_plan",
+   "shape": {
+    "type": "polygon",
+    "points": [
+     [
+      11.821,
+      52.379
+     ],
+     [
+      11.822,
+      52.379
+     ],
+     [
+      11.822,
+      52.3795
+     ]
+    ]
+   },
+   "category": "objective",
+   "fillOpacity": 0.18,
+   "pattern": "cross",
+   "labelPos": [
+    11.8215,
+    52.3792
+   ],
+   "objectiveStatus": "secured",
+   "label": "Ziel B"
+  },
+  {
+   "kind": "text",
+   "id": "el_t1",
+   "layerId": "lay_plan",
+   "pos": [
+    11.825,
+    52.382
+   ],
+   "text": "Sammelpunkt",
+   "size": 16,
+   "color": "#14181b",
+   "label": "SP",
+   "notes": "Nach Abschnitt 2"
+  },
+  {
+   "kind": "route",
+   "id": "el_r2",
+   "layerId": "lay_plan",
+   "points": [
+    [
+     11.821,
+     52.38
+    ],
+    [
+     11.822,
+     52.381
+    ]
+   ],
+   "style": "alternative",
+   "arrow": false,
+   "phaseIds": [
+    "ph_2"
+   ]
+  },
+  {
+   "kind": "bearing",
+   "id": "el_b1",
+   "layerId": "lay_plan",
+   "start": [
+    11.8235,
+    52.3812
+   ],
+   "end": [
+    11.826,
+    52.383
+   ],
+   "label": "Peilung"
+  }
+ ],
+ "drawings": [
+  {
+   "id": "dr_1",
+   "points": [
+    [
+     11.82,
+     52.38
+    ],
+    [
+     11.821,
+     52.3805
+    ],
+    [
+     11.822,
+     52.381
+    ]
+   ],
+   "color": "#c8393f",
+   "width": 4,
+   "opacity": 0.9,
+   "layerId": "lay_plan",
+   "createdAt": "2026-11-08T11:00:00.000Z"
+  },
+  {
+   "id": "dr_2",
+   "points": [
+    [
+     11.82,
+     52.381
+    ],
+    [
+     11.823,
+     52.382
+    ]
+   ],
+   "color": "#2f6fc4",
+   "width": 3,
+   "opacity": 1,
+   "briefingOnly": true,
+   "phaseIds": [
+    "ph_2"
+   ],
+   "anchorImageId": "img_scan"
+  }
+ ],
+ "images": [
+  {
+   "id": "img_scan",
+   "name": "Lageplan",
+   "asset": "5dc4dc71556d629c0e96da18cbf92fa055bc60a44f568e68e9328a9ca23dbbe7",
+   "mime": "image/png",
+   "width": 1200,
+   "height": 900,
+   "corners": [
+    [
+     11.817696081910524,
+     52.38342816498206
+    ],
+    [
+     11.828303918089476,
+     52.38342816498206
+    ],
+    [
+     11.828303918089476,
+     52.378571835017944
+    ],
+    [
+     11.817696081910524,
+     52.378571835017944
+    ]
+   ],
+   "opacity": 0.75,
+   "visible": true,
+   "controlPoints": [
+    {
+     "px": [
+      10,
+      10
+     ],
+     "lngLat": [
+      11.82,
+      52.383
+     ],
+     "label": "A"
+    },
+    {
+     "px": [
+      1190,
+      890
+     ],
+     "lngLat": [
+      11.827,
+      52.379
+     ]
+    }
+   ],
+   "fit": {
+    "method": "similarity",
+    "rmsM": 2.1,
+    "maxM": 3.4
+   },
+   "locked": true,
+   "knownId": "probe-known"
+  },
+  {
+   "id": "img_inset",
+   "name": "Detail",
+   "asset": "fc7d41a4713ca314842897662b5ed312dbabfa7c83ca8a8e8379118013c0ba7d",
+   "mime": "image/png",
+   "width": 400,
+   "height": 300,
+   "corners": [
+    [
+     11.823010671763694,
+     52.38156979610912
+    ],
+    [
+     11.824189328236308,
+     52.38156979610912
+    ],
+    [
+     11.824189328236308,
+     52.38103020389089
+    ],
+    [
+     11.823010671763694,
+     52.38103020389089
+    ]
+   ],
+   "opacity": 1,
+   "visible": false,
+   "anchorImageId": "img_scan",
+   "fit": {
+    "method": "manual"
+   }
+  }
+ ],
+ "teams": [
+  {
+   "id": "tm_alpha",
+   "name": "Alpha",
+   "color": "#2f6fc4",
+   "side": "friendly",
+   "displayMode": "logo",
+   "symbol": "chevron",
+   "callsign": "A",
+   "radioChannel": "3",
+   "strength": 12,
+   "leader": "Leiter A",
+   "unitNumber": "2-1",
+   "notes": "Funk prüfen",
+   "planning": {
+    "role": "Sturm",
+    "mission": "Gebäude 4 nehmen",
+    "task": "Eingang sichern",
+    "objective": "Halle 4",
+    "startPoint": "Tor",
+    "rallyPoint": "Wald",
+    "timing": "10:00–11:00",
+    "actionsOnContact": "Deckung",
+    "contingency": "Rückzug",
+    "equipment": "Rauch"
+   },
+   "logoAsset": "96fd9c291c077985d68c63597abebe7529b71e0728c6d982de4062b6676609f5",
+   "formationId": "frm_1",
+   "formationName": "Zug 1",
+   "squadName": "Gruppe A",
+   "inheritFormationVisual": true
+  },
+  {
+   "id": "tm_bravo",
+   "name": "Bravo",
+   "color": "#c8393f",
+   "side": "friendly",
+   "displayMode": "icon",
+   "symbol": "text:BR",
+   "formationId": "frm_1",
+   "formationName": "Zug 1"
+  },
+  {
+   "id": "tm_red",
+   "name": "Rot",
+   "color": "#c8393f",
+   "side": "enemy",
+   "displayMode": "icon",
+   "symbol": "chevron"
+  }
+ ],
+ "phases": [
+  {
+   "id": "ph_1",
+   "name": "Anmarsch",
+   "start": "09:30",
+   "end": "10:00",
+   "notes": "Ruhig vorgehen",
+   "camera": {
+    "center": [
+     11.823,
+     52.381
+    ],
+    "zoom": 16,
+    "bearing": 0
+   }
+  },
+  {
+   "id": "ph_2",
+   "name": "Angriff",
+   "start": "10:00"
+  }
+ ],
+ "log": [
+  {
+   "id": "lg_1",
+   "t": "2026-11-08T10:05:00.000Z",
+   "text": "Alpha am Startpunkt",
+   "teamId": "tm_alpha",
+   "elementId": "el_m1"
+  }
+ ],
+ "tracks": [
+  {
+   "id": "trk_1",
+   "name": "08.11.26, 09:40",
+   "startedAt": "2026-11-08T09:40:00.000Z",
+   "endedAt": "2026-11-08T09:45:00.000Z",
+   "points": [
+    {
+     "p": [
+      11.8231,
+      52.3811
+     ],
+     "t": "2026-11-08T09:40:00.000Z",
+     "acc": 5
+    },
+    {
+     "p": [
+      11.8234,
+      52.3812
+     ],
+     "t": "2026-11-08T09:41:00.000Z",
+     "acc": 4
+    }
+   ]
+  }
+ ],
+ "settings": {
+  "returnToSelect": true,
+  "directManipulation": true,
+  "keepBriefingInk": false,
+  "legLabels": true,
+  "grid": "off",
+  "basemapLabels": true,
+  "unitScale": 1
+ },
+ "event": {
+  "siteId": "mahlwinkel",
+  "eventId": "m24",
+  "edition": "fieldmaps-2998bb6",
+  "source": "FieldMaps / @rwolffgang, commit 2998bb6d7413a3e036412fa37443e8eead1238f3"
+ }
+}
