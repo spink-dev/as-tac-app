@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useOnline } from '../../core/net';
 import type { Map as MlMap } from 'maplibre-gl';
 import { Search, WifiOff } from 'lucide-react';
 import { useT, formatBytes } from '../../i18n';
@@ -49,22 +50,12 @@ export function AreaDownloadDialog() {
     const [name, setName] = useState('');
     const [resumable, setResumable] = useState(0);
     const [busy, setBusy] = useState<{ phase: DownloadPhase; bytes: number; part?: { done: number; total: number } } | null>(null);
-    const [online, setOnline] = useState(navigator.onLine);
+    const online = useOnline();
     const abort = useRef<AbortController | null>(null);
     const searchAbort = useRef<AbortController | null>(null);
     const [searching, setSearching] = useState(false);
     const nameId = useId();
     const searchId = useId();
-
-    useEffect(() => {
-        const update = () => setOnline(navigator.onLine);
-        window.addEventListener('online', update);
-        window.addEventListener('offline', update);
-        return () => {
-            window.removeEventListener('online', update);
-            window.removeEventListener('offline', update);
-        };
-    }, []);
 
     useEffect(() => {
         if (!open) {

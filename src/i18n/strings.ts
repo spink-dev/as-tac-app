@@ -64,6 +64,7 @@ export const S = {
     'library.empty.title': ['Noch kein Plan auf diesem Gerät', 'No plan on this device yet'],
     'library.empty.body': ['Starte mit einem Gebiet: {n} vorbereitete Airsoft-Felder in {countries} Ländern liegen bereit, etwa Mahlwinkel oder der Bärenkopf. Jedes andere Gebiet lädst du direkt aus OpenStreetMap.', 'Start with an area: {n} prepared airsoft fields in {countries} countries are ready, such as Mahlwinkel or the Bärenkopf. Any other area downloads straight from OpenStreetMap.'],
     'library.pickField': ['Feld wählen', 'Choose a field'],
+    'library.startOn': ['Neuer Plan auf {name}', 'New plan on {name}'],
     'library.restoreBackup': ['Stand vor dem Update als Kopie', 'Version before the update, as a copy'],
     'library.restoredBackup': ['Als «{name}» wiederhergestellt.', 'Restored as "{name}".'],
     'library.backupName': ['{name} (vor Update)', '{name} (before update)'],
@@ -96,6 +97,7 @@ export const S = {
     'credits.dependencies': ['Lizenzen der verwendeten Open-Source-Bibliotheken', 'Licences of the open-source libraries used'],
 
     'new.title': ['Neuer Plan', 'New plan'],
+    'new.useStartField': ['Mahlwinkel wählen', 'Choose Mahlwinkel'],
     'new.name': ['Name des Plans', 'Plan name'],
     'new.namePlaceholder': ['z. B. Dark Emergency – Zug 2', 'e.g. Dark Emergency – Platoon 2'],
     'new.area': ['Gebiet', 'Area'],

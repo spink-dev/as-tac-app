@@ -10,6 +10,30 @@ export interface Release {
 
 export const RELEASES: readonly Release[] = [
     {
+        version: '1.0.0-alpha.5',
+        date: '2026-11-09',
+        items: [
+            [
+                'Feldkatalog und «Neuer Plan» öffnen jetzt auf deinem Land, wenn es dort Felder gibt, sonst auf Deutschland. Die App erkennt das Land an der Zeitzone des Geräts, ohne Standort- oder Netzabfrage.',
+                'The field catalog and "New plan" now open on your country when it has fields, otherwise on Germany. The app tells the country from the device’s time zone, without a location or network request.',
+            ],
+            [
+                'Das Ausbildungszentrum Riedikon ist nicht mehr im Katalog. Wer es schon gespeichert hat, behält es unter «Auf diesem Gerät».',
+                'Ausbildungszentrum Riedikon is no longer in the catalog. If you saved it before, it stays under "On this device".',
+            ],
+        ],
+    },
+    {
+        version: '1.0.0-alpha.4',
+        date: '2026-11-09',
+        items: [
+            [
+                'as-tac.dev sperrt KI-Crawler und automatisierte Abrufe aus; Suchmaschinen und Link-Vorschauen sehen nur eine kurze Infoseite.',
+                'as-tac.dev now blocks AI crawlers and automated access; search engines and link previews see only a short info page.',
+            ],
+        ],
+    },
+    {
         version: '1.0.0-alpha.3',
         date: '2026-11-09',
         items: [

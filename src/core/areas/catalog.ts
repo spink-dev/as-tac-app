@@ -60,19 +60,128 @@ export function byCountry(areas: readonly BundledArea[], locale: 'de' | 'en'): C
 }
 
 /**
- * The country a catalogue opens on: that of the chosen field, else the first region among the
- * browser's languages that has fields (de-CH → CH), else Germany.
+ * Time zones of the catalogue's countries: every zone IANA's zone.tab gives them, plus the old
+ * names a browser may still report (tests/unit/catalog.test.ts checks the table against zone.tab
+ * and the catalogue). A field in a new country needs its zones here.
  */
-export function defaultCountry(areaId?: string | null, languages: readonly string[] = typeof navigator === 'undefined' ? [] : navigator.languages ?? []): string {
-    const chosen = bundledArea(areaId);
-    if (chosen) {
-        return chosen.country;
+export const ZONE_COUNTRY: ReadonlyMap<string, string> = new Map(Object.entries({
+    'Europe/Vienna': 'AT',
+    'Europe/Brussels': 'BE',
+    'Europe/Sofia': 'BG',
+    'Europe/Zurich': 'CH',
+    'Europe/Berlin': 'DE',
+    'Europe/Busingen': 'DE',
+    'Europe/Madrid': 'ES',
+    'Africa/Ceuta': 'ES',
+    'Atlantic/Canary': 'ES',
+    'Europe/Paris': 'FR',
+    'Europe/London': 'GB',
+    'Europe/Belfast': 'GB',
+    GB: 'GB',
+    'GB-Eire': 'GB',
+    'Europe/Budapest': 'HU',
+    'Europe/Rome': 'IT',
+    'Europe/Amsterdam': 'NL',
+    'Europe/Warsaw': 'PL',
+    Poland: 'PL',
+    'Europe/Bratislava': 'SK',
+}));
+
+/** Zones that name a place; UTC, Etc/GMT+1 and the like say nothing about where the device is. */
+const PLACED_ZONE = /^(?:Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|Brazil|Canada|Chile|Mexico|US)\//;
+
+/**
+ * Zones that also stand for an abbreviation: since tzdata 2024b `CET` and `MET` are Europe/Brussels
+ * and `EET` is Europe/Athens, and browsers report those names. There a browser language of a
+ * catalogue country on the same time counts first (a German device set to `CET` opens on Germany,
+ * not Belgium); a language of a country on another time never does (English (UK) in Brussels stays
+ * Belgium, Greek with English (UK) in Athens gets Germany). The test checks these sets against the
+ * time zones themselves.
+ */
+export const SHARED_ZONES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+    ['Europe/Brussels', new Set(['AT', 'BE', 'CH', 'DE', 'ES', 'FR', 'HU', 'IT', 'NL', 'PL', 'SK'])],
+    ['Europe/Athens', new Set(['BG'])],
+]);
+
+export interface DevicePlace {
+    timeZone: string;
+    languages: readonly string[];
+}
+
+/** What the device says about where it is, without asking any server. */
+export function devicePlace(): DevicePlace {
+    let timeZone = '';
+    try {
+        timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? '';
+    } catch {
+        // No time zone support: the languages alone decide.
     }
-    for (const language of languages) {
-        const region = language.split('-')[1]?.toUpperCase();
-        if (region && BUNDLED_AREAS.some((area) => area.country === region)) {
-            return region;
+    return { timeZone, languages: typeof navigator === 'undefined' ? [] : navigator.languages ?? [] };
+}
+
+/**
+ * The user's country where the catalogue has fields there, else `null`. The device's time zone
+ * decides (Europe/Zurich → CH; Europe/Rome → IT; America/New_York → no fields there). Where the zone
+ * names no place (UTC), the first region among the browser's languages that has fields counts
+ * (de-CH → CH); where it may be an abbreviation (Europe/Brussels = CET), see `SHARED_ZONES`.
+ * Nothing leaves the device: no location request, no IP lookup.
+ */
+export function homeCountry(place: DevicePlace = devicePlace()): string | null {
+    const zone = ZONE_COUNTRY.get(place.timeZone);
+    const regions = place.languages.map(languageRegion).filter((region): region is string => region !== undefined && hasFields(region));
+    const neighbours = SHARED_ZONES.get(place.timeZone);
+    if (neighbours) {
+        // The zone's own country among the languages wins (fr-FR, fr-BE in Brussels → Belgium).
+        const spoken = zone !== undefined && regions.includes(zone) ? zone : regions.find((region) => neighbours.has(region));
+        if (spoken) {
+            return spoken;
         }
     }
-    return 'DE';
+    if (zone !== undefined || PLACED_ZONE.test(place.timeZone)) {
+        return zone !== undefined && hasFields(zone) ? zone : null;
+    }
+    return regions[0] ?? null;
+}
+
+function hasFields(country: string): boolean {
+    return BUNDLED_AREAS.some((area) => area.country === country);
+}
+
+/** de-CH → CH, zh-Hant-TW → TW; a language without a region (de) names no country. */
+function languageRegion(language: string): string | undefined {
+    try {
+        return new Intl.Locale(language).region;
+    } catch {
+        return undefined;
+    }
+}
+
+/** The country a catalogue opens on: that of the chosen field, else the user's, else Germany. */
+export function defaultCountry(areaId?: string | null, place: DevicePlace = devicePlace()): string {
+    return bundledArea(areaId)?.country ?? homeCountry(place) ?? 'DE';
+}
+
+/** Germany's start field: it ships with the app (on every device, also offline) and has event templates. */
+export const START_FIELD = 'mahlwinkel';
+
+/**
+ * The field a new plan starts on in a country: one already on the device (Mahlwinkel always is), in
+ * the order Mahlwinkel, then by name; without one the first in that order.
+ */
+export function startField(country: string, locale: 'de' | 'en' = 'de', installed: ReadonlySet<string> = new Set()): BundledArea | undefined {
+    const fields = BUNDLED_AREAS.filter((area) => area.country === country);
+    const ordered = [...fields.filter((area) => area.id === START_FIELD), ...(byCountry(fields.filter((area) => area.id !== START_FIELD), locale)[0]?.areas ?? [])];
+    return ordered.find((area) => area.id === START_FIELD || installed.has(area.id)) ?? ordered[0];
+}
+
+/**
+ * Country and field a new plan starts on. Offline, a field that is not on the device cannot be
+ * used: with nothing of that country on the device, Mahlwinkel in Germany (it ships with the app).
+ */
+export function startChoice(country: string, locale: 'de' | 'en', installed: ReadonlySet<string>, online: boolean): { country: string; areaId: string } {
+    const field = startField(country, locale, installed);
+    if (field && (online || field.id === START_FIELD || installed.has(field.id))) {
+        return { country, areaId: field.id };
+    }
+    return { country: bundledArea(START_FIELD)?.country ?? 'DE', areaId: START_FIELD };
 }

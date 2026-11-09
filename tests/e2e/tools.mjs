@@ -10,7 +10,7 @@ try {
 const out = process.argv[2] ?? 'tests/e2e/screenshots';
 const base = process.env.BASE_URL ?? 'http://localhost:4000';
 const browser = await playwright.chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'de-CH' });
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'de-CH', timezoneId: 'Europe/Berlin' });
 await context.addInitScript(() => localStorage.setItem('as-tac.appearance', 'day'));
 const page = await context.newPage();
 const errors = [];

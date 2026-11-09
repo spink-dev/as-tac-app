@@ -159,7 +159,7 @@ try {
     // (Set for the whole browser: a context's userAgent does not reach the service worker's fetches.)
     const browser = await playwright.chromium.launch({ args: [`--user-agent=${chrome}`] });
     try {
-        const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', userAgent: chrome, serviceWorkers: 'allow' });
+        const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin', userAgent: chrome, serviceWorkers: 'allow' });
         const page = await context.newPage();
         const refused = [];
         page.on('response', (response) => {

@@ -1,12 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Download, Map as MapIcon } from 'lucide-react';
-import { areaErrorText } from '../areas/areaErrors';
+import { Download, Map as MapIcon, WifiOff } from 'lucide-react';
+import { areaErrorText, isNetworkError } from '../areas/areaErrors';
 import { useT, formatBytes } from '../../i18n';
 import { Button, Dialog, Field, ICON } from '../../ui/components';
 import { useDialogs } from '../../core/store/dialogs';
 import { bundledArea, ensureArea, isBundled, listAreas, areaCenter } from '../../core/areas/store';
-import { defaultCountry } from '../../core/areas/catalog';
+import { defaultCountry, START_FIELD, startChoice, startField } from '../../core/areas/catalog';
 import { CountrySelect, useCountries } from '../areas/AreaCatalog';
+import { usePrefs } from '../../core/store/prefs';
 import type { AreaMeta } from '../../core/areas/types';
 import { createProject } from '../../core/model/factory';
 import { createAndOpen } from '../../core/store/route';
@@ -21,32 +22,60 @@ export function NewPlanDialog() {
     const show = useDialogs((state) => state.show);
     const nameId = useId();
     const [name, setName] = useState('');
-    const [areaId, setAreaId] = useState<string>('mahlwinkel');
+    const locale = usePrefs((state) => state.locale);
+    // The user's country and its start field; refined once the installed areas are known.
+    const [country, setCountry] = useState(() => defaultCountry());
+    const [areaId, setAreaId] = useState<string>(() => startChoice(country, locale, new Set(), true).areaId);
     const [template, setTemplate] = useState<string>('');
     const [installed, setInstalled] = useState<AreaMeta[] | null>(null);
     const countries = useCountries();
-    const [country, setCountry] = useState(() => defaultCountry('mahlwinkel'));
     const [busy, setBusy] = useState<number | null>(null);
+    // The chosen field could not be loaded for lack of network: said here, with Mahlwinkel offered
+    // (a toast's button would sit behind the modal dialog).
+    const [networkProblem, setNetworkProblem] = useState<string | null>(null);
     const creating = useRef(false);
+    // Until someone chooses an area or a country, the dialog keeps to the default choice.
+    const picked = useRef(false);
+    // Per opening: its number, the opening the installed list belongs to (the dialog stays mounted,
+    // so a list from an earlier opening must not count), the list looked at once, a country asked
+    // for by «Feld wählen».
+    const opening = useRef(0);
+    const loadedFor = useRef(-1);
+    const refined = useRef(false);
+    const pendingCountry = useRef<string | null>(null);
+    const areasRef = useRef<HTMLDivElement>(null);
+    const installedIds = (list: AreaMeta[] | null) => new Set((list ?? []).map((area) => area.id));
 
     useEffect(() => {
         if (open) {
+            const current = ++opening.current;
             setInstalled(null);
-            void listAreas().then(setInstalled);
+            void listAreas().then((list) => {
+                if (opening.current === current) {
+                    loadedFor.current = current;
+                    setInstalled(list);
+                }
+            });
             setName('');
             setTemplate('');
             setBusy(null);
+            setNetworkProblem(null);
+            refined.current = false;
+            pendingCountry.current = null;
             if (payload?.areaId) {
+                picked.current = true;
                 setAreaId(payload.areaId);
                 setCountry(defaultCountry(payload.areaId));
             } else if (payload?.country) {
                 // «Feld wählen»: a field of that country, whatever was chosen last time.
+                picked.current = true;
+                pendingCountry.current = payload.country;
                 setCountry(payload.country);
-                const first = countries.find((group) => group.country === payload.country)?.areas[0];
+                const first = startField(payload.country, locale, installedIds(installed));
                 if (first) {
                     chooseArea(first.id);
                 }
-            } else {
+            } else if (picked.current) {
                 setCountry(defaultCountry(areaId));
             }
         }
@@ -55,10 +84,33 @@ export function NewPlanDialog() {
     }, [open, payload]);
 
     useEffect(() => {
-        // A remembered own area removed since: back to Mahlwinkel instead of an unseen, missing choice.
-        if (open && installed && areaId !== '__none' && !isBundled(areaId) && !installed.some((area) => area.id === areaId)) {
-            chooseArea('mahlwinkel');
-            setCountry(defaultCountry('mahlwinkel'));
+        if (!open || !installed || loadedFor.current !== opening.current) {
+            return;
+        }
+        const ids = installedIds(installed);
+        const first = !refined.current;
+        refined.current = true;
+        if (first && pendingCountry.current) {
+            // «Feld wählen»: now that the installed areas are known, a field of it on the device first.
+            const field = startField(pendingCountry.current, locale, ids);
+            pendingCountry.current = null;
+            if (field && field.id !== areaId) {
+                chooseArea(field.id);
+            }
+            return;
+        }
+        // The default: the user's country, a field of it already on the device first; offline with
+        // none there, Mahlwinkel (it ships with the app). Also after a remembered own area was
+        // removed, instead of an unseen, missing choice, and, once per opening, offline instead of a
+        // remembered field that is not on the device.
+        const missing = areaId !== '__none' && !isBundled(areaId) && !ids.has(areaId);
+        const unusable = first && !navigator.onLine && isBundled(areaId) && areaId !== START_FIELD && !ids.has(areaId);
+        if (!picked.current || missing || unusable) {
+            const choice = startChoice(defaultCountry(), locale, ids, navigator.onLine);
+            setCountry(choice.country);
+            if (choice.areaId !== areaId) {
+                chooseArea(choice.areaId);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, installed, areaId]);
@@ -76,15 +128,22 @@ export function NewPlanDialog() {
     function chooseArea(id: string) {
         setAreaId(id);
         setTemplate('');
+        setNetworkProblem(null);
+    }
+
+    function pickArea(id: string) {
+        picked.current = true;
+        chooseArea(id);
     }
 
     /**
-     * Another country. A field chosen in the old one gives way to the new country's first field, so
+     * Another country. A field chosen in the old one gives way to the new country's start field, so
      * the choice stays visible; an own area or «Ohne Grundkarte» stays chosen (both are always shown).
      */
     function pickCountry(next: string) {
+        picked.current = true;
         setCountry(next);
-        const first = countries.find((group) => group.country === next)?.areas[0];
+        const first = startField(next, locale, installedIds(installed));
         const chosen = bundledArea(areaId);
         if (first && chosen && chosen.country !== next) {
             chooseArea(first.id);
@@ -109,7 +168,13 @@ export function NewPlanDialog() {
             await createAndOpen(project);
         } catch (error) {
             setBusy(null);
-            toast(areaErrorText(error), { tone: 'danger' });
+            // A field that needs the network while there is none (or none that carries data):
+            // Mahlwinkel ships with the app and always works.
+            if (isNetworkError(error) && isBundled(areaId) && areaId !== START_FIELD) {
+                setNetworkProblem(areaErrorText(error));
+            } else {
+                toast(areaErrorText(error), { tone: 'danger' });
+            }
         } finally {
             creating.current = false;
         }
@@ -148,9 +213,9 @@ export function NewPlanDialog() {
             <div className="field">
                 <span className="field__label">{t('new.area')}</span>
                 <CountrySelect value={country} onChange={pickCountry} />
-                <div className="choice-list" role="radiogroup" aria-label={t('new.area')} data-testid="new-plan-areas">
+                <div className="choice-list" role="radiogroup" aria-label={t('new.area')} data-testid="new-plan-areas" ref={areasRef}>
                     {fields.map((area) => (
-                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => chooseArea(area.id)}>
+                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => pickArea(area.id)}>
                             <MapIcon {...ICON} />
                             <span className="choice__main">
                                 <span className="choice__title">{area.name}</span>
@@ -160,7 +225,7 @@ export function NewPlanDialog() {
                     ))}
                     {own.length ? <div className="choice-list__label" id={ownLabel} aria-hidden="true">{t('area.own')}</div> : null}
                     {own.map((area) => (
-                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} aria-describedby={ownLabel} className="choice" onClick={() => chooseArea(area.id)}>
+                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} aria-describedby={ownLabel} className="choice" onClick={() => pickArea(area.id)}>
                             <MapIcon {...ICON} />
                             <span className="choice__main">
                                 <span className="choice__title">{area.name}</span>
@@ -168,7 +233,7 @@ export function NewPlanDialog() {
                             </span>
                         </button>
                     ))}
-                    <button type="button" role="radio" aria-checked={areaId === '__none'} className="choice" onClick={() => chooseArea('__none')}>
+                    <button type="button" role="radio" aria-checked={areaId === '__none'} className="choice" onClick={() => pickArea('__none')}>
                         <span className="choice__main">
                             <span className="choice__title">{t('new.noArea')}</span>
                         </span>
@@ -181,6 +246,21 @@ export function NewPlanDialog() {
                     </span>
                 </button>
                 <span className="field__hint">{t('new.areaHint')}</span>
+                {networkProblem ? (
+                    <div className="notice notice--warn" role="alert" data-testid="new-plan-network">
+                        <WifiOff {...ICON} />
+                        <span className="notice__body">{networkProblem}</span>
+                        <Button small onClick={() => {
+                            picked.current = true;
+                            setCountry(defaultCountry(START_FIELD));
+                            chooseArea(START_FIELD);
+                            // The notice goes away with this button: focus moves to the chosen field.
+                            requestAnimationFrame(() => areasRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
+                        }}>
+                            {t('new.useStartField')}
+                        </Button>
+                    </div>
+                ) : null}
             </div>
             {templates.length > 0 ? (
                 <div className="field">

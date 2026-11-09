@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BUNDLED_AREAS, byCountry, countryName, defaultCountry, isBundled } from '../../src/core/areas/catalog';
+import { BUNDLED_AREAS, byCountry, countryName, defaultCountry, homeCountry, isBundled, SHARED_ZONES, startChoice, startField, ZONE_COUNTRY } from '../../src/core/areas/catalog';
 import { areaKm2 } from '../../src/core/areas/overpass';
 import { validateBounds } from '../../src/core/areas/store';
 
@@ -83,10 +83,91 @@ describe('field catalog', () => {
         expect(countryName('not a code', 'de')).toBe('not a code');
     });
 
-    it('opens on the chosen field’s country, then the browser region, then Germany', () => {
-        expect(defaultCountry('fr-baerenkopf', ['de-CH'])).toBe('FR');
-        expect(defaultCountry(null, ['de-CH', 'de'])).toBe('CH');
-        expect(defaultCountry('my-own-area', ['en-US', 'en'])).toBe('DE');
-        expect(defaultCountry(undefined, [])).toBe('DE');
+    it('no longer contains Riedikon', () => {
+        expect(isBundled('ch-riedikon')).toBe(false);
+        expect(BUNDLED_AREAS.filter((area) => area.country === 'CH').map((area) => area.id)).toEqual(['ch-steinmaur']);
+    });
+
+    it('opens on the chosen field’s country, then the user’s country, then Germany', () => {
+        const at = (timeZone: string, ...languages: string[]) => ({ timeZone, languages });
+        // The chosen field wins.
+        expect(defaultCountry('fr-baerenkopf', at('Europe/Zurich', 'de-CH'))).toBe('FR');
+        // The device's time zone names the country.
+        expect(defaultCountry(null, at('Europe/Zurich', 'en-US'))).toBe('CH');
+        expect(defaultCountry(null, at('Europe/Rome', 'de-CH'))).toBe('IT');
+        expect(defaultCountry(null, at('Europe/Busingen', 'de-CH'))).toBe('DE');
+        expect(defaultCountry(null, at('Atlantic/Canary', 'es-ES'))).toBe('ES');
+        expect(defaultCountry(null, at('Europe/Berlin', 'de-CH'))).toBe('DE');
+        // A country without fields: Germany, whatever the languages say.
+        expect(defaultCountry(null, at('America/New_York', 'de-CH'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Vaduz', 'de-CH'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Prague', 'fr-FR'))).toBe('DE');
+        // A zone without a place (UTC, CET): the first browser region that has fields.
+        expect(defaultCountry(null, at('UTC', 'en-US', 'de-CH'))).toBe('CH');
+        expect(defaultCountry(null, at('Etc/GMT-1', 'fr-BE'))).toBe('BE');
+        expect(defaultCountry(null, at('', 'zh-Hant-TW', 'it-IT'))).toBe('IT');
+        expect(defaultCountry('my-own-area', at('UTC', 'en-US', 'en'))).toBe('DE');
+        expect(defaultCountry(undefined, at('', 'not a language'))).toBe('DE');
+        expect(homeCountry(at('Asia/Tokyo', 'de-CH'))).toBeNull();
+        // CET and MET are reported as Europe/Brussels, EET as Europe/Athens: there a language of a
+        // country on the same time comes first; Brussels without one stays Belgium.
+        expect(defaultCountry(null, at('Europe/Brussels', 'de-DE', 'de'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'de-CH'))).toBe('CH');
+        expect(defaultCountry(null, at('Europe/Brussels', 'nl-BE', 'nl'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'fr-FR', 'fr-BE'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'en-US', 'en'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'en-GB', 'en'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'bg-BG'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'fr'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Athens', 'bg-BG'))).toBe('BG');
+        expect(defaultCountry(null, at('Europe/Athens', 'el-GR'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Athens', 'el-GR', 'en-GB'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Athens', 'de-DE'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Lisbon', 'pt-PT', 'en-GB'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Lisbon', 'fr-FR'))).toBe('DE');
+        // Inherited object keys are not time zones.
+        expect(homeCountry(at('constructor', 'de-AT'))).toBe('AT');
+    });
+
+    it('knows a time zone for every catalogue country', () => {
+        expect(new Set(ZONE_COUNTRY.values())).toEqual(new Set(BUNDLED_AREAS.map((area) => area.country)));
+    });
+
+    it('lets languages override a shared zone only for countries on the same time', () => {
+        // Offsets in winter and in summer, as the browser computes them.
+        const offsets = (zone: string) => [Date.UTC(2026, 0, 15), Date.UTC(2026, 6, 15)].map((when) => new Intl.DateTimeFormat('en', { timeZone: zone, timeZoneName: 'longOffset' }).formatToParts(when).find((part) => part.type === 'timeZoneName')?.value);
+        for (const [shared, countries] of SHARED_ZONES) {
+            const same = new Set([...ZONE_COUNTRY].filter(([zone]) => zone.includes('/')).filter(([zone]) => JSON.stringify(offsets(zone)) === JSON.stringify(offsets(shared))).map(([, country]) => country));
+            expect([shared, [...countries].sort()]).toEqual([shared, [...same].sort()]);
+        }
+    });
+
+    // IANA's own list (tzdata): every zone of a catalogue country is in the table.
+    const tab = '/usr/share/zoneinfo/zone.tab';
+    it.skipIf(!existsSync(tab))('has every zone.tab zone of the catalogue countries', () => {
+        const countries = new Set(BUNDLED_AREAS.map((area) => area.country));
+        const zones = readFileSync(tab, 'utf8').split('\n').filter((line) => line && !line.startsWith('#')).map((line) => line.split('\t'));
+        for (const [code, , zone] of zones) {
+            if (countries.has(code)) {
+                expect([zone, ZONE_COUNTRY.get(zone)]).toEqual([zone, code]);
+            }
+        }
+    });
+
+    it('starts a new plan on a field on the device, else Mahlwinkel in Germany, else the first by name', () => {
+        const none = new Set<string>();
+        expect(startField('DE')?.id).toBe('mahlwinkel');
+        expect(startField('DE', 'de', new Set(['de-blackfield']))?.id).toBe('mahlwinkel');
+        expect(startField('CH')?.id).toBe('ch-steinmaur');
+        const fr = byCountry(BUNDLED_AREAS, 'de').find((group) => group.country === 'FR')?.areas ?? [];
+        expect(startField('FR')?.id).toBe(fr[0].id);
+        expect(startField('FR', 'de', new Set(['fr-baerenkopf', 'mahlwinkel']))?.id).toBe('fr-baerenkopf');
+        expect(startField('US')).toBeUndefined();
+        // Offline only what is on the device: Mahlwinkel ships with the app.
+        expect(startChoice('CH', 'de', none, true)).toEqual({ country: 'CH', areaId: 'ch-steinmaur' });
+        expect(startChoice('CH', 'de', none, false)).toEqual({ country: 'DE', areaId: 'mahlwinkel' });
+        expect(startChoice('CH', 'de', new Set(['ch-steinmaur']), false)).toEqual({ country: 'CH', areaId: 'ch-steinmaur' });
+        expect(startChoice('DE', 'de', none, false)).toEqual({ country: 'DE', areaId: 'mahlwinkel' });
+        expect(startChoice('FR', 'de', new Set(['fr-baerenkopf']), false)).toEqual({ country: 'FR', areaId: 'fr-baerenkopf' });
     });
 });

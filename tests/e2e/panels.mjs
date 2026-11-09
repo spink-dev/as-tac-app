@@ -13,7 +13,7 @@ const browser = await playwright.chromium.launch();
 const errors = [];
 async function run(name, viewport, appearance) {
     const mobile = viewport.width < 800;
-    const context = await browser.newContext({ viewport, locale: 'de-CH', hasTouch: mobile, isMobile: mobile });
+    const context = await browser.newContext({ viewport, locale: 'de-CH', timezoneId: 'Europe/Berlin', hasTouch: mobile, isMobile: mobile });
     await context.addInitScript((mode) => localStorage.setItem('as-tac.appearance', mode), appearance);
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));

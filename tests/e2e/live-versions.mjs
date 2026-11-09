@@ -20,7 +20,7 @@ const check = (name, ok, detail = '') => {
         errors.push(`check failed: ${name} ${detail}`);
     }
 };
-const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH' });
+const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin' });
 const watch = (page, name) => {
     page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));
 };
