@@ -91,11 +91,17 @@ export const ZONE_COUNTRY: ReadonlyMap<string, string> = new Map(Object.entries(
 const PLACED_ZONE = /^(?:Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|Brazil|Canada|Chile|Mexico|US)\//;
 
 /**
- * Zones that also stand for an abbreviation: since tzdata 2024b `CET` and `MET` are Europe/Brussels,
- * `EET` is Europe/Athens and `WET` Europe/Lisbon, and browsers report those names. A German device
- * set to `CET` must not open on Belgium, so here the languages come first.
+ * Zones that also stand for an abbreviation: since tzdata 2024b `CET` and `MET` are Europe/Brussels
+ * and `EET` is Europe/Athens, and browsers report those names. There a browser language of a
+ * catalogue country on the same time counts first (a German device set to `CET` opens on Germany,
+ * not Belgium); a language of a country on another time never does (English (UK) in Brussels stays
+ * Belgium, Greek with English (UK) in Athens gets Germany). The test checks these sets against the
+ * time zones themselves.
  */
-const SHARED_ZONES: ReadonlySet<string> = new Set(['Europe/Brussels', 'Europe/Athens', 'Europe/Lisbon']);
+export const SHARED_ZONES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+    ['Europe/Brussels', new Set(['AT', 'BE', 'CH', 'DE', 'ES', 'FR', 'HU', 'IT', 'NL', 'PL', 'SK'])],
+    ['Europe/Athens', new Set(['BG'])],
+]);
 
 export interface DevicePlace {
     timeZone: string;
@@ -116,20 +122,25 @@ export function devicePlace(): DevicePlace {
 /**
  * The user's country where the catalogue has fields there, else `null`. The device's time zone
  * decides (Europe/Zurich → CH; Europe/Rome → IT; America/New_York → no fields there). Where the zone
- * names no place (UTC) or may be an abbreviation (Europe/Brussels = CET), the first region among the
- * browser's languages that has fields counts (de-CH → CH); Europe/Brussels without one stays Belgium.
+ * names no place (UTC), the first region among the browser's languages that has fields counts
+ * (de-CH → CH); where it may be an abbreviation (Europe/Brussels = CET), see `SHARED_ZONES`.
  * Nothing leaves the device: no location request, no IP lookup.
  */
 export function homeCountry(place: DevicePlace = devicePlace()): string | null {
     const zone = ZONE_COUNTRY.get(place.timeZone);
-    const spoken = place.languages.map(languageRegion).find((region) => region !== undefined && hasFields(region)) ?? null;
-    if (SHARED_ZONES.has(place.timeZone) && spoken) {
-        return spoken;
+    const regions = place.languages.map(languageRegion).filter((region): region is string => region !== undefined && hasFields(region));
+    const neighbours = SHARED_ZONES.get(place.timeZone);
+    if (neighbours) {
+        // The zone's own country among the languages wins (fr-FR, fr-BE in Brussels → Belgium).
+        const spoken = zone !== undefined && regions.includes(zone) ? zone : regions.find((region) => neighbours.has(region));
+        if (spoken) {
+            return spoken;
+        }
     }
     if (zone !== undefined || PLACED_ZONE.test(place.timeZone)) {
         return zone !== undefined && hasFields(zone) ? zone : null;
     }
-    return spoken;
+    return regions[0] ?? null;
 }
 
 function hasFields(country: string): boolean {

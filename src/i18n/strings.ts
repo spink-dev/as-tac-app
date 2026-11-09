@@ -97,6 +97,7 @@ export const S = {
     'credits.dependencies': ['Lizenzen der verwendeten Open-Source-Bibliotheken', 'Licences of the open-source libraries used'],
 
     'new.title': ['Neuer Plan', 'New plan'],
+    'new.useStartField': ['Mahlwinkel wählen', 'Choose Mahlwinkel'],
     'new.name': ['Name des Plans', 'Plan name'],
     'new.namePlaceholder': ['z. B. Dark Emergency – Zug 2', 'e.g. Dark Emergency – Platoon 2'],
     'new.area': ['Gebiet', 'Area'],

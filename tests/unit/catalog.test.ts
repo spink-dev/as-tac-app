@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BUNDLED_AREAS, byCountry, countryName, defaultCountry, homeCountry, isBundled, startChoice, startField, ZONE_COUNTRY } from '../../src/core/areas/catalog';
+import { BUNDLED_AREAS, byCountry, countryName, defaultCountry, homeCountry, isBundled, SHARED_ZONES, startChoice, startField, ZONE_COUNTRY } from '../../src/core/areas/catalog';
 import { areaKm2 } from '../../src/core/areas/overpass';
 import { validateBounds } from '../../src/core/areas/store';
 
@@ -109,22 +109,37 @@ describe('field catalog', () => {
         expect(defaultCountry('my-own-area', at('UTC', 'en-US', 'en'))).toBe('DE');
         expect(defaultCountry(undefined, at('', 'not a language'))).toBe('DE');
         expect(homeCountry(at('Asia/Tokyo', 'de-CH'))).toBeNull();
-        // CET and MET are reported as Europe/Brussels, EET as Europe/Athens, WET as Europe/Lisbon:
-        // there the languages come first, Brussels without one stays Belgium.
+        // CET and MET are reported as Europe/Brussels, EET as Europe/Athens: there a language of a
+        // country on the same time comes first; Brussels without one stays Belgium.
         expect(defaultCountry(null, at('Europe/Brussels', 'de-DE', 'de'))).toBe('DE');
         expect(defaultCountry(null, at('Europe/Brussels', 'de-CH'))).toBe('CH');
         expect(defaultCountry(null, at('Europe/Brussels', 'nl-BE', 'nl'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'fr-FR', 'fr-BE'))).toBe('BE');
         expect(defaultCountry(null, at('Europe/Brussels', 'en-US', 'en'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'en-GB', 'en'))).toBe('BE');
+        expect(defaultCountry(null, at('Europe/Brussels', 'bg-BG'))).toBe('BE');
         expect(defaultCountry(null, at('Europe/Brussels', 'fr'))).toBe('BE');
         expect(defaultCountry(null, at('Europe/Athens', 'bg-BG'))).toBe('BG');
         expect(defaultCountry(null, at('Europe/Athens', 'el-GR'))).toBe('DE');
-        expect(defaultCountry(null, at('Europe/Lisbon', 'es-ES'))).toBe('ES');
+        expect(defaultCountry(null, at('Europe/Athens', 'el-GR', 'en-GB'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Athens', 'de-DE'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Lisbon', 'pt-PT', 'en-GB'))).toBe('DE');
+        expect(defaultCountry(null, at('Europe/Lisbon', 'fr-FR'))).toBe('DE');
         // Inherited object keys are not time zones.
         expect(homeCountry(at('constructor', 'de-AT'))).toBe('AT');
     });
 
     it('knows a time zone for every catalogue country', () => {
         expect(new Set(ZONE_COUNTRY.values())).toEqual(new Set(BUNDLED_AREAS.map((area) => area.country)));
+    });
+
+    it('lets languages override a shared zone only for countries on the same time', () => {
+        // Offsets in winter and in summer, as the browser computes them.
+        const offsets = (zone: string) => [Date.UTC(2026, 0, 15), Date.UTC(2026, 6, 15)].map((when) => new Intl.DateTimeFormat('en', { timeZone: zone, timeZoneName: 'longOffset' }).formatToParts(when).find((part) => part.type === 'timeZoneName')?.value);
+        for (const [shared, countries] of SHARED_ZONES) {
+            const same = new Set([...ZONE_COUNTRY].filter(([zone]) => zone.includes('/')).filter(([zone]) => JSON.stringify(offsets(zone)) === JSON.stringify(offsets(shared))).map(([, country]) => country));
+            expect([shared, [...countries].sort()]).toEqual([shared, [...same].sort()]);
+        }
     });
 
     // IANA's own list (tzdata): every zone of a catalogue country is in the table.

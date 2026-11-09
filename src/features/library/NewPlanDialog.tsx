@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Download, Map as MapIcon } from 'lucide-react';
-import { areaErrorText } from '../areas/areaErrors';
+import { Download, Map as MapIcon, WifiOff } from 'lucide-react';
+import { areaErrorText, isNetworkError } from '../areas/areaErrors';
 import { useT, formatBytes } from '../../i18n';
 import { Button, Dialog, Field, ICON } from '../../ui/components';
 import { useDialogs } from '../../core/store/dialogs';
 import { bundledArea, ensureArea, isBundled, listAreas, areaCenter } from '../../core/areas/store';
-import { defaultCountry, startChoice, startField } from '../../core/areas/catalog';
+import { defaultCountry, START_FIELD, startChoice, startField } from '../../core/areas/catalog';
 import { CountrySelect, useCountries } from '../areas/AreaCatalog';
 import { usePrefs } from '../../core/store/prefs';
 import type { AreaMeta } from '../../core/areas/types';
@@ -30,9 +30,15 @@ export function NewPlanDialog() {
     const [installed, setInstalled] = useState<AreaMeta[] | null>(null);
     const countries = useCountries();
     const [busy, setBusy] = useState<number | null>(null);
+    // The chosen field could not be loaded for lack of network: said here, with Mahlwinkel offered
+    // (a toast's button would sit behind the modal dialog).
+    const [networkProblem, setNetworkProblem] = useState<string | null>(null);
     const creating = useRef(false);
     // Until someone chooses an area or a country, the dialog keeps to the default choice.
     const picked = useRef(false);
+    // Per opening: the installed areas have been looked at once; a country asked for by «Feld wählen».
+    const refined = useRef(false);
+    const pendingCountry = useRef<string | null>(null);
     const installedIds = (list: AreaMeta[] | null) => new Set((list ?? []).map((area) => area.id));
 
     useEffect(() => {
@@ -42,6 +48,9 @@ export function NewPlanDialog() {
             setName('');
             setTemplate('');
             setBusy(null);
+            setNetworkProblem(null);
+            refined.current = false;
+            pendingCountry.current = null;
             if (payload?.areaId) {
                 picked.current = true;
                 setAreaId(payload.areaId);
@@ -49,6 +58,7 @@ export function NewPlanDialog() {
             } else if (payload?.country) {
                 // «Feld wählen»: a field of that country, whatever was chosen last time.
                 picked.current = true;
+                pendingCountry.current = payload.country;
                 setCountry(payload.country);
                 const first = startField(payload.country, locale, installedIds(installed));
                 if (first) {
@@ -66,12 +76,26 @@ export function NewPlanDialog() {
         if (!open || !installed) {
             return;
         }
+        const ids = installedIds(installed);
+        const first = !refined.current;
+        refined.current = true;
+        if (first && pendingCountry.current) {
+            // «Feld wählen»: now that the installed areas are known, a field of it on the device first.
+            const field = startField(pendingCountry.current, locale, ids);
+            pendingCountry.current = null;
+            if (field && field.id !== areaId) {
+                chooseArea(field.id);
+            }
+            return;
+        }
         // The default: the user's country, a field of it already on the device first; offline with
         // none there, Mahlwinkel (it ships with the app). Also after a remembered own area was
-        // removed, instead of an unseen, missing choice.
-        const missing = areaId !== '__none' && !isBundled(areaId) && !installed.some((area) => area.id === areaId);
-        if (!picked.current || missing) {
-            const choice = startChoice(defaultCountry(), locale, installedIds(installed), navigator.onLine);
+        // removed, instead of an unseen, missing choice, and, once per opening, offline instead of a
+        // remembered field that is not on the device.
+        const missing = areaId !== '__none' && !isBundled(areaId) && !ids.has(areaId);
+        const unusable = first && !navigator.onLine && isBundled(areaId) && areaId !== START_FIELD && !ids.has(areaId);
+        if (!picked.current || missing || unusable) {
+            const choice = startChoice(defaultCountry(), locale, ids, navigator.onLine);
             setCountry(choice.country);
             if (choice.areaId !== areaId) {
                 chooseArea(choice.areaId);
@@ -93,6 +117,7 @@ export function NewPlanDialog() {
     function chooseArea(id: string) {
         setAreaId(id);
         setTemplate('');
+        setNetworkProblem(null);
     }
 
     function pickArea(id: string) {
@@ -132,7 +157,13 @@ export function NewPlanDialog() {
             await createAndOpen(project);
         } catch (error) {
             setBusy(null);
-            toast(areaErrorText(error), { tone: 'danger' });
+            // A field that needs the network while there is none (or none that carries data):
+            // Mahlwinkel ships with the app and always works.
+            if (isNetworkError(error) && isBundled(areaId) && areaId !== START_FIELD) {
+                setNetworkProblem(areaErrorText(error));
+            } else {
+                toast(areaErrorText(error), { tone: 'danger' });
+            }
         } finally {
             creating.current = false;
         }
@@ -204,6 +235,19 @@ export function NewPlanDialog() {
                     </span>
                 </button>
                 <span className="field__hint">{t('new.areaHint')}</span>
+                {networkProblem ? (
+                    <div className="notice notice--warn" role="alert" data-testid="new-plan-network">
+                        <WifiOff {...ICON} />
+                        <span className="notice__body">{networkProblem}</span>
+                        <Button small onClick={() => {
+                            picked.current = true;
+                            setCountry(defaultCountry(START_FIELD));
+                            chooseArea(START_FIELD);
+                        }}>
+                            {t('new.useStartField')}
+                        </Button>
+                    </div>
+                ) : null}
             </div>
             {templates.length > 0 ? (
                 <div className="field">

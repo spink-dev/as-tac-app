@@ -126,6 +126,21 @@ const linkBox = await link.boundingBox();
 check('website-link-tappable', Boolean(linkBox) && linkBox.width >= 48 && linkBox.height >= 48 && (await link.isVisible()), JSON.stringify(linkBox));
 await small.screenshot({ path: `${out}/fields-phone.png` });
 
+// France: a field already on the device comes first, for the empty library's button and «Feld wählen».
+const paris = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'fr-FR', timezoneId: 'Europe/Paris' });
+const fr = await paris.newPage();
+fr.on('pageerror', (error) => errors.push(`france: ${error.message}`));
+await fr.goto(base);
+await fr.getByTestId('area-catalog').waitFor();
+check('france-opens-on-france', (await fr.locator('.lib').getByTestId('area-country').inputValue()) === 'FR');
+await fr.getByTestId('area-catalog').locator('.area-row').filter({ hasText: 'Bärenkopf' }).getByTestId('area-install').click();
+await fr.getByTestId('area-installed').getByText(/Bärenkopf/).waitFor({ timeout: 60000 });
+check('installed-field-suggested', await fr.locator('.lib__empty').getByRole('button', { name: /Neuer Plan auf Bärenkopf/ }).waitFor({ timeout: 10000 }).then(() => true, () => false));
+await fr.locator('.lib__empty').getByRole('button', { name: 'Feld wählen' }).click();
+const pick = fr.locator('.dialog').getByRole('radio', { name: /Bärenkopf/ });
+check('pick-field-prefers-installed', await fr.waitForFunction(() => document.querySelector('.dialog [role=radio][aria-checked=true]')?.textContent?.includes('Bärenkopf'), null, { timeout: 10000 }).then(() => true, () => false), String(await pick.getAttribute('aria-checked')));
+await paris.close();
+
 // Offline after the first visit, in Switzerland: Mahlwinkel comes from the precache, other fields
 // need the network, so a new plan starts on Mahlwinkel while no Swiss field is on the device.
 const offline = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Zurich', serviceWorkers: 'allow' });
@@ -145,6 +160,15 @@ await away.getByTestId('new-plan').click();
 const offlineDialog = away.locator('.dialog');
 const offlineMahlwinkel = await offlineDialog.getByRole('radio', { name: /Mahlwinkel/ }).waitFor({ timeout: 10000 }).then(() => true, () => false);
 check('offline-default-is-mahlwinkel', offlineMahlwinkel && (await offlineDialog.getByRole('radio', { name: /Mahlwinkel/ }).getAttribute('aria-checked')) === 'true' && (await offlineDialog.getByTestId('area-country').inputValue()) === 'DE');
+// A field that is not on the device, chosen anyway: the error offers Mahlwinkel.
+await offlineDialog.getByTestId('area-country').selectOption('CH');
+await offlineDialog.getByTestId('create-plan').click();
+const offer = offlineDialog.getByTestId('new-plan-network').getByRole('button', { name: 'Mahlwinkel wählen' });
+const offered = await offer.waitFor({ timeout: 15000 }).then(() => true, () => false);
+if (offered) {
+    await offer.click();
+}
+check('offline-failure-offers-mahlwinkel', offered && !(await offlineDialog.getByTestId('new-plan-network').count()) && (await offlineDialog.getByRole('radio', { name: /Mahlwinkel/ }).getAttribute('aria-checked')) === 'true');
 await away.getByTestId('create-plan').click();
 await away.waitForSelector('.maplibregl-canvas');
 const offlineArea = await away.waitForFunction(() => new Promise((resolve) => {

@@ -4,6 +4,13 @@ import { t } from '../../i18n';
  * What to tell the user after a failed area download, install or plan creation — a sentence,
  * never a raw code, and only «try again» when trying again can help.
  */
+/** The failure is the connection (none, or too weak), not the device or the data. */
+export function isNetworkError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    const name = error instanceof Error ? error.name : '';
+    return message === 'offline' || /^(stalled|download|timeout)$/.test(message) || (name === 'TypeError' && /fetch|network|load failed/i.test(message));
+}
+
 export function areaErrorText(error: unknown, kept = 0, total = 0): string {
     const message = error instanceof Error ? error.message : String(error);
     const name = error instanceof Error ? error.name : '';
