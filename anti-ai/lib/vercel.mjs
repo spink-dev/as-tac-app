@@ -1,8 +1,9 @@
 // Vercel Routing Middleware: the same decision as nginx, before Vercel's cache.
-//   proxy.ts:  import { createProxy } from './anti-ai/lib/vercel.mjs';
-//              import policy from './anti-ai.policy.json';
-//              export default createProxy(policy);
-//   vercel.json: { "proxy": { "entrypoint": "proxy.ts" } }
+//   proxy.mjs:   import { createProxy } from './anti-ai/lib/vercel.mjs';
+//                import policy from './anti-ai.policy.mjs';
+//                export default createProxy(policy);
+//   vercel.json: { "proxy": { "entrypoint": "proxy.mjs" } }
+// Vercel runs this as native Node ESM (no bundling): relative imports need their extension.
 import { next, rewrite } from '@vercel/functions';
 import { decide } from './classify.mjs';
 

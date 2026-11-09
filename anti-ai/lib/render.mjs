@@ -259,6 +259,10 @@ export function fail2banJail(site) {
     ].join('\n');
 }
 
+/**
+ * The policy as an ES module: Vercel runs the proxy as native Node ESM without bundling, and Node
+ * refuses a plain JSON import (it needs `with { type: 'json' }`), so a module works everywhere.
+ */
 export function vercelPolicy(policy) {
-    return `${JSON.stringify(policy, null, 4)}\n`;
+    return `// ${GENERATED}\nexport default ${JSON.stringify(policy, null, 4)};\n`;
 }

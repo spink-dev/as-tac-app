@@ -27,6 +27,6 @@
         "fail2banTrapFilter": "docker/anti-ai/fail2ban/filter.d/anti-ai-trap.conf",
         "fail2banDenyFilter": "docker/anti-ai/fail2ban/filter.d/anti-ai-deny.conf",
         "fail2banJail": "docker/anti-ai/fail2ban/jail.d/anti-ai.conf",
-        "vercelPolicy": "anti-ai.policy.json"
+        "vercelPolicy": "anti-ai.policy.mjs"
     }
 }

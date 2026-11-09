@@ -57,14 +57,13 @@ Dazu überall: `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimagein
 
 ### Vercel
 
-- `proxy.ts` im Projekt:
-  ```ts
+- `proxy.mjs` im Projekt (Ausgabe `vercelPolicy` z. B. auf `anti-ai.policy.mjs`):
+  ```js
   import { createProxy } from './anti-ai/lib/vercel.mjs';
-  import type { Policy } from './anti-ai/lib/classify.mjs';
-  import policy from './anti-ai.policy.json';
-  export default createProxy(policy as Policy);
+  import policy from './anti-ai.policy.mjs';
+  export default createProxy(policy);
   ```
-  und in `vercel.json`: `"proxy": { "entrypoint": "proxy.ts" }` (nicht mit Frameworks, die eigene Middleware bauen, z. B. Next.js oder Astro – dort deren Datei verwenden). Läuft vor Vercels Cache bei jeder Anfrage.
+  und in `vercel.json`: `"proxy": { "entrypoint": "proxy.mjs" }`. Vercel führt die Datei als natives Node-ESM aus, ohne zu bündeln: kein JSON-Import (Node verlangt dafür `with { type: 'json' }`), relative Importe mit Endung (nicht mit Frameworks, die eigene Middleware bauen, z. B. Next.js oder Astro – dort deren Datei verwenden). Läuft vor Vercels Cache bei jeder Anfrage.
 - Zusätzlich die verwalteten Firewall-Regeln von Vercel einschalten (alle Pläne, standardmässig aus); sie prüfen Bots auch über IP-Bereiche, Reverse-DNS und Signaturen:
   - **AI Bots:** Dashboard → Security → Firewall → Rules → Bot Management → AI Bots, für «AI crawlers» und «AI assistants» je **Deny**. Per CLI z. B. `vercel firewall rules edit ai-bots --category ai-crawlers --action deny --yes`, dann `vercel firewall diff` und `vercel firewall publish`.
   - **Bot Protection:** stellt Clients, die sich nicht wie ein Browser verhalten (z. B. `curl` mit Chrome-Namen), eine JavaScript-Prüfung. Zuerst auf **Log**, nach Durchsicht auf **Challenge**. Wirkt nicht, wenn ein weiterer Proxy (Cloudflare) vor Vercel steht.
