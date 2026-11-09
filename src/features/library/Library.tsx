@@ -16,6 +16,7 @@ import { defaultCountry, startChoice } from '../../core/areas/catalog';
 import { areaLabel, CountrySelect, useCountries } from '../areas/AreaCatalog';
 import type { AreaMeta } from '../../core/areas/types';
 import { checkForUpdate, usePwa } from '../../core/pwa';
+import { useOnline } from '../../core/net';
 import { FORMAT_VERSION } from '../../core/model/schema';
 import { AppInfo, UpdateBanner } from '../update/Update';
 import { LegacyBanner } from './LegacyBanner';
@@ -372,17 +373,3 @@ export function Library() {
     );
 }
 
-/** `navigator.onLine`, kept current. */
-function useOnline(): boolean {
-    const [online, setOnline] = useState(() => navigator.onLine);
-    useEffect(() => {
-        const update = () => setOnline(navigator.onLine);
-        window.addEventListener('online', update);
-        window.addEventListener('offline', update);
-        return () => {
-            window.removeEventListener('online', update);
-            window.removeEventListener('offline', update);
-        };
-    }, []);
-    return online;
-}
