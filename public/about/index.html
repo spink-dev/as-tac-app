@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="de-CH">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>AS-TAC – Taktische Karten für Airsoft</title>
+        <meta name="description" content="AS-TAC plant Airsoft-Spiele auf echten Karten: offline nutzbar, mit Markern, Routen, Zonen, Feldnavigation und Live-Briefing." />
+        <!-- The only public page (anti-ai.site.json): may be listed, never archived or used for AI. -->
+        <meta name="robots" content="noarchive, noai, noimageai" />
+        <meta name="tdm-reservation" content="1" />
+        <link rel="canonical" href="https://as-tac.dev/about/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="AS-TAC" />
+        <meta property="og:title" content="AS-TAC – Taktische Karten für Airsoft" />
+        <meta property="og:description" content="Planen, orientieren und briefen auf echten Karten – auch ohne Netz." />
+        <meta property="og:url" content="https://as-tac.dev/about/" />
+        <meta property="og:image" content="https://as-tac.dev/icon-512.png" />
+        <meta name="theme-color" content="#171a1e" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <style>
+            :root {
+                --bg: oklch(0.955 0.004 250);
+                --surface: oklch(0.993 0.002 250);
+                --ink: oklch(0.255 0.012 250);
+                --ink-2: oklch(0.39 0.012 250);
+                --line: oklch(0.875 0.006 250);
+                --accent: oklch(0.53 0.155 40);
+                --accent-ink: oklch(0.99 0.004 40);
+                color-scheme: light dark;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg: oklch(0.2 0.008 250);
+                    --surface: oklch(0.245 0.009 250);
+                    --ink: oklch(0.93 0.006 250);
+                    --ink-2: oklch(0.78 0.008 250);
+                    --line: oklch(0.36 0.01 250);
+                    --accent: oklch(0.68 0.15 45);
+                    --accent-ink: oklch(0.18 0.01 45);
+                }
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--ink);
+                font: 17px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            }
+            main {
+                max-width: 40rem;
+                margin: 0 auto;
+                padding: max(2.5rem, env(safe-area-inset-top)) 1.25rem 3rem;
+            }
+            header {
+                display: flex;
+                align-items: center;
+                gap: 0.875rem;
+                margin-bottom: 1.75rem;
+            }
+            header img {
+                width: 3rem;
+                height: 3rem;
+                border-radius: 0.6rem;
+            }
+            h1 {
+                margin: 0;
+                font-size: 1.6rem;
+                line-height: 1.2;
+                letter-spacing: -0.01em;
+                text-wrap: balance;
+            }
+            h2 {
+                margin: 2.25rem 0 0.5rem;
+                font-size: 1.05rem;
+            }
+            p,
+            li {
+                max-width: 65ch;
+                color: var(--ink-2);
+                text-wrap: pretty;
+            }
+            ul {
+                padding-left: 1.2rem;
+            }
+            .open {
+                display: inline-flex;
+                align-items: center;
+                min-height: 48px;
+                margin: 0.5rem 0 0;
+                padding: 0 1.25rem;
+                border-radius: 0.6rem;
+                background: var(--accent);
+                color: var(--accent-ink);
+                font-weight: 600;
+                text-decoration: none;
+            }
+            .open:focus-visible {
+                outline: 3px solid var(--ink);
+                outline-offset: 3px;
+            }
+            .notice {
+                margin-top: 2.5rem;
+                padding: 1rem 1.125rem;
+                border: 1px solid var(--line);
+                border-radius: 0.6rem;
+                background: var(--surface);
+            }
+            .notice p {
+                margin: 0.25rem 0;
+                font-size: 0.94rem;
+            }
+            hr {
+                margin: 3rem 0 0;
+                border: 0;
+                border-top: 1px solid var(--line);
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <header>
+                <img src="/icon.svg" alt="" width="48" height="48" />
+                <h1>AS-TAC – Taktische Karten für Airsoft</h1>
+            </header>
+            <p>AS-TAC hilft beim Planen und Spielen von Airsoft-Events auf echten Karten: Gelände offline speichern, Marker, Routen und Zonen setzen, im Feld navigieren und Briefings leiten – allein oder gemeinsam. Die App läuft im Browser und danach ohne Netz.</p>
+            <a class="open" href="/">AS-TAC öffnen</a>
+
+            <div class="notice" role="note">
+                <p><strong>Kein automatisierter Zugriff, keine KI-Nutzung.</strong></p>
+                <p>Automatisierter Zugriff, Scraping sowie die Nutzung von Inhalten, Code oder Design dieser Website für KI-Training, KI-Systeme, KI-Antworten oder Datensätze sind nicht gestattet. Text- und Data-Mining ist ausdrücklich vorbehalten (maschinenlesbar in <code>robots.txt</code>, <code>ai.txt</code> und <code>/.well-known/tdmrep.json</code>).</p>
+            </div>
+
+            <hr />
+
+            <section lang="en">
+                <h2>AS-TAC – tactical maps for airsoft</h2>
+                <p>AS-TAC helps plan and play airsoft events on real maps: save terrain for offline use, place markers, routes and zones, navigate in the field and lead briefings – alone or together. It runs in the browser and then without a network.</p>
+                <a class="open" href="/">Open AS-TAC</a>
+                <div class="notice" role="note">
+                    <p><strong>No automated access, no AI use.</strong></p>
+                    <p>Automated access, scraping, and any use of this site's content, code or design for AI training, AI systems, AI answers or datasets are not permitted. Text and data mining is expressly reserved (machine-readable in <code>robots.txt</code>, <code>ai.txt</code> and <code>/.well-known/tdmrep.json</code>).</p>
+                </div>
+            </section>
+        </main>
+    </body>
+</html>

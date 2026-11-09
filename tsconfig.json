@@ -17,5 +17,5 @@
     "noEmit": true,
     "types": ["vite/client", "vite-plugin-pwa/client", "node", "geojson"]
   },
-  "include": ["src", "tests/unit", "vite.config.ts"]
+  "include": ["src", "tests/unit", "vite.config.ts", "proxy.ts"]
 }

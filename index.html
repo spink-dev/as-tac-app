@@ -5,6 +5,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
         <meta name="theme-color" content="#171a1e" />
         <meta name="description" content="AS-TAC: Offline-Karten, Planung, Feldnavigation und Live-Briefing für Airsoft." />
+        <!-- anti-ai (anti-ai.site.json): only /about/ is public; no indexing, no AI use, text and data mining reserved. -->
+        <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai" />
+        <meta name="tdm-reservation" content="1" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
@@ -28,6 +31,8 @@
     </head>
     <body>
         <div id="root"></div>
+        <!-- Trap for clients that ignore robots.txt: invisible, not focusable, never followed by people. -->
+        <a href="/_/t9q4x2/" rel="nofollow" tabindex="-1" aria-hidden="true" hidden>.</a>
         <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
             <filter id="red-light" color-interpolation-filters="sRGB">
                 <feColorMatrix type="matrix" values="0.42 0.80 0.16 0 0  0.05 0.10 0.02 0 0  0.02 0.04 0.01 0 0  0 0 0 1 0" />

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unveröffentlicht
+
+- **KI-Schutz (anti-ai):** wiederverwendbarer Baustein in `anti-ai/` für nginx und Vercel, für as-tac.dev in `anti-ai.site.json` eingestellt. KI-Crawler, KI-Assistenten und signierte KI-Agenten (Web Bot Auth), Skripte, HTTP-Bibliotheken, Headless-Browser und unbekannte Bots erhalten 403 auf allem; Suchmaschinen nur die neue Infoseite `/about/` (Deutsch/Englisch), Link-Vorschauen die Infoseite statt der App; Seitenaufrufe ohne `Accept-Language` werden abgelehnt. `robots.txt`, `ai.txt`, `/.well-known/tdmrep.json`, `X-Robots-Tag` (`noindex`, `noai`) und `tdm-reservation` überall; unsichtbarer Fallen-Link mit fail2ban-Filter und -Jail; Ratenbegrenzung für Seitenaufrufe je Adresse (nginx). Vercel: `proxy.ts` (Routing Middleware) mit derselben Entscheidung, `vercel.json` stellt das Projekt auf Vite. KI-Namensliste von ai.robots.txt (MIT), Stand 2026-11-09.
+
 ## 1.0.0-alpha.3 — 2026-11-09
 
 - **Felder nach Land:** 36 mitgelieferte Airsoft-Felder in 13 Ländern (Deutschland 8, Frankreich 8, Schweiz 2, Österreich 2, Slowakei 3, Vereinigtes Königreich 3, Belgien 2, Bulgarien 2, Italien 2, Niederlande, Polen, Spanien, Ungarn je 1), unter anderem der Bärenkopf (Fort de la Tête de l’Ours, Col des Croix), das Ausbildungszentrum Riedikon, der Steinbruch Dielsdorf in Steinmaur, Airsoft Park Tirol, Actionbase Rauchenwarth, Blackfield, RSA Harnekop und Area-M. Katalog in `src/config/maps.json` (Land, Ort, Website, OSM-Objekt, Datei, Grösse, Objektzahl, SHA-256, Datenstand); Dateien unter `public/maps/<land>/<name>.<sha256:8>.geojson`, damit eine spätere Aktualisierung nie eine Datei ersetzt, die eine ältere Version noch lädt. Startseite: «Auf diesem Gerät» und «Felder nach Land» mit Länderwahl; «Neuer Plan», «Karten» und die Platzierung beim Import gruppieren ebenso. Ländernamen kommen vom Browser (`Intl.DisplayNames`).
