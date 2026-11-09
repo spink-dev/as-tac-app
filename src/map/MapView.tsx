@@ -4,7 +4,8 @@ import { MaplibreMap } from './engine';
 import { useProject } from '../core/store/project';
 import { useUi } from '../core/store/ui';
 import { usePrefs } from '../core/store/prefs';
-import { getArea, ensureArea } from '../core/areas/store';
+import { getArea, ensureArea, isBundled } from '../core/areas/store';
+import { areaErrorText } from '../features/areas/areaErrors';
 import { kvGet, kvSet } from '../core/storage/db';
 import { utmGrid } from '../core/geo/mgrs';
 import type { Camera, Project } from '../core/model/schema';
@@ -144,13 +145,22 @@ async function loadArea(project: Project, fit: boolean) {
         return;
     }
     let row = await getArea(project.areaId);
-    if (!row) {
+    if (!row && !isBundled(project.areaId)) {
+        // Downloaded or imported on another device, or a field no longer in the catalog: the old
+        // basemap must not stay under the plan as if it were this one.
+        setSourceData(map, 'osm', EMPTY_FC);
+        toast(t('area.missing', { id: project.areaId }), { tone: 'warn' });
+    } else if (!row) {
         try {
             toast(t('new.installing'));
             await ensureArea(project.areaId);
             row = await getArea(project.areaId);
-        } catch {
-            toast(t('area.needsNetwork'), { tone: 'warn' });
+        } catch (error) {
+            // Not the previous area's basemap under a plan that now names another one.
+            if (mapRef.current === map && useProject.getState().project?.areaId === project.areaId) {
+                setSourceData(map, 'osm', EMPTY_FC);
+            }
+            toast(areaErrorText(error), { tone: 'warn' });
         }
     }
     if (!row || mapRef.current !== map || useProject.getState().project?.areaId !== project.areaId) {
@@ -262,7 +272,9 @@ export function MapView() {
             if (state.project !== prev.project) {
                 schedulePlanRender();
                 if (state.project && state.project.areaId !== prev.project?.areaId) {
-                    void loadArea(state.project, false);
+                    // Another area for the same plan (Karten, undo, a live partner): show it. Fields lie
+                    // all over Europe, so the old view would show nothing of the new one.
+                    void loadArea(state.project, prev.project?.id === state.project.id);
                 }
                 if (state.project?.settings.grid !== prev.project?.settings.grid) {
                     renderGrid();

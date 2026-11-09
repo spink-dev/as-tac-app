@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { areaKm2, cachedTiles, downloadArea, mergeTiles, secondsUntilNextDownload, tileBounds } from '../../src/core/areas/overpass';
+import { areaKm2, cachedTiles, downloadArea, mergeTiles, OVERPASS_ENDPOINTS, secondsUntilNextDownload, tileBounds } from '../../src/core/areas/overpass';
 import type { Bounds } from '../../src/core/geo/geo';
 
 const AREA: Bounds = [11.80, 52.37, 11.83, 52.39];
+/** Requests for one tile before a download gives up: every server, three rounds. */
+const ATTEMPTS = OVERPASS_ENDPOINTS.length * 3;
 
 /** A fake Overpass: one way per tile plus a way shared by all tiles, a node tagged in one tile only. */
 function answer(query: string) {
@@ -67,8 +69,8 @@ describe('tiled area downloads', () => {
         vi.useFakeTimers();
         const total = tileBounds(AREA).length;
         expect(total).toBeGreaterThan(1);
-        // Every request for the last tile fails: both servers, all rounds.
-        failing = new Set(Array.from({ length: 8 }, (_, i) => total + i));
+        // Every request for the last tile fails: every server, all rounds.
+        failing = new Set(Array.from({ length: ATTEMPTS }, (_, i) => total + i));
         const first = downloadArea({ id: 'a', name: 'A', bounds: AREA, signal: new AbortController().signal, onProgress: () => undefined });
         const failed = first.catch((error: Error) => error);
         // (Not runAllTimers: that would also fire the 30-minute expiry of the kept tiles.)
@@ -98,7 +100,7 @@ describe('tiled area downloads', () => {
         // Past the polite pause after the previous test's download.
         vi.setSystemTime(Date.now() + (secondsUntilNextDownload() + 1) * 1000);
         const total = tileBounds(AREA).length;
-        failing = new Set(Array.from({ length: 6 }, (_, i) => total + i));
+        failing = new Set(Array.from({ length: ATTEMPTS }, (_, i) => total + i));
         const failed = downloadArea({ id: 'b', name: 'B', bounds: AREA, signal: new AbortController().signal, onProgress: () => undefined }).catch((error: Error) => error);
         await vi.advanceTimersByTimeAsync(5 * 60_000);
         expect(((await failed) as Error).message).toBe('Failed to fetch');

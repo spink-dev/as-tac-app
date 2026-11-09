@@ -17,14 +17,16 @@ export async function exportAreaFile(id: string): Promise<{ blob: Blob; filename
 
 /**
  * Import an area package without duplicating what is already here:
- * - a bundled id always means the installed bundled area (never forked, never replaced);
+ * - a bundled id (or an area installed as a prepared field) always means the installed area
+ *   (never forked, never replaced);
  * - the same content (by sanitized hash) is reused under whatever id it already has;
  * - only genuinely different data under a taken (or bundled) id gets a new id.
  */
 export async function importAreaPackage(raw: unknown): Promise<AreaMeta> {
     const pkg = await sanitizeArea(await verifyArea(raw));
-    const bundled = BUNDLED_AREAS.some((area) => area.id === pkg.id);
     const existing = (await db.areaMeta.get(pkg.id))?.meta;
+    // Also a field installed from an earlier catalog (e.g. the Zürich test areas up to alpha.2).
+    const bundled = BUNDLED_AREAS.some((area) => area.id === pkg.id) || existing?.origin === 'bundled';
     if (existing && (bundled || existing.sha256 === pkg.sha256 || existing.contentSha256 === pkg.sha256)) {
         return existing;
     }

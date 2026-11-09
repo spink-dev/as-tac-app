@@ -32,11 +32,24 @@ export interface AreaPackage {
 
 export type AreaMeta = Omit<AreaPackage, 'data'>;
 
+/** A prepared field of the catalog (src/config/maps.json, see areas/catalog.ts). */
 export interface BundledArea {
     id: string;
     name: string;
+    /** ISO 3166-1 alpha-2. */
+    country: string;
+    /** Municipality or nearest town. */
+    place: string;
+    /** The operator's site, when known. */
+    website?: string;
+    /** The field itself in OpenStreetMap (`way/123`), when it is mapped there. */
+    osm?: string;
     bounds: Bounds;
+    /** Served path of the GeoJSON; `bytes` and `sha256` describe exactly that file. */
     file: string;
-    approxBytes: number;
-    description: string;
+    bytes: number;
+    featureCount: number;
+    sha256: string;
+    dataTimestamp: string;
+    source: string;
 }

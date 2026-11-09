@@ -6,7 +6,8 @@ import { Button, Dialog, Field } from '../../ui/components';
 import { readImportFile, storeImported, type ImportResult } from '../../core/files/astac';
 import type { TacMapPlacement } from '../../core/legacy/tacmap';
 import { isIos, pickFile } from '../../core/files/save';
-import { BUNDLED_AREAS, listAreas } from '../../core/areas/store';
+import { BUNDLED_AREAS, bundledArea, listAreas } from '../../core/areas/store';
+import { AreaOptions } from '../areas/AreaCatalog';
 import type { AreaMeta } from '../../core/areas/types';
 import { boundsSizeM } from '../../core/geo/geo';
 import { closeProject, openProject, useRoute } from '../../core/store/route';
@@ -50,23 +51,16 @@ export function importErrorText(error: unknown): string {
     return translate('import.errorInvalid');
 }
 
-interface AreaOption {
-    id: string;
-    name: string;
-    bounds: [number, number, number, number];
-}
-
 function PlacementStep({ onPlace }: { onPlace: (placement: TacMapPlacement) => void }) {
     const t = useT();
-    const [areas, setAreas] = useState<AreaOption[]>([]);
+    const [installed, setInstalled] = useState<AreaMeta[]>([]);
     const [choice, setChoice] = useState('');
     const selectId = useId();
     const map = mapRef.current;
     useEffect(() => {
-        void listAreas().then((installed: AreaMeta[]) => {
-            const options = [...BUNDLED_AREAS.map((a) => ({ id: a.id, name: a.name, bounds: a.bounds })), ...installed.filter((a) => !BUNDLED_AREAS.some((b) => b.id === a.id)).map((a) => ({ id: a.id, name: a.name, bounds: a.bounds }))];
-            setAreas(options);
-            setChoice(map ? 'view' : options[0]?.id ?? '');
+        void listAreas().then((rows: AreaMeta[]) => {
+            setInstalled(rows);
+            setChoice(map ? 'view' : rows[0]?.id ?? BUNDLED_AREAS[0]?.id ?? '');
         });
     }, [map]);
     const place = () => {
@@ -76,7 +70,7 @@ function PlacementStep({ onPlace }: { onPlace: (placement: TacMapPlacement) => v
             onPlace({ center: [map.getCenter().lng, map.getCenter().lat], widthM: boundsSizeM(bounds).width * 0.7 });
             return;
         }
-        const area = areas.find((a) => a.id === choice);
+        const area = bundledArea(choice) ?? installed.find((a) => a.id === choice);
         if (area) {
             const [w, s, e, n] = area.bounds;
             onPlace({ center: [(w + e) / 2, (s + n) / 2], widthM: boundsSizeM(area.bounds).width * 0.6 });
@@ -88,7 +82,7 @@ function PlacementStep({ onPlace }: { onPlace: (placement: TacMapPlacement) => v
             <Field label={t('share.placeTitle')} htmlFor={selectId}>
                 <select id={selectId} className="select" autoFocus value={choice} onChange={(event) => setChoice(event.target.value)}>
                     {map ? <option value="view">{t('share.placeHere')}</option> : null}
-                    {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
+                    <AreaOptions installed={installed} />
                 </select>
             </Field>
             <Button variant="primary" onClick={place} disabled={!choice}><MapPin size={18} /> {t('common.next')}</Button>

@@ -88,12 +88,18 @@ Neuentwicklung; Code eigens geschrieben. Übernommen bzw. neu verwendet:
 | Lenis 1.3 | Sanftes Scrollen (nur Rad/Trackpad) | MIT |
 | Supabase JS | optionale Live-Zusammenarbeit | MIT |
 
+### Mitgelieferte Felder (ab 1.0.0-alpha.3)
+
+- **Grundkarten:** OpenStreetMap-Daten © OpenStreetMap-Mitwirkende, ODbL 1.0, abgefragt am 2026-11-09 über `overpass.openstreetmap.fr` (Datenstand je Feld in `src/config/maps.json`, `dataTimestamp`), mit der App-eigenen Umwandlung (`toBasemap`, osmtogeojson) nach `public/maps/<land>/` geschrieben. Mahlwinkel unverändert aus 0.6.
+- **Lage der Felder:** in OSM als `sport=airsoft` erfasste Objekte (Katalogfeld `osm`), ergänzt um Felder, deren Lage öffentlich genannt ist: Bärenkopf / Fort de Château-Lambert (OSM `way/32543811`; Zufahrt, Parkplatz und Kaserne aus dem Forum france-airsoft.fr, Thema 214618), Ausbildungszentrum Riedikon und Steinbruch Steinmaur (OSM, Adressen aus milsim-events.ch und airsoft-gelaende.eu), Airsoft Park Tirol und Actionbase Rauchenwarth (OSM, Adressen aus portal-airsoft.de), Blackfield und RSA Harnekop (Koordinaten aus airsoft-gelaende.eu), The Green Mile (projekt-airsoft.de), Area-M (airsoft-koblenz.de). Übernommen sind nur Namen, Orte, Koordinaten und Website-Adressen – keine Logos, Kartenbilder oder Texte der Betreiber.
+- Ein Feld im Katalog ist kein Hinweis auf Öffnungszeiten, Regeln oder Erlaubnis; massgeblich sind die Betreiber.
+
 ### Bekannte Eventkarten (nicht ausgeliefert)
 
 `src/core/templates/knownImages.ts` enthält nur SHA-256, Bildgrösse und Passpunkte der Bildkarten «Mahlwinkel – Dark Emergency 2026» (Airsoft Helden) und «Mahlwinkel – Mission 24H 2026». Die Bilder selbst sind **nicht** im Repository. Importiert ein Nutzer seine eigene Kopie (z. B. aus einem TacMap-Projekt), wird sie automatisch georeferenziert. Passpunkte: Ecken der r2-Safe-Zonen (DE) bzw. Windturbinenfundamente und HQ-Positionen (M24H), affin ausgeglichen; RMS 2,6 m bzw. 4,8 m. Keine Vermessungszusage.
 
 ### Online-Dienste (nur auf ausdrücklichen Nutzerwunsch)
 
-- Overpass API (`overpass-api.de`, Ausweich: `overpass.private.coffee`) für Gebietsdownloads; OSM-Daten ODbL 1.0, Attribution in Karte und Paket.
+- Overpass API (`overpass-api.de`, Ausweich: `overpass.private.coffee`, `overpass.openstreetmap.fr`) für Gebietsdownloads und die mitgelieferten Felder; OSM-Daten ODbL 1.0, Attribution in Karte und Paket.
 - Nominatim (`nominatim.openstreetmap.org`) für die Ortssuche, gemäss Nutzungsrichtlinie nur auf Absenden, ≤ 1 Anfrage/s.
 - OSM-Standardkacheln (`tile.openstreetmap.org`) ausschliesslich als Orientierungshintergrund im Download-Dialog, ohne Vorabladen oder Offline-Speicherung.

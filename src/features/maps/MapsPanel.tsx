@@ -5,7 +5,8 @@ import { useProject, mutate } from '../../core/store/project';
 import { useUi, toast } from '../../core/store/ui';
 import { showDialog } from '../../core/store/dialogs';
 import { Button, Empty, Field, IconButton } from '../../ui/components';
-import { BUNDLED_AREAS, listAreas } from '../../core/areas/store';
+import { isBundled, listAreas } from '../../core/areas/store';
+import { AreaOptions } from '../areas/AreaCatalog';
 import type { AreaMeta } from '../../core/areas/types';
 import { canEdit, toastUndoable } from '../../core/actions';
 import { addImageMap, boundCount, removeImage } from '../../core/images';
@@ -87,7 +88,7 @@ export function MapsPanel() {
     const editing = useUi((state) => state.imageEditId);
     useUi((state) => state.mode);
     useProject((state) => state.readOnly);
-    const [areas, setAreas] = useState<AreaMeta[]>([]);
+    const [areas, setAreas] = useState<AreaMeta[] | null>(null);
     useEffect(() => {
         void listAreas().then(setAreas);
     }, []);
@@ -95,11 +96,7 @@ export function MapsPanel() {
         return null;
     }
     const editable = canEdit();
-    const options = [
-        ...BUNDLED_AREAS.map((area) => ({ id: area.id, name: area.name })),
-        ...areas.filter((area) => !BUNDLED_AREAS.some((b) => b.id === area.id)).map((area) => ({ id: area.id, name: area.name })),
-    ];
-    const current = areas.find((area) => area.id === project.areaId);
+    const current = areas?.find((area) => area.id === project.areaId);
     const patchImage = (id: string, patch: Partial<ImageOverlay>, key: string) => mutate(t('maps.images'), (draft) => {
         const image = draft.images.find((i) => i.id === id);
         if (image) {
@@ -116,7 +113,11 @@ export function MapsPanel() {
                         draft.areaId = event.target.value || null;
                     })}>
                         <option value="">{t('new.noArea')}</option>
-                        {options.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
+                        <AreaOptions installed={areas ?? []} />
+                        {project.areaId && !isBundled(project.areaId) && !(areas ?? []).some((area) => area.id === project.areaId) ? (
+                            // Until the device's areas are read, the id alone: not yet «missing».
+                            <option value={project.areaId}>{areas ? t('area.missingOption', { id: project.areaId }) : project.areaId}</option>
+                        ) : null}
                     </select>
                 </Field>
                 <Button small variant="ghost" onClick={() => showDialog('areaDownload')}><Download size={16} /> {t('new.downloadArea')}</Button>

@@ -4,7 +4,9 @@ import { areaErrorText } from '../areas/areaErrors';
 import { useT, formatBytes } from '../../i18n';
 import { Button, Dialog, Field, ICON } from '../../ui/components';
 import { useDialogs } from '../../core/store/dialogs';
-import { BUNDLED_AREAS, ensureArea, listAreas, areaCenter } from '../../core/areas/store';
+import { bundledArea, ensureArea, isBundled, listAreas, areaCenter } from '../../core/areas/store';
+import { defaultCountry } from '../../core/areas/catalog';
+import { CountrySelect, useCountries } from '../areas/AreaCatalog';
 import type { AreaMeta } from '../../core/areas/types';
 import { createProject } from '../../core/model/factory';
 import { createAndOpen } from '../../core/store/route';
@@ -14,38 +16,79 @@ import { toast } from '../../core/store/ui';
 export function NewPlanDialog() {
     const t = useT();
     const open = useDialogs((state) => state.open === 'newPlan');
-    const payload = useDialogs((state) => state.payload as { areaId?: string } | null);
+    const payload = useDialogs((state) => state.payload as { areaId?: string; country?: string } | null);
     const hide = useDialogs((state) => state.hide);
     const show = useDialogs((state) => state.show);
     const nameId = useId();
     const [name, setName] = useState('');
     const [areaId, setAreaId] = useState<string>('mahlwinkel');
     const [template, setTemplate] = useState<string>('');
-    const [installed, setInstalled] = useState<AreaMeta[]>([]);
+    const [installed, setInstalled] = useState<AreaMeta[] | null>(null);
+    const countries = useCountries();
+    const [country, setCountry] = useState(() => defaultCountry('mahlwinkel'));
     const [busy, setBusy] = useState<number | null>(null);
     const creating = useRef(false);
 
     useEffect(() => {
         if (open) {
+            setInstalled(null);
             void listAreas().then(setInstalled);
             setName('');
             setTemplate('');
             setBusy(null);
             if (payload?.areaId) {
                 setAreaId(payload.areaId);
+                setCountry(defaultCountry(payload.areaId));
+            } else if (payload?.country) {
+                // «Feld wählen»: a field of that country, whatever was chosen last time.
+                setCountry(payload.country);
+                const first = countries.find((group) => group.country === payload.country)?.areas[0];
+                if (first) {
+                    chooseArea(first.id);
+                }
+            } else {
+                setCountry(defaultCountry(areaId));
             }
         }
+        // Only when the dialog opens: the chosen area is kept between openings.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, payload]);
 
-    const areas = [
-        ...BUNDLED_AREAS.map((area) => ({ id: area.id, name: area.name, meta: `${t('area.bundled')} · ${formatBytes(area.approxBytes)}` })),
-        ...installed.filter((area) => !BUNDLED_AREAS.some((b) => b.id === area.id)).map((area) => ({ id: area.id, name: area.name, meta: `${t('area.installed')} · ${formatBytes(area.byteSize)}` })),
-    ];
+    useEffect(() => {
+        // A remembered own area removed since: back to Mahlwinkel instead of an unseen, missing choice.
+        if (open && installed && areaId !== '__none' && !isBundled(areaId) && !installed.some((area) => area.id === areaId)) {
+            chooseArea('mahlwinkel');
+            setCountry(defaultCountry('mahlwinkel'));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, installed, areaId]);
+
+    const here = installed ?? [];
+    const fields = (countries.find((group) => group.country === country)?.areas ?? []).map((area) => ({
+        id: area.id,
+        name: area.name,
+        meta: `${area.place} · ${here.some((i) => i.id === area.id) ? t('area.installed') : t('area.onFirstUse', { size: formatBytes(area.bytes) })}`,
+    }));
+    const own = here.filter((area) => !isBundled(area.id)).map((area) => ({ id: area.id, name: area.name, meta: `${t('area.installed')} · ${formatBytes(area.byteSize)}` }));
+    const ownLabel = useId();
     const templates = areaId === 'mahlwinkel' ? MAHLWINKEL_EVENTS : [];
 
     function chooseArea(id: string) {
         setAreaId(id);
         setTemplate('');
+    }
+
+    /**
+     * Another country. A field chosen in the old one gives way to the new country's first field, so
+     * the choice stays visible; an own area or «Ohne Grundkarte» stays chosen (both are always shown).
+     */
+    function pickCountry(next: string) {
+        setCountry(next);
+        const first = countries.find((group) => group.country === next)?.areas[0];
+        const chosen = bundledArea(areaId);
+        if (first && chosen && chosen.country !== next) {
+            chooseArea(first.id);
+        }
     }
 
     async function create() {
@@ -81,7 +124,7 @@ export function NewPlanDialog() {
             footer={(
                 <>
                     <Button variant="ghost" onClick={hide}>{t('common.cancel')}</Button>
-                    <Button variant="primary" onClick={() => void create()} disabled={busy !== null} data-testid="create-plan">
+                    <Button variant="primary" onClick={() => void create()} disabled={busy !== null || installed === null} data-testid="create-plan">
                         {busy !== null ? t('new.installing') : t('new.create')}
                     </Button>
                 </>
@@ -104,9 +147,20 @@ export function NewPlanDialog() {
             </Field>
             <div className="field">
                 <span className="field__label">{t('new.area')}</span>
-                <div className="choice-list" role="radiogroup" aria-label={t('new.area')}>
-                    {areas.map((area) => (
+                <CountrySelect value={country} onChange={pickCountry} />
+                <div className="choice-list" role="radiogroup" aria-label={t('new.area')} data-testid="new-plan-areas">
+                    {fields.map((area) => (
                         <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => chooseArea(area.id)}>
+                            <MapIcon {...ICON} />
+                            <span className="choice__main">
+                                <span className="choice__title">{area.name}</span>
+                                <span className="choice__meta">{area.meta}</span>
+                            </span>
+                        </button>
+                    ))}
+                    {own.length ? <div className="choice-list__label" id={ownLabel} aria-hidden="true">{t('area.own')}</div> : null}
+                    {own.map((area) => (
+                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} aria-describedby={ownLabel} className="choice" onClick={() => chooseArea(area.id)}>
                             <MapIcon {...ICON} />
                             <span className="choice__main">
                                 <span className="choice__title">{area.name}</span>

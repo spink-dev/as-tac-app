@@ -2,11 +2,11 @@
 
 Taktische Kartenplanung für Airsoft – auf echten OpenStreetMap-Karten, offline im Gelände, mit Bildkarten, Teams, Briefing und Live-Zusammenarbeit. Privates Projekt von Samuel Spink.
 
-**Stand 1.0.0-alpha.1 (2026-11-08):** Neuentwicklung, die as-tac 0.6 (echte OSM-Karten) und TacMap 0.12 (Bildkarten, umfangreiche Werkzeuge) zu einer App zusammenführt. Alte Pläne, TacMap-Dateien und die gespeicherten Gebiete Mahlwinkel und Zürich/Benglen lassen sich übernehmen.
+**Stand 1.0.0-alpha.3 (2026-11-09):** Neuentwicklung, die as-tac 0.6 (echte OSM-Karten) und TacMap 0.12 (Bildkarten, umfangreiche Werkzeuge) zu einer App zusammenführt. Alte Pläne, TacMap-Dateien und gespeicherte Gebiete aus as-tac 0.x lassen sich übernehmen.
 
 ## Was die App kann
 
-- **Echte Karten offline:** mitgelieferte Gebiete (Mahlwinkel, Benglen, Zürich bis Benglen) und eigene Ausschnitte bis 36 km² direkt aus OpenStreetMap (Overpass) herunterladen. Danach läuft alles ohne Netz. Grosse Ausschnitte kommen in Teilen von höchstens 4 km²; bricht die Verbindung ab, setzt «Fortsetzen» beim fehlenden Teil an (fertige Teile bleiben 30 Minuten erhalten, solange die App offen ist).
+- **Echte Karten offline:** 36 mitgelieferte Airsoft-Felder in 13 Ländern, nach Land geordnet (siehe unten), und eigene Ausschnitte bis 36 km² direkt aus OpenStreetMap (Overpass) herunterladen. Danach läuft alles ohne Netz. Grosse Ausschnitte kommen in Teilen von höchstens 4 km²; bricht die Verbindung ab, setzt «Fortsetzen» beim fehlenden Teil an (fertige Teile bleiben 30 Minuten erhalten, solange die App offen ist).
 - **Bildkarten wie in TacMap:** Eventkarten, Skizzen oder Luftbilder auf die echte Karte legen und mit Passpunkten ausrichten (ab 2 Paaren ähnlich, ab 4 gut verteilten Paaren mit Verzerrungsausgleich). Bekannte Mahlwinkel-Eventkarten werden am SHA-256 erkannt und sofort ausgerichtet. Objekte, Zeichnungen und Ausschnitte auf einer Bildkarte bewegen sich beim Neuausrichten mit.
 - **Werkzeuge:** Marker (M→1–9), Routen (R→1–4), Zonen als Fläche oder Kreis (Z→1–8, Tab), Text, freies Zeichnen (D), Radierer, Peilung, Messen, Ebenen, Teams mit Auftragskarte, Verbände, Logos, Teamvorlagen, Protokoll, Rückgängig/Wiederholen, Befehlspalette (⌘K / Ctrl+K), frei belegbare Tastenkürzel.
 - **Feldmodus:** Plan gesperrt, eigene Position mit Genauigkeit, MGRS, Kompass mit «Blickrichtung oben», Navigation zu angetippten Objekten, Pfadaufnahme (bleibt auf dem Gerät).
@@ -19,6 +19,49 @@ Taktische Kartenplanung für Airsoft – auf echten OpenStreetMap-Karten, offlin
 - **Darstellung:** Tag, Dunkel, Rotlicht; grosse Touch-Ziele; Telefon mit Bottom Sheet, Desktop mit Seitenpanel.
 - **Sprache:** Deutsch ist die erste Sprache, unabhängig von der Browsersprache. Englisch lässt sich auf der Startseite (Schaltfläche oben rechts), in den Einstellungen und in der Befehlssuche wählen; die Wahl gilt für dieses Gerät.
 - **Version und Updates:** Version und Build stehen auf der Startseite («Dieses Gerät») und in den Einstellungen. Die App fragt beim Start, stündlich und nach einem Funkloch den Server nach einer neuen Version (`/version.json`, wenige Bytes) und lädt sie im Hintergrund – im Datensparmodus erst auf Tippen («Update laden»). Unabhängig davon prüft der Browser beim Öffnen der App selbst, ob sich die App-Dateien geändert haben, und lädt eine neue Version dann auch ohne Zutun; aktiv wird sie trotzdem erst auf Tippen oder beim nächsten Start, wenn alle AS-TAC-Fenster geschlossen waren. Eingespielt wird sie nur auf Tippen («Jetzt aktualisieren»), nie Minuten später von selbst: eine laufende Pfadaufnahme, ein offener Entwurf oder temporäre Zeichnungen blockieren; dann wird alles gespeichert, Änderungen werden gesperrt, und danach öffnet sich derselbe Plan im selben Modus und mit derselben Streamer-Safe-Ansicht. Andere offene Fenster laden nicht von selbst neu, sondern werden zum Neuladen aufgefordert. Eine ältere Version auf dem Server (Rücknahme) wird gemeldet und von der App nicht von selbst geladen; der Browser kann sie wie jede neue Version beim nächsten Start aktivieren, danach meldet die App «Jetzt Version … (älter als zuvor)». «Neuerungen» zeigt die Kurzfassung dieser Liste, mit Link auf das mitgelieferte CHANGELOG.
+
+## Mitgelieferte Felder
+
+Katalog in `src/config/maps.json`, Daten unter `public/maps/<land>/` (OpenStreetMap, ODbL; Datenstand 2026-09-06, Mahlwinkel 2026-10-01). Ein Feld wird erst beim ersten Gebrauch auf dem Gerät gespeichert; nur Mahlwinkel liegt nach der Installation der App schon bereit und lässt sich auch ohne Netz als Grundkarte wählen. Aktualisieren oder ergänzen: Eintrag im Katalog, dann `npm run map:build -- <id>` (lädt aus Overpass) oder `npm run map:build -- --from antworten.json.gz`. Die Dateien tragen die ersten acht Zeichen ihrer SHA-256 im Namen; ältere Dateien bleiben liegen, bis keine unterstützte Version sie mehr nennt (Ausnahme: die mit alpha.3 entfernten Zürcher Testgebiete).
+
+| Land | Feld | Ort | Grösse |
+| --- | --- | --- | --- |
+| Belgien | Fort Knox Playground | Sint-Katelijne-Waver | 282 KB |
+| Belgien | Fullyloaded | Spiere-Helkijn | 416 KB |
+| Bulgarien | Airsoft Sofia Field | Sofia (Krivina) | 172 KB |
+| Bulgarien | Boinopole | Sofia (Obelya) | 115 KB |
+| Deutschland | AirsoftField Kreuzfeld | Kreuzfeld (Malente) | 157 KB |
+| Deutschland | Area-M · Airsoft Koblenz | Simmern (Westerwald) | 257 KB |
+| Deutschland | Blackfield · Bunkerfeld | Altwarp | 190 KB |
+| Deutschland | EventPark Oberpfalz | Schmidgaden | 110 KB |
+| Deutschland | Mahlwinkel · Airsoft-Feld | Mahlwinkel | 298 KB |
+| Deutschland | RSA Harnekop | Prötzel-Harnekop | 122 KB |
+| Deutschland | The Green Mile | Wittlich | 103 KB |
+| Deutschland | Woodlandpark Leese | Leese | 85 KB |
+| Frankreich | Airsoft Lille | Beaucamps-Ligny | 139 KB |
+| Frankreich | Bärenkopf · Fort de la Tête de l'Ours | Haut-du-Them-Château-Lambert | 200 KB |
+| Frankreich | Black Reapers Cahors | Douelle | 138 KB |
+| Frankreich | Freelance Paintball Airsoft | Cirières | 92 KB |
+| Frankreich | Grand Terrain SAG28 | Saint-Martin-de-Nigelles | 73 KB |
+| Frankreich | S.A.S Force 51 | Tours-sur-Marne | 447 KB |
+| Frankreich | Sentinelle 07 Airsoft | Vernoux-en-Vivarais | 798 KB |
+| Frankreich | Terrain d'airsoft des Ardennes | Aiglemont | 392 KB |
+| Italien | Softair Dynamico Camp | Cellatica | 614 KB |
+| Italien | SST Softair | Vigolzone | 123 KB |
+| Niederlande | Balls & Arrows | Lelystad | 247 KB |
+| Österreich | Actionbase Rauchenwarth | Rauchenwarth | 196 KB |
+| Österreich | Airsoft Park Tirol | Patsch | 444 KB |
+| Polen | ASG Arena Battleground | Wrocław | 1.6 MB |
+| Schweiz | Ausbildungszentrum Riedikon | Riedikon (Uster) | 451 KB |
+| Schweiz | Steinbruch Dielsdorf | Steinmaur | 797 KB |
+| Slowakei | Airsoft Chtelnica | Chtelnica | 236 KB |
+| Slowakei | Airsoft Jablonové | Jablonové | 303 KB |
+| Slowakei | Airsoft Rastislavice | Rastislavice | 22 KB |
+| Spanien | CQB La Finca | Trespaderne | 582 KB |
+| Ungarn | US Army Firebase | Gyöngyös | 358 KB |
+| Vereinigtes Königreich | Black Hills Airsoft | Hundall (Chesterfield) | 233 KB |
+| Vereinigtes Königreich | HQ Airsoft | Driffield | 232 KB |
+| Vereinigtes Königreich | Humber Airsoft | South Ferriby | 84 KB |
 
 ## Starten
 
@@ -93,7 +136,7 @@ Die beiden Werte werden beim Build eingebunden; ohne sie läuft die App rein lok
 
 ## Was geprüft ist – und was nicht
 
-- Geprüft: Typprüfung, Unit-Tests (Geometrie, Format-Migrationen mit eingefrorenen Beispieldateien, Datenbank-Upgrade von alpha.1, Live-Formatkennzeichen, Versionsvergleich, MGRS, Speicher, Undo mit Partnern, Dateiformate, ZIP-Grenzen, TacMap-Umwandlung, Live-Migration und RLS unter PGlite, gleiche Regeln im lokalen Testmodus), Browser-Szenarien in Chromium (echtes Update zwischen zwei Builds mit zweitem Fenster und Streamer Safe, Live-Partner auf verschiedenen App-Versionen samt Nachholen nach dem Update, Werkzeuge, Panels, Bildkarten mit erzeugtem Bild und Ablehnung ungültiger Bilder, Feld mit simuliertem GPS/Kompass, Teilen/Import, Live im lokalen Testmodus mit drei Tabs, Live über ein simuliertes schwaches Netz mit 64 kbit/s, 300 ms Latenz und 20 % verlorenen Anfragen samt Funkloch, Bildkarten über schwaches Netz mit Datensparmodus), auch gegen die nginx-Konfiguration aus `docker/`. Gebietsdownloads in Teilen und fortsetzbare Bildübertragungen sind gegen nachgebildete Server geprüft (Overpass ist aus der Testumgebung nicht erreichbar).
+- Geprüft: Typprüfung, Unit-Tests (Geometrie, Format-Migrationen mit eingefrorenen Beispieldateien, Datenbank-Upgrade von alpha.1, Live-Formatkennzeichen, Versionsvergleich, MGRS, Speicher, Undo mit Partnern, Dateiformate, ZIP-Grenzen, TacMap-Umwandlung, Live-Migration und RLS unter PGlite, gleiche Regeln im lokalen Testmodus), Browser-Szenarien in Chromium (Feldkatalog nach Land mit Installation eines Felds vom eigenen Server und gemeldeter fehlender Grundkarte, echtes Update zwischen zwei Builds mit zweitem Fenster und Streamer Safe, Live-Partner auf verschiedenen App-Versionen samt Nachholen nach dem Update, Werkzeuge, Panels, Bildkarten mit erzeugtem Bild und Ablehnung ungültiger Bilder, Feld mit simuliertem GPS/Kompass, Teilen/Import, Live im lokalen Testmodus mit drei Tabs, Live über ein simuliertes schwaches Netz mit 64 kbit/s, 300 ms Latenz und 20 % verlorenen Anfragen samt Funkloch, Bildkarten über schwaches Netz mit Datensparmodus), auch gegen die nginx-Konfiguration aus `docker/`. Gebietsdownloads in Teilen und fortsetzbare Bildübertragungen sind gegen nachgebildete Server geprüft (Overpass ist aus der Testumgebung nicht erreichbar); die Daten der mitgelieferten Felder wurden über einen Browser von `overpass.openstreetmap.fr` geholt und mit `npm run map:build -- --from` umgewandelt, Grösse und SHA-256 jeder Datei prüft ein Unit-Test.
 - **Nicht** geprüft: ein Update auf echten Telefonen (installierte App auf iOS/Android) und eine echte Formatänderung (Format 2 gibt es noch nicht; die Schritte sind mit einem erfundenen Format geprüft), echte Geräte (iPhone, Android) und echte Sensoren, Safari/WebKit, ein echtes Supabase-Projekt (Realtime, Storage, Auth), Offline-Betrieb auf einem installierten Telefon, der Docker-Build selbst, die Erkennung bekannter Eventkarten (braucht die eigene Bilddatei: `node tests/e2e/images.mjs <ordner> <eventkarte>`).
 
 ## Lizenzen

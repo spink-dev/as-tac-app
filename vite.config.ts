@@ -3,10 +3,14 @@ import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import fieldCatalog from './src/config/maps.json';
 
-// Large bundled OSM areas are installed into IndexedDB on demand instead of being precached.
-// Their manifests too: a precached manifest from an older deploy would not match fresh data.
-const ON_DEMAND = ['maps/zurich.geojson', 'maps/benglen.geojson', 'maps/zurich.json', 'maps/benglen.json'];
+// Prepared fields (public/maps/<country>/, named after their content) are installed into IndexedDB
+// on demand and checked against the SHA-256 in src/config/maps.json. Only Mahlwinkel is precached, so
+// a fresh install can start a plan there offline; `maps/mahlwinkel.{json,geojson}` stay for apps up
+// to 1.0.0-alpha.2, which read that manifest before the data.
+const mahlwinkelFile = (fieldCatalog.fields.find((field) => field.id === 'mahlwinkel')?.file ?? '/maps/mahlwinkel.geojson').slice(1);
+const PRECACHED_MAPS = [...new Set(['maps/mahlwinkel.json', 'maps/mahlwinkel.geojson', mahlwinkelFile])];
 
 /**
  * Identity of this build: package version, commit and build time. `BUILD_COMMIT` comes from the
@@ -130,8 +134,7 @@ export default defineConfig({
                 navigateFallback: '/index.html',
                 navigateFallbackDenylist: [/^\/maps\//, /^\/glyphs\//],
                 maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-                globPatterns: ['**/*.{js,css,html,svg,png,pbf,txt,webmanifest}', 'licenses/*.md', 'maps/*.json', 'maps/mahlwinkel.geojson'],
-                globIgnores: ON_DEMAND,
+                globPatterns: ['**/*.{js,css,html,svg,png,pbf,txt,webmanifest}', 'licenses/*.md', ...PRECACHED_MAPS],
             },
             devOptions: { enabled: false },
         }),
