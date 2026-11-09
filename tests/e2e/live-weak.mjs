@@ -21,7 +21,7 @@ const check = (name, ok, detail = '') => {
 };
 // About EDGE/poor 3G: 300 ms latency, 64 kbit/s, every 5th request and realtime message lost.
 const WEAK = { latencyMs: 300, kbps: 64, failRate: 0.2 };
-const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH' });
+const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin' });
 const watch = (page, name) => {
     page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));
 };

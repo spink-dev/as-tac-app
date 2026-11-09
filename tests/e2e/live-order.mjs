@@ -13,7 +13,7 @@ try {
 const base = process.env.BASE_URL ?? 'http://localhost:4000';
 const browser = await playwright.chromium.launch();
 const log = (...a) => console.log(...a);
-const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH' });
+const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin' });
 const errors = [];
 const results = {};
 const check = (name, ok, detail = '') => {

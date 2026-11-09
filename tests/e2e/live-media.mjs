@@ -55,7 +55,7 @@ const pngPath = join(dir, 'lageplan.png');
 const png = makePng(400);
 writeFileSync(pngPath, png);
 
-const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH' });
+const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin' });
 const watch = (page, name) => {
     page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));
 };

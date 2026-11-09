@@ -6,7 +6,7 @@ Taktische Kartenplanung für Airsoft – auf echten OpenStreetMap-Karten, offlin
 
 ## Was die App kann
 
-- **Echte Karten offline:** 36 mitgelieferte Airsoft-Felder in 13 Ländern, nach Land geordnet (siehe unten), und eigene Ausschnitte bis 36 km² direkt aus OpenStreetMap (Overpass) herunterladen. Danach läuft alles ohne Netz. Grosse Ausschnitte kommen in Teilen von höchstens 4 km²; bricht die Verbindung ab, setzt «Fortsetzen» beim fehlenden Teil an (fertige Teile bleiben 30 Minuten erhalten, solange die App offen ist).
+- **Echte Karten offline:** 35 mitgelieferte Airsoft-Felder in 13 Ländern, nach Land geordnet (siehe unten); Katalog und «Neuer Plan» öffnen auf dem Land des Geräts (Zeitzone, ohne Standort- oder Netzabfrage), gibt es dort keine Felder, auf Deutschland; und eigene Ausschnitte bis 36 km² direkt aus OpenStreetMap (Overpass) herunterladen. Danach läuft alles ohne Netz. Grosse Ausschnitte kommen in Teilen von höchstens 4 km²; bricht die Verbindung ab, setzt «Fortsetzen» beim fehlenden Teil an (fertige Teile bleiben 30 Minuten erhalten, solange die App offen ist).
 - **Bildkarten wie in TacMap:** Eventkarten, Skizzen oder Luftbilder auf die echte Karte legen und mit Passpunkten ausrichten (ab 2 Paaren ähnlich, ab 4 gut verteilten Paaren mit Verzerrungsausgleich). Bekannte Mahlwinkel-Eventkarten werden am SHA-256 erkannt und sofort ausgerichtet. Objekte, Zeichnungen und Ausschnitte auf einer Bildkarte bewegen sich beim Neuausrichten mit.
 - **Werkzeuge:** Marker (M→1–9), Routen (R→1–4), Zonen als Fläche oder Kreis (Z→1–8, Tab), Text, freies Zeichnen (D), Radierer, Peilung, Messen, Ebenen, Teams mit Auftragskarte, Verbände, Logos, Teamvorlagen, Protokoll, Rückgängig/Wiederholen, Befehlspalette (⌘K / Ctrl+K), frei belegbare Tastenkürzel.
 - **Feldmodus:** Plan gesperrt, eigene Position mit Genauigkeit, MGRS, Kompass mit «Blickrichtung oben», Navigation zu angetippten Objekten, Pfadaufnahme (bleibt auf dem Gerät).
@@ -52,7 +52,6 @@ Katalog in `src/config/maps.json`, Daten unter `public/maps/<land>/` (OpenStreet
 | Österreich | Actionbase Rauchenwarth | Rauchenwarth | 196 KB |
 | Österreich | Airsoft Park Tirol | Patsch | 444 KB |
 | Polen | ASG Arena Battleground | Wrocław | 1.6 MB |
-| Schweiz | Ausbildungszentrum Riedikon | Riedikon (Uster) | 451 KB |
 | Schweiz | Steinbruch Dielsdorf | Steinmaur | 797 KB |
 | Slowakei | Airsoft Chtelnica | Chtelnica | 236 KB |
 | Slowakei | Airsoft Jablonové | Jablonové | 303 KB |

@@ -308,26 +308,6 @@
             "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
-            "id": "ch-riedikon",
-            "country": "CH",
-            "name": "Ausbildungszentrum Riedikon",
-            "place": "Riedikon (Uster)",
-            "website": "https://www.ausbildungszentrum-riedikon.ch/",
-            "osm": "way/797920825",
-            "file": "/maps/ch/riedikon.926d41a7.geojson",
-            "bounds": [
-                8.70292,
-                47.32353,
-                8.72943,
-                47.3379
-            ],
-            "bytes": 461879,
-            "featureCount": 806,
-            "sha256": "926d41a78a9c1b6dcbff8a0dbeacb9b763b0b804404dc3a8c5afc701166372bc",
-            "dataTimestamp": "2026-09-06T11:27:51Z",
-            "source": "https://overpass.openstreetmap.fr/api/interpreter"
-        },
-        {
             "id": "ch-steinmaur",
             "country": "CH",
             "name": "Steinbruch Dielsdorf",

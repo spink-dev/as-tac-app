@@ -12,7 +12,7 @@ import { requestPersistence, storageEstimate } from '../../core/storage/db';
 import { openProject } from '../../core/store/route';
 import { toast } from '../../core/store/ui';
 import { bundledArea, installBundled, listAreas, removeArea, areaUsage } from '../../core/areas/store';
-import { defaultCountry } from '../../core/areas/catalog';
+import { defaultCountry, startField } from '../../core/areas/catalog';
 import { areaLabel, CountrySelect, useCountries } from '../areas/AreaCatalog';
 import type { AreaMeta } from '../../core/areas/types';
 import { checkForUpdate, usePwa } from '../../core/pwa';
@@ -45,6 +45,8 @@ export function Library() {
     const [installing, setInstalling] = useState<Record<string, number>>({});
     const countries = useCountries();
     const [country, setCountry] = useState(() => defaultCountry());
+    // The empty library's first suggestion: the start field of the country the catalog shows.
+    const start = startField(country, locale);
     const scroller = useSmoothScroll<HTMLDivElement>();
     const listRef = useStaggerIn<HTMLUListElement>([projects === null]);
     const pwa = usePwa();
@@ -214,9 +216,11 @@ export function Library() {
                                 <h3>{t('library.empty.title')}</h3>
                                 <p>{t('library.empty.body', { n: countries.reduce((sum, group) => sum + group.areas.length, 0), countries: countries.length })}</p>
                                 <div className="row-gap">
-                                    <Button variant="primary" onClick={() => showDialog('newPlan', { areaId: 'mahlwinkel' })}>
-                                        <MapIcon {...ICON} /> Mahlwinkel
-                                    </Button>
+                                    {start ? (
+                                        <Button variant="primary" onClick={() => showDialog('newPlan', { areaId: start.id })}>
+                                            <MapIcon {...ICON} /> {start.name.split(' · ')[0]}
+                                        </Button>
+                                    ) : null}
                                     <Button onClick={() => showDialog('newPlan', { country })}>
                                         <MapIcon {...ICON} /> {t('library.pickField')}
                                     </Button>
