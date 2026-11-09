@@ -27,16 +27,16 @@
             "website": "https://www.airsoft-koblenz.de/",
             "file": "/maps/de/area-m.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                7.67642,
+                50.36601,
+                7.70458,
+                50.38039
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 263006,
+            "featureCount": 280,
+            "sha256": "81be82513f3c95245a467c9b9c789e7fbe8359ec874e1889d1ac6525e1fef241",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "de-blackfield",
@@ -46,36 +46,36 @@
             "website": "https://blackfield-airsoft.de/",
             "file": "/maps/de/blackfield.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                14.21205,
+                53.7382,
+                14.24243,
+                53.75257
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 194120,
+            "featureCount": 226,
+            "sha256": "cc4dfa9ee9e5b8d7ebb2585b0c6ac7db506f4a568e558ae1c8507e11c9b14ed8",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "de-kreuzfeld",
             "country": "DE",
             "name": "AirsoftField Kreuzfeld",
-            "place": "Malente",
+            "place": "Kreuzfeld (Malente)",
             "website": "https://www.airsoftfield-kreuzfeld.de/",
             "osm": "way/83756405",
             "file": "/maps/de/kreuzfeld.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                10.49651,
+                54.14338,
+                10.52719,
+                54.15775
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 161224,
+            "featureCount": 509,
+            "sha256": "3998fae11efafc8b03e6030bc1781d0d94a91825fec813df7f5241a4a50aa8ad",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "de-oberpfalz",
@@ -85,16 +85,16 @@
             "osm": "way/1346432629",
             "file": "/maps/de/oberpfalz.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                12.02433,
+                49.4355,
+                12.05196,
+                49.44987
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 112724,
+            "featureCount": 217,
+            "sha256": "dee7da6156abcad641a803a4db08d36e1ca388debcde9d767f755118367ed73d",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "de-green-mile",
@@ -104,16 +104,16 @@
             "website": "https://green-mile-wittlich.de/",
             "file": "/maps/de/green-mile.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                6.83593,
+                49.97349,
+                6.86387,
+                49.98787
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 105688,
+            "featureCount": 191,
+            "sha256": "0ec77ea2acc4b9efad99f85cb520fe20dccb40216195196dad22a5e0e5ca62c5",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "de-harnekop",
@@ -123,16 +123,16 @@
             "website": "https://rsa-harnekop.de/",
             "file": "/maps/de/harnekop.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                13.96686,
+                52.68627,
+                13.9965,
+                52.70064
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 125311,
+            "featureCount": 59,
+            "sha256": "ca27dba1b295f199228de636ebae7cad8271b7be2d5de0f06d1e5e9beb500aad",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "de-leese",
@@ -143,16 +143,16 @@
             "osm": "way/1170408236",
             "file": "/maps/de/leese.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                9.12095,
+                52.51938,
+                9.15048,
+                52.53375
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 86812,
+            "featureCount": 242,
+            "sha256": "149ac5299474514a5e71da0672e514d7037329ab6d88eac5a11e9c1099fcd205",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "fr-baerenkopf",
@@ -162,112 +162,112 @@
             "osm": "way/32543811",
             "file": "/maps/fr/baerenkopf.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                6.73093,
+                47.85219,
+                6.75771,
+                47.86656
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 205052,
+            "featureCount": 337,
+            "sha256": "da0ff9580a1e05252a8740d1ed4403242a50bdb425946f1cf52e4c7f127f6f5f",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "fr-cahors",
             "country": "FR",
             "name": "Black Reapers Cahors",
-            "place": "Pradines",
+            "place": "Douelle",
             "website": "https://blackreaperscahors.fr/",
             "osm": "way/1082825054",
             "file": "/maps/fr/cahors.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                1.36898,
+                44.4635,
+                1.39415,
+                44.47787
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 141454,
+            "featureCount": 276,
+            "sha256": "2f523646ff13df0b9c4ac6d5902a78d739ae4cdd34ead2b87b5b5a203a643c4f",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "fr-freelance",
             "country": "FR",
             "name": "Freelance Paintball Airsoft",
-            "place": "Cerizay",
+            "place": "Cirières",
             "osm": "way/1266569838",
             "file": "/maps/fr/freelance.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                -0.64787,
+                46.81425,
+                -0.62161,
+                46.82863
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 93838,
+            "featureCount": 150,
+            "sha256": "82f6d4f5edfa2653bc799d1f4c9d03d31cefcd11c59fde1ff141d54cddd0c96b",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "fr-sag28",
             "country": "FR",
             "name": "Grand Terrain SAG28",
-            "place": "Épernon",
+            "place": "Saint-Martin-de-Nigelles",
             "osm": "way/886163597",
             "file": "/maps/fr/sag28.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                1.62722,
+                48.61817,
+                1.6544,
+                48.63255
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 74246,
+            "featureCount": 144,
+            "sha256": "fc65ef654fb3fb319a0966b7afda0f16a6d821c4018fc98c5a8cb5d5c5139ec3",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "fr-lille",
             "country": "FR",
             "name": "Airsoft Lille",
-            "place": "Wavrin",
+            "place": "Beaucamps-Ligny",
             "osm": "way/349524301",
             "file": "/maps/fr/lille.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                2.9028,
+                50.58085,
+                2.9311,
+                50.59522
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 142109,
+            "featureCount": 286,
+            "sha256": "50af2709a0ab942c6e0bc3a4cf2373d0d73afa1f0543b09aade2e5eaeadcf80c",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "fr-force-51",
             "country": "FR",
             "name": "S.A.S Force 51",
-            "place": "Condé-sur-Marne",
+            "place": "Tours-sur-Marne",
             "osm": "way/265354461",
             "file": "/maps/fr/force-51.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                4.11615,
+                49.03508,
+                4.14356,
+                49.04946
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 457317,
+            "featureCount": 852,
+            "sha256": "133d7626dfd18ac779beb7604cbde40d6b0166f8292e004f81a24f0b12511b2e",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "fr-sentinelle",
@@ -277,55 +277,55 @@
             "osm": "way/1464320662",
             "file": "/maps/fr/sentinelle.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                4.63897,
+                44.88083,
+                4.66433,
+                44.8952
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 817016,
+            "featureCount": 1058,
+            "sha256": "c7e1c2c643e7f3b0e0ad3cf481538de8f3ca4e8bdb10b77ff901941793a5b6e9",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "fr-ardennes",
             "country": "FR",
             "name": "Terrain d'airsoft des Ardennes",
-            "place": "Ville-sur-Lumes",
+            "place": "Aiglemont",
             "osm": "way/971927415",
             "file": "/maps/fr/ardennes.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                4.76382,
+                49.77729,
+                4.79165,
+                49.79167
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 401172,
+            "featureCount": 1137,
+            "sha256": "40ab7ff1cff737819c76a96583873750f3e36b419fd4d0ab40e7a4aea4996b09",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "ch-riedikon",
             "country": "CH",
             "name": "Ausbildungszentrum Riedikon",
-            "place": "Uster",
+            "place": "Riedikon (Uster)",
             "website": "https://www.ausbildungszentrum-riedikon.ch/",
             "osm": "way/797920825",
             "file": "/maps/ch/riedikon.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                8.70292,
+                47.32353,
+                8.72943,
+                47.3379
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 461879,
+            "featureCount": 806,
+            "sha256": "926d41a78a9c1b6dcbff8a0dbeacb9b763b0b804404dc3a8c5afc701166372bc",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "ch-steinmaur",
@@ -336,16 +336,16 @@
             "osm": "way/11704559",
             "file": "/maps/ch/steinmaur.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                8.43471,
+                47.47817,
+                8.46129,
+                47.49254
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 816388,
+            "featureCount": 2614,
+            "sha256": "19c30a18054120e589d8c025486187e8d258b2e416711d460be12eb88c86f74b",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "at-rauchenwarth",
@@ -356,16 +356,16 @@
             "osm": "way/105617314",
             "file": "/maps/at/rauchenwarth.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                16.52184,
+                48.06649,
+                16.54872,
+                48.08087
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 200369,
+            "featureCount": 399,
+            "sha256": "7e399fcc91b4fd8b6f599c7c76a242fd5b10e823b406568f131584eb2eff595d",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "at-tirol",
@@ -375,35 +375,35 @@
             "osm": "way/419158594",
             "file": "/maps/at/tirol.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                11.38629,
+                47.19626,
+                11.41273,
+                47.21064
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 454610,
+            "featureCount": 616,
+            "sha256": "d0676191f3e1791c633b3c8eb8e10d0db30c082642d6c87d6b3338f4e6313ca4",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "it-dynamico",
             "country": "IT",
             "name": "Softair Dynamico Camp",
-            "place": "Collebeato",
+            "place": "Cellatica",
             "osm": "way/392099798",
             "file": "/maps/it/dynamico.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                10.17391,
+                45.59064,
+                10.19958,
+                45.60501
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 628423,
+            "featureCount": 1041,
+            "sha256": "024c1cb8f2c573738f6e0be69e48fa413f65ab817c4f5eae211552f555fbabd9",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "it-sst",
@@ -413,55 +413,55 @@
             "osm": "way/738478307",
             "file": "/maps/it/sst.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                9.65114,
+                44.88955,
+                9.67651,
+                44.90392
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 125481,
+            "featureCount": 266,
+            "sha256": "022823d6e5588554c7d0b4ea1224db1d4b82c505822baa7f2360f52c06f6309b",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "be-fort-knox",
             "country": "BE",
             "name": "Fort Knox Playground",
-            "place": "Lier",
+            "place": "Sint-Katelijne-Waver",
             "osm": "way/209816202",
             "file": "/maps/be/fort-knox.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                4.55306,
+                51.07584,
+                4.58166,
+                51.09021
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 288400,
+            "featureCount": 859,
+            "sha256": "81d6c6ab4f7cfb3fa8959d75de7f6dca2e598eb3a0342081bceb6c8887d28b88",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "be-fullyloaded",
             "country": "BE",
             "name": "Fullyloaded",
-            "place": "Pecq",
+            "place": "Spiere-Helkijn",
             "website": "https://www.fullyloaded.be/",
             "osm": "way/510792302",
             "file": "/maps/be/fullyloaded.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                3.34389,
+                50.70972,
+                3.37227,
+                50.72409
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 425964,
+            "featureCount": 1068,
+            "sha256": "bba9e9d4c7f16356a27eb89cdcbf024696f66b68015faa0887d7c3e140fdabeb",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "nl-balls-arrows",
@@ -472,16 +472,16 @@
             "osm": "way/945845813",
             "file": "/maps/nl/balls-arrows.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                5.51373,
+                52.52096,
+                5.54326,
+                52.53533
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 252705,
+            "featureCount": 630,
+            "sha256": "f628d2ca3728cc14eef38c048991b22a043b59f8c928e368d22b53d4c8f41831",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "sk-chtelnica",
@@ -492,16 +492,16 @@
             "osm": "way/1053888671",
             "file": "/maps/sk/chtelnica.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                17.59904,
+                48.57732,
+                17.6262,
+                48.5917
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 241755,
+            "featureCount": 337,
+            "sha256": "217d14174c8d49bc282c5ab1f308fd2cec2d46e6f04a2d6cfab6326216fcd623",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "sk-jablonove",
@@ -512,16 +512,16 @@
             "osm": "way/926646884",
             "file": "/maps/sk/jablonove.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                17.0994,
+                48.34302,
+                17.12643,
+                48.35739
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 310485,
+            "featureCount": 676,
+            "sha256": "dd590e488da2d13d6a5eef2565b4cca5e7f7a3bdef5aba2f52f9587f818a8f56",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "sk-rastislavice",
@@ -531,16 +531,16 @@
             "osm": "way/1057873057",
             "file": "/maps/sk/rastislavice.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                18.10336,
+                48.13788,
+                18.13028,
+                48.15225
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 22176,
+            "featureCount": 24,
+            "sha256": "987773b7c5d08e4c4cf2bcdfe355fb619507c3bdd1e4ece67a3d66623657d1a4",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "hu-firebase",
@@ -550,16 +550,16 @@
             "osm": "way/275830303",
             "file": "/maps/hu/firebase.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                19.91565,
+                47.75654,
+                19.94237,
+                47.77091
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 366160,
+            "featureCount": 502,
+            "sha256": "74e7c93b3ffdeea6a9b80ae5fee1d3da636241401f9318b86b11d792ba468d2b",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "pl-battleground",
@@ -569,36 +569,36 @@
             "osm": "way/1545471302",
             "file": "/maps/pl/battleground.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                17.07982,
+                51.05252,
+                17.1084,
+                51.06689
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 1669194,
+            "featureCount": 4578,
+            "sha256": "b7c11014d671e78d279d07d29eb87c59b131e858f3aee898d5323033a93a1d2c",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "gb-black-hills",
             "country": "GB",
             "name": "Black Hills Airsoft",
-            "place": "Chesterfield",
+            "place": "Hundall (Chesterfield)",
             "website": "https://blackhillsairsoft.co.uk/",
             "osm": "way/377634441",
             "file": "/maps/gb/black-hills.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                -1.42822,
+                53.27889,
+                -1.39817,
+                53.29327
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 238586,
+            "featureCount": 521,
+            "sha256": "fb0edb34ccccefa1b882e03f5091f8106a2993441c3ac8e8fd532b329122a270",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "gb-hq",
@@ -608,35 +608,35 @@
             "osm": "way/701918497",
             "file": "/maps/gb/hq.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                -0.48317,
+                53.987,
+                -0.45261,
+                54.00137
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 237804,
+            "featureCount": 654,
+            "sha256": "a97fd47d72a5f6f0d1d84a9be459798a3b62c15d7ceab7fcbd57f09ec0c360ce",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "gb-humber",
             "country": "GB",
             "name": "Humber Airsoft",
-            "place": "Barton-upon-Humber",
+            "place": "South Ferriby",
             "osm": "way/669411682",
             "file": "/maps/gb/humber.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                -0.50182,
+                53.67571,
+                -0.47148,
+                53.69009
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 85647,
+            "featureCount": 54,
+            "sha256": "ec5fd59bf754d1d065af64b33dfb4fbdbc40b202ce5488592e7c934a24201edc",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "es-la-finca",
@@ -647,56 +647,56 @@
             "osm": "way/1231446602",
             "file": "/maps/es/la-finca.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                -3.38472,
+                42.80082,
+                -3.36023,
+                42.81519
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 595869,
+            "featureCount": 305,
+            "sha256": "3c6a762d06ea2a14272d14daa3245aeae78ca1bbb100295f18d09fa2aa3636b1",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "bg-sofia",
             "country": "BG",
             "name": "Airsoft Sofia Field",
-            "place": "Sofia",
+            "place": "Sofia (Krivina)",
             "website": "https://airsoftsofiafield.com/",
             "osm": "way/1315915446",
             "file": "/maps/bg/sofia.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                23.44643,
+                42.69787,
+                23.47088,
+                42.71225
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 175875,
+            "featureCount": 497,
+            "sha256": "19d4aa5f874312ff58cb787026b3635723d441708669439631de813d2ff52563",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         },
         {
             "id": "bg-boinopole",
             "country": "BG",
             "name": "Boinopole",
-            "place": "Sofia",
+            "place": "Sofia (Obelya)",
             "website": "https://boinopole.bg/",
             "osm": "way/1370789826",
             "file": "/maps/bg/boinopole.geojson",
             "bounds": [
-                0,
-                0,
-                0,
-                0
+                23.25974,
+                42.7523,
+                23.28421,
+                42.76667
             ],
-            "bytes": 0,
-            "featureCount": 0,
-            "sha256": "",
-            "dataTimestamp": "",
-            "source": ""
+            "bytes": 117900,
+            "featureCount": 257,
+            "sha256": "0ae71305252478c0718d670ce3c5fee377b0b6c782635cb8184a2071728a3616",
+            "dataTimestamp": "2026-09-06T11:27:51Z",
+            "source": "https://overpass.openstreetmap.fr/api/interpreter"
         }
     ]
 }
