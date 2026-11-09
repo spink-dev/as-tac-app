@@ -10,7 +10,7 @@ export interface Release {
 
 export const RELEASES: readonly Release[] = [
     {
-        version: '1.0.0-alpha.4',
+        version: '1.0.0-alpha.5',
         date: '2026-11-09',
         items: [
             [
@@ -21,6 +21,12 @@ export const RELEASES: readonly Release[] = [
                 'Das Ausbildungszentrum Riedikon ist nicht mehr im Katalog. Wer es schon gespeichert hat, behält es unter «Auf diesem Gerät».',
                 'Ausbildungszentrum Riedikon is no longer in the catalog. If you saved it before, it stays under "On this device".',
             ],
+        ],
+    },
+    {
+        version: '1.0.0-alpha.4',
+        date: '2026-11-09',
+        items: [
             [
                 'as-tac.dev sperrt KI-Crawler und automatisierte Abrufe aus; Suchmaschinen und Link-Vorschauen sehen nur eine kurze Infoseite.',
                 'as-tac.dev now blocks AI crawlers and automated access; search engines and link previews see only a short info page.',
