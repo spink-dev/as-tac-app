@@ -40,7 +40,7 @@ check('no-zurich-in-library', !(await page.locator('.lib').getByText(/Zürich|Be
 const country = page.locator('.lib').getByTestId('area-country');
 check('catalog-opens-on-home-country', (await country.inputValue()) === 'CH', await country.inputValue());
 check('swiss-field-listed', /Steinbruch Dielsdorf/.test(await page.getByTestId('area-catalog').textContent()));
-check('empty-library-suggests-home-field', await page.locator('.lib__empty').getByRole('button', { name: 'Steinbruch Dielsdorf' }).isVisible());
+check('empty-library-suggests-home-field', await page.locator('.lib__empty').getByRole('button', { name: 'Neuer Plan auf Steinbruch Dielsdorf' }).waitFor({ timeout: 10000 }).then(() => true, () => false));
 const countries = await country.locator('option').count();
 check('several-countries', countries >= 10, String(countries));
 check('nothing-installed-yet', await page.getByText('Noch kein Gebiet offline gespeichert.').isVisible());
@@ -126,8 +126,9 @@ const linkBox = await link.boundingBox();
 check('website-link-tappable', Boolean(linkBox) && linkBox.width >= 48 && linkBox.height >= 48 && (await link.isVisible()), JSON.stringify(linkBox));
 await small.screenshot({ path: `${out}/fields-phone.png` });
 
-// Offline after the first visit: Mahlwinkel comes from the precache, other fields need the network.
-const offline = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Berlin', serviceWorkers: 'allow' });
+// Offline after the first visit, in Switzerland: Mahlwinkel comes from the precache, other fields
+// need the network, so a new plan starts on Mahlwinkel while no Swiss field is on the device.
+const offline = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Zurich', serviceWorkers: 'allow' });
 const away = await offline.newPage();
 away.on('pageerror', (error) => errors.push(`offline: ${error.message}`));
 await away.goto(base);
@@ -136,11 +137,14 @@ await away.reload();
 await away.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 30000 });
 await offline.setOffline(true);
 await away.getByTestId('area-catalog').waitFor();
-await away.getByTestId('area-catalog').locator('.area-row').filter({ hasText: 'Blackfield' }).getByTestId('area-install').click();
+await away.getByTestId('area-catalog').locator('.area-row').filter({ hasText: 'Steinbruch Dielsdorf' }).getByTestId('area-install').click();
 const refused = await away.getByText('Für den Download ist eine Internetverbindung nötig.').waitFor({ timeout: 15000 }).then(() => true, () => false);
 check('offline-field-needs-network', refused);
+check('offline-empty-library-suggests-mahlwinkel', await away.locator('.lib__empty').getByRole('button', { name: /Neuer Plan auf Mahlwinkel/ }).isVisible());
 await away.getByTestId('new-plan').click();
-check('offline-default-is-mahlwinkel', (await away.locator('.dialog').getByRole('radio', { name: /Mahlwinkel/ }).getAttribute('aria-checked')) === 'true');
+const offlineDialog = away.locator('.dialog');
+const offlineMahlwinkel = await offlineDialog.getByRole('radio', { name: /Mahlwinkel/ }).waitFor({ timeout: 10000 }).then(() => true, () => false);
+check('offline-default-is-mahlwinkel', offlineMahlwinkel && (await offlineDialog.getByRole('radio', { name: /Mahlwinkel/ }).getAttribute('aria-checked')) === 'true' && (await offlineDialog.getByTestId('area-country').inputValue()) === 'DE');
 await away.getByTestId('create-plan').click();
 await away.waitForSelector('.maplibregl-canvas');
 const offlineArea = await away.waitForFunction(() => new Promise((resolve) => {
