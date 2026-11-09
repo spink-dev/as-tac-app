@@ -141,6 +141,29 @@ const pick = fr.locator('.dialog').getByRole('radio', { name: /Bärenkopf/ });
 check('pick-field-prefers-installed', await fr.waitForFunction(() => document.querySelector('.dialog [role=radio][aria-checked=true]')?.textContent?.includes('Bärenkopf'), null, { timeout: 10000 }).then(() => true, () => false), String(await pick.getAttribute('aria-checked')));
 await paris.close();
 
+// Switzerland, second opening of the dialog in one session: a plan on Steinbruch Dielsdorf saves the
+// field; offline afterwards, «Neuer Plan» stays on it (the dialog must not judge from the list of its
+// previous opening).
+const zurich = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Zurich', serviceWorkers: 'allow' });
+const ch = await zurich.newPage();
+ch.on('pageerror', (error) => errors.push(`zurich: ${error.message}`));
+await ch.goto(base);
+await ch.evaluate(() => navigator.serviceWorker.ready);
+await ch.reload();
+await ch.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 30000 });
+await ch.locator('.lib__empty').getByRole('button', { name: 'Neuer Plan auf Steinbruch Dielsdorf' }).click();
+await ch.getByTestId('create-plan').click();
+await ch.waitForSelector('.maplibregl-canvas', { timeout: 60000 });
+await ch.getByTestId('back').click();
+await ch.getByTestId('area-catalog').waitFor();
+await zurich.setOffline(true);
+await ch.getByTestId('new-plan').click();
+await ch.waitForFunction(() => !document.querySelector('[data-testid=create-plan]')?.disabled);
+await settle(800);
+const again = ch.locator('.dialog');
+check('second-opening-keeps-saved-field', (await again.getByTestId('area-country').inputValue()) === 'CH' && (await again.getByRole('radio', { name: /Steinbruch Dielsdorf/ }).getAttribute('aria-checked')) === 'true', await again.getByTestId('area-country').inputValue());
+await zurich.close();
+
 // Offline after the first visit, in Switzerland: Mahlwinkel comes from the precache, other fields
 // need the network, so a new plan starts on Mahlwinkel while no Swiss field is on the device.
 const offline = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', timezoneId: 'Europe/Zurich', serviceWorkers: 'allow' });
@@ -169,6 +192,7 @@ if (offered) {
     await offer.click();
 }
 check('offline-failure-offers-mahlwinkel', offered && !(await offlineDialog.getByTestId('new-plan-network').count()) && (await offlineDialog.getByRole('radio', { name: /Mahlwinkel/ }).getAttribute('aria-checked')) === 'true');
+check('offer-moves-focus-to-mahlwinkel', await away.waitForFunction(() => document.activeElement?.getAttribute('role') === 'radio' && document.activeElement.textContent.includes('Mahlwinkel'), null, { timeout: 5000 }).then(() => true, () => false));
 await away.getByTestId('create-plan').click();
 await away.waitForSelector('.maplibregl-canvas');
 const offlineArea = await away.waitForFunction(() => new Promise((resolve) => {
