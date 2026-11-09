@@ -4,6 +4,6 @@
     "buildCommand": "npm run build",
     "outputDirectory": "dist",
     "proxy": {
-        "entrypoint": "proxy.mjs"
+        "entrypoint": "proxy.js"
     }
 }

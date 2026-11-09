@@ -141,7 +141,7 @@ as-tac.dev ist nur für Menschen gedacht. Konfiguration in `anti-ai.site.json`, 
 - **Menschen im Browser:** die ganze App. **Suchmaschinen:** nur die Infoseite `/about/`. **Link-Vorschauen** (WhatsApp, Telegram, Discord): die Infoseite statt der App. **KI-Crawler, KI-Assistenten und -Agenten, Skripte, Headless-Browser, unbekannte Bots:** 403 auf allem (nur `robots.txt`, `ai.txt` und `/.well-known/tdmrep.json` bleiben lesbar).
 - Überall `X-Robots-Tag` mit `noindex`/`noai` und `tdm-reservation: 1`; ein unsichtbarer Fallen-Link in `index.html` meldet Clients, die `robots.txt` missachten.
 - **Docker/VPS:** die Regeln stecken im Image (`docker/anti-ai/`, eingebunden in `docker/nginx.conf`). Log-Ordner auf den Host binden (siehe oben) und fail2ban mit `docker/anti-ai/fail2ban/` einrichten, damit die Falle sperrt. Steht ein Proxy davor, dessen Adressen in `trustedProxies`.
-- **Vercel:** `proxy.mjs` (über `vercel.json`) wendet dieselben Regeln an. Zusätzlich im Vercel-Dashboard die verwalteten Regeln «AI Bots» (Deny) und «Bot Protection» einschalten.
+- **Vercel:** `proxy.js` (über `vercel.json`) wendet dieselben Regeln an. Zusätzlich im Vercel-Dashboard die verwalteten Regeln «AI Bots» (Deny) und «Bot Protection» einschalten.
 - Nach jeder Änderung an `anti-ai.site.json` oder den Listen: `npm run anti-ai`; `npm run check` prüft, dass die erzeugten Dateien aktuell sind.
 - Quellcode schützt nur ein privates Repository: was öffentlich auf GitHub liegt, lesen auch KI-Crawler.
 

@@ -1,4 +1,4 @@
-// The site's own Vercel proxy (proxy.mjs in the directory the tests run in), loaded the way Vercel
+// The site's own Vercel proxy (proxy.js in the directory the tests run in), loaded the way Vercel
 // runs it: plain Node ESM, no bundler. A JSON import or a missing extension fails here as it would
 // in production (MIDDLEWARE_INVOCATION_FAILED for every request).
 import { test } from 'node:test';
@@ -7,9 +7,9 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const entry = join(process.cwd(), 'proxy.mjs');
+const entry = join(process.cwd(), 'proxy.js');
 
-test('the site proxy loads as plain ESM and answers', { skip: !existsSync(entry) && 'no proxy.mjs here' }, async () => {
+test('the site proxy loads as plain ESM and answers', { skip: !existsSync(entry) && 'no proxy.js here' }, async () => {
     const { default: proxy } = await import(pathToFileURL(entry).href);
     const refused = proxy(new Request('https://site.test/', { headers: { 'user-agent': 'GPTBot/1.2' } }));
     assert.equal(refused.status, 403);
