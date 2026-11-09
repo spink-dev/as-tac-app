@@ -4,7 +4,7 @@ import { MaplibreMap } from './engine';
 import { useProject } from '../core/store/project';
 import { useUi } from '../core/store/ui';
 import { usePrefs } from '../core/store/prefs';
-import { getArea, ensureArea } from '../core/areas/store';
+import { getArea, ensureArea, isBundled } from '../core/areas/store';
 import { kvGet, kvSet } from '../core/storage/db';
 import { utmGrid } from '../core/geo/mgrs';
 import type { Camera, Project } from '../core/model/schema';
@@ -144,7 +144,10 @@ async function loadArea(project: Project, fit: boolean) {
         return;
     }
     let row = await getArea(project.areaId);
-    if (!row) {
+    if (!row && !isBundled(project.areaId)) {
+        // Downloaded or imported on another device, or a field no longer in the catalog.
+        toast(t('area.missing', { id: project.areaId }), { tone: 'warn' });
+    } else if (!row) {
         try {
             toast(t('new.installing'));
             await ensureArea(project.areaId);

@@ -1,25 +1,11 @@
-import presets from '../../config/maps.json';
 import { isJson, migrateRecord, versionOf } from '../model/migrations';
 import { db, type AreaRow } from '../storage/db';
 import { sha256Hex } from '../storage/assets';
 import type { Bounds } from '../geo/geo';
-import { AREA_FORMAT_VERSION, AREA_STEPS, type AreaMeta, type AreaPackage, type BundledArea } from './types';
+import { AREA_FORMAT_VERSION, AREA_STEPS, type AreaMeta, type AreaPackage } from './types';
+import { BUNDLED_AREAS, bundledArea, isBundled } from './catalog';
 
-const DESCRIPTIONS: Record<string, string> = {
-    mahlwinkel: 'Airsoft-Gelände Mahlwinkel (DE) mit FieldMaps-Eventvorlagen',
-    benglen: 'Testgebiet Benglen (ZH)',
-    zurich: 'Zürich-West, Zentrum bis Benglen, inkl. ZHAW Lagerstrasse und Toni-Areal',
-};
-const SIZES: Record<string, number> = { mahlwinkel: 305055, benglen: 1650000, zurich: 24866859 };
-
-export const BUNDLED_AREAS: BundledArea[] = (presets as { id: string; name: string; bounds: number[] }[]).map((preset) => ({
-    id: preset.id,
-    name: preset.name,
-    bounds: preset.bounds as Bounds,
-    file: `/maps/${preset.id}.geojson`,
-    approxBytes: SIZES[preset.id] ?? 0,
-    description: DESCRIPTIONS[preset.id] ?? '',
-}));
+export { BUNDLED_AREAS, bundledArea, isBundled };
 
 export const MAX_FEATURES = 150000;
 export const MAX_AREA_BYTES = 60 * 1024 * 1024;
@@ -96,7 +82,7 @@ export type Progress = (fraction: number | null, phase: 'download' | 'verify' | 
 
 /** Copy a bundled area from the app's own server into IndexedDB for offline use. */
 export async function installBundled(id: string, onProgress?: Progress): Promise<AreaMeta> {
-    const preset = BUNDLED_AREAS.find((area) => area.id === id);
+    const preset = bundledArea(id);
     if (!preset) {
         throw new Error('area-unknown');
     }
@@ -158,14 +144,14 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
         }
         throw lastError instanceof Error ? lastError : new Error('download');
     };
-    const manifest = JSON.parse(new TextDecoder().decode(await getBytes(`/maps/${id}.json`, { cache: 'no-cache' }))) as Omit<AreaPackage, 'data' | 'format' | 'formatVersion'>;
+    // The catalog in this build names the exact file (size and SHA-256), so no manifest is fetched.
     const bytes = await getBytes(preset.file, undefined, (received, length) => {
-        const total = length || manifest.byteSize || preset.approxBytes;
+        const total = length || preset.bytes;
         onProgress?.(total ? Math.min(1, received / total) : null, 'download');
     });
     onProgress?.(null, 'verify');
     const hash = await sha256Hex(bytes);
-    if (hash !== manifest.sha256) {
+    if (hash !== preset.sha256) {
         throw new Error('area-checksum');
     }
     const data = JSON.parse(new TextDecoder().decode(bytes)) as GeoJSON.FeatureCollection;
@@ -176,8 +162,8 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
         id,
         name: preset.name,
         bounds: preset.bounds,
-        dataTimestamp: manifest.dataTimestamp,
-        source: manifest.source,
+        dataTimestamp: preset.dataTimestamp,
+        source: `OpenStreetMap via Overpass API (${preset.source})`,
         attribution: '© OpenStreetMap contributors',
         license: 'ODbL 1.0',
         byteSize: bytes.byteLength,
@@ -192,7 +178,7 @@ export async function ensureArea(id: string, onProgress?: Progress): Promise<Are
     if (existing) {
         return existing;
     }
-    if (BUNDLED_AREAS.some((area) => area.id === id)) {
+    if (isBundled(id)) {
         return installBundled(id, onProgress);
     }
     return null;

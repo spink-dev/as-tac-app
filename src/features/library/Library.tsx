@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, Download, FileUp, HardDrive, Map as MapIcon, MoreHorizontal, Pencil, History, Plus, Radio, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, FileUp, HardDrive, Map as MapIcon, MoreHorizontal, Pencil, History, Plus, Radio, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { areaErrorText } from '../areas/areaErrors';
 import { t, useT, relativeTime, formatBytes } from '../../i18n';
 import { usePrefs } from '../../core/store/prefs';
@@ -11,7 +11,9 @@ import type { ProjectIndexRow } from '../../core/storage/db';
 import { requestPersistence, storageEstimate } from '../../core/storage/db';
 import { openProject } from '../../core/store/route';
 import { toast } from '../../core/store/ui';
-import { BUNDLED_AREAS, installBundled, listAreas, removeArea, areaUsage } from '../../core/areas/store';
+import { bundledArea, installBundled, listAreas, removeArea, areaUsage } from '../../core/areas/store';
+import { defaultCountry } from '../../core/areas/catalog';
+import { areaLabel, CountrySelect, useCountries } from '../areas/AreaCatalog';
 import type { AreaMeta } from '../../core/areas/types';
 import { checkForUpdate, usePwa } from '../../core/pwa';
 import { FORMAT_VERSION } from '../../core/model/schema';
@@ -41,6 +43,8 @@ export function Library() {
     const [menu, setMenu] = useState<string | null>(null);
     const [renaming, setRenaming] = useState<string | null>(null);
     const [installing, setInstalling] = useState<Record<string, number>>({});
+    const countries = useCountries();
+    const [country, setCountry] = useState(() => defaultCountry());
     const scroller = useSmoothScroll<HTMLDivElement>();
     const listRef = useStaggerIn<HTMLUListElement>([projects === null]);
     const pwa = usePwa();
@@ -133,7 +137,7 @@ export function Library() {
         setInstalling((state) => ({ ...state, [id]: 0 }));
         try {
             await installBundled(id, (fraction) => setInstalling((state) => ({ ...state, [id]: fraction ?? state[id] ?? 0 })));
-            toast(t('area.saved', { name: BUNDLED_AREAS.find((a) => a.id === id)?.name ?? id }), { tone: 'ok' });
+            toast(t('area.saved', { name: bundledArea(id)?.name ?? id }), { tone: 'ok' });
         } catch (error) {
             toast(areaErrorText(error), { tone: 'danger' });
         } finally {
@@ -156,10 +160,7 @@ export function Library() {
         await refresh();
     }
 
-    const areaRows = [
-        ...BUNDLED_AREAS.map((bundled) => ({ id: bundled.id, name: bundled.name, bundled: true, meta: areas.find((a) => a.id === bundled.id), size: bundled.approxBytes, description: bundled.description })),
-        ...areas.filter((area) => !BUNDLED_AREAS.some((b) => b.id === area.id)).map((area) => ({ id: area.id, name: area.name, bundled: false, meta: area, size: area.byteSize, description: '' })),
-    ];
+    const fields = countries.find((group) => group.country === country)?.areas ?? [];
 
     return (
         <div className="lib" ref={scroller}>
@@ -211,13 +212,13 @@ export function Library() {
                         ) : projects.length === 0 ? (
                             <div className="lib__empty">
                                 <h3>{t('library.empty.title')}</h3>
-                                <p>{t('library.empty.body')}</p>
+                                <p>{t('library.empty.body', { n: countries.reduce((sum, group) => sum + group.areas.length, 0), countries: countries.length })}</p>
                                 <div className="row-gap">
                                     <Button variant="primary" onClick={() => showDialog('newPlan', { areaId: 'mahlwinkel' })}>
                                         <MapIcon {...ICON} /> Mahlwinkel
                                     </Button>
-                                    <Button onClick={() => showDialog('newPlan', { areaId: 'zurich' })}>
-                                        <MapIcon {...ICON} /> Zürich
+                                    <Button onClick={() => showDialog('newPlan', { country })}>
+                                        <MapIcon {...ICON} /> {t('library.pickField')}
                                     </Button>
                                     <Button variant="ghost" onClick={() => showDialog('areaDownload')}>
                                         <Download {...ICON} /> {t('new.downloadArea')}
@@ -241,7 +242,7 @@ export function Library() {
                                                 <span className="plan-row__title">{row.name}</span>
                                                 <span className="plan-row__meta">
                                                     {[
-                                                        areaRows.find((a) => a.id === row.areaId)?.name ?? (row.areaId ? row.areaId : t('new.noArea')),
+                                                        row.areaId ? areaLabel(row.areaId, areas) : t('new.noArea'),
                                                         t('library.elements', { n: row.elementCount }),
                                                         t('library.updated', { when: relativeTime(row.updatedAt, locale) }),
                                                     ].join(' · ')}
@@ -283,34 +284,64 @@ export function Library() {
                                     <Download size={16} /> {t('area.download')}
                                 </Button>
                             </div>
-                            <ul className="area-list">
-                                {areaRows.map((area) => (
-                                    <li key={area.id} className="area-row">
-                                        <div className="list-row__main">
-                                            <span className="list-row__title">{area.name}</span>
-                                            <span className="list-row__meta">
-                                                {area.meta ? `${t('area.installed')} · ${formatBytes(area.meta.byteSize)}` : `${t('area.bundled')} · ${formatBytes(area.size)}`}
-                                            </span>
-                                            {installing[area.id] !== undefined ? (
-                                                <div className="progress"><div className="progress__bar" style={{ transform: `scaleX(${Math.max(0.04, installing[area.id])})` }} /></div>
-                                            ) : null}
-                                        </div>
-                                        {area.meta ? (
-                                            <>
+                            <h3 className="lib__sub">{t('area.installedTitle')}</h3>
+                            {areas.length === 0 ? (
+                                <p className="field__hint">{t('area.noneInstalled')}</p>
+                            ) : (
+                                <ul className="area-list" data-testid="area-installed">
+                                    {areas.map((area) => {
+                                        const field = bundledArea(area.id);
+                                        return (
+                                            <li key={area.id} className="area-row">
+                                                <div className="list-row__main">
+                                                    <span className="list-row__title">{area.name}</span>
+                                                    <span className="list-row__meta">{[field?.place, formatBytes(area.byteSize)].filter(Boolean).join(' · ')}</span>
+                                                </div>
                                                 <IconButton label={t('area.exportFile')} tipPos="left" onClick={() => void exportAreaFile(area.id).then(({ blob, filename }) => saveFile(blob, filename)).catch(() => toast(t('error.generic'), { tone: 'danger' }))}>
                                                     <Download {...ICON} />
                                                 </IconButton>
-                                                <IconButton label={t('area.remove')} tipPos="left" onClick={() => void uninstall(area.meta as AreaMeta)}>
+                                                <IconButton label={t('area.remove')} tipPos="left" onClick={() => void uninstall(area)}>
                                                     <Trash2 {...ICON} />
                                                 </IconButton>
-                                            </>
-                                        ) : (
-                                            <Button small onClick={() => void install(area.id)} disabled={installing[area.id] !== undefined}>
-                                                <HardDrive size={16} /> {t('area.install')}
-                                            </Button>
-                                        )}
-                                    </li>
-                                ))}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                            <h3 className="lib__sub">{t('area.catalog')}</h3>
+                            <CountrySelect value={country} onChange={setCountry} />
+                            <ul className="area-list" data-testid="area-catalog">
+                                {fields.map((field) => {
+                                    const here = areas.some((area) => area.id === field.id);
+                                    return (
+                                        <li key={field.id} className="area-row">
+                                            <div className="list-row__main">
+                                                <span className="list-row__title">{field.name}</span>
+                                                <span className="list-row__meta">
+                                                    {field.place} · {formatBytes(field.bytes)}
+                                                    {field.website ? (
+                                                        <>
+                                                            {' · '}
+                                                            <a className="area-row__link" href={field.website} target="_blank" rel="noopener noreferrer" aria-label={t('area.website', { name: field.name })}>
+                                                                {t('area.websiteShort')}<ExternalLink size={12} aria-hidden="true" />
+                                                            </a>
+                                                        </>
+                                                    ) : null}
+                                                </span>
+                                                {installing[field.id] !== undefined ? (
+                                                    <div className="progress"><div className="progress__bar" style={{ transform: `scaleX(${Math.max(0.04, installing[field.id])})` }} /></div>
+                                                ) : null}
+                                            </div>
+                                            {here ? (
+                                                <span className="badge badge--ok">{t('area.installed')}</span>
+                                            ) : (
+                                                <Button small onClick={() => void install(field.id)} disabled={installing[field.id] !== undefined} data-testid="area-install">
+                                                    <HardDrive size={16} /> {t('area.install')}
+                                                </Button>
+                                            )}
+                                        </li>
+                                    );
+                                })}
                             </ul>
                             <p className="field__hint">{t('area.attribution')}</p>
                         </section>

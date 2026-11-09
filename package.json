@@ -2,7 +2,7 @@
   "name": "as-tac-app",
   "private": true,
   "type": "module",
-  "version": "1.0.0-alpha.2",
+  "version": "1.0.0-alpha.3",
   "description": "AS-TAC: offline-first tactical map planning, field navigation and live briefing for airsoft.",
   "engines": {
     "node": ">=22.12.0"
@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "e2e": "node tests/e2e/run.mjs",
     "check": "npm run typecheck && npm run test && npm run build",
-    "map:fetch": "node scripts/fetch-map.mjs",
+    "map:build": "node scripts/build-maps.mjs",
     "licenses": "node scripts/licenses.mjs"
   },
   "dependencies": {

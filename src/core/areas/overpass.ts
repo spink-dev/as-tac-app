@@ -4,8 +4,12 @@ import { sha256Hex } from '../storage/assets';
 import { AREA_FORMAT_VERSION, type AreaPackage } from './types';
 import { MAX_FEATURES, validateBounds } from './store';
 
-/** Public Overpass instances; the second is only tried when the first is unreachable or overloaded. */
-export const OVERPASS_ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+/** Public Overpass instances, tried in this order when one is unreachable or overloaded. */
+export const OVERPASS_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass.openstreetmap.fr/api/interpreter',
+];
 export const MAX_AREA_KM2 = 36;
 const MIN_INTERVAL_MS = 30000;
 
@@ -257,7 +261,7 @@ async function fetchOverpass(endpoint: string, query: string, signal: AbortSigna
     }
 }
 
-/** One tile: both servers, a few rounds with growing pauses (Retry-After when rate-limited). */
+/** One tile: every server in turn, a few rounds with growing pauses (Retry-After when rate-limited). */
 async function fetchTile(query: string, signal: AbortSignal, budget: number, onBytes: (bytes: number) => void, onWait: (seconds: number) => void, used: Set<string>): Promise<{ response: OverpassResponse; bytes: number }> {
     let lastError: unknown = null;
     let incomplete = 0;

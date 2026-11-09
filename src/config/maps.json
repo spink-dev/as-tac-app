@@ -1,32 +1,702 @@
-[
-    {
-        "id": "mahlwinkel",
-        "name": "Mahlwinkel · Airsoft-Feld",
-        "bounds": [
-            11.809,
-            52.375,
-            11.84,
-            52.387
-        ]
-    },
-    {
-        "id": "benglen",
-        "name": "Zürich · Benglen",
-        "bounds": [
-            8.62,
-            47.349,
-            8.652,
-            47.373
-        ]
-    },
-    {
-        "id": "zurich",
-        "name": "Zürich Stadt · bis Benglen",
-        "bounds": [
-            8.503,
-            47.349,
-            8.654,
-            47.401
-        ]
-    }
-]
+{
+    "fields": [
+        {
+            "id": "mahlwinkel",
+            "country": "DE",
+            "name": "Mahlwinkel · Airsoft-Feld",
+            "place": "Mahlwinkel",
+            "website": "https://airsofthelden-events.com/",
+            "file": "/maps/mahlwinkel.geojson",
+            "bounds": [
+                11.809,
+                52.375,
+                11.84,
+                52.387
+            ],
+            "bytes": 305055,
+            "featureCount": 430,
+            "sha256": "c9a74fc7e9ca392be9b830f42239d53eb921e2e63c536c0db7e0ea3e62c3adc3",
+            "dataTimestamp": "2026-10-01T11:57:06Z",
+            "source": "https://overpass-api.de/api/interpreter"
+        },
+        {
+            "id": "de-area-m",
+            "country": "DE",
+            "name": "Area-M · Airsoft Koblenz",
+            "place": "Simmern (Westerwald)",
+            "website": "https://www.airsoft-koblenz.de/",
+            "file": "/maps/de/area-m.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "de-blackfield",
+            "country": "DE",
+            "name": "Blackfield · Bunkerfeld",
+            "place": "Altwarp",
+            "website": "https://blackfield-airsoft.de/",
+            "file": "/maps/de/blackfield.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "de-kreuzfeld",
+            "country": "DE",
+            "name": "AirsoftField Kreuzfeld",
+            "place": "Malente",
+            "website": "https://www.airsoftfield-kreuzfeld.de/",
+            "osm": "way/83756405",
+            "file": "/maps/de/kreuzfeld.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "de-oberpfalz",
+            "country": "DE",
+            "name": "EventPark Oberpfalz",
+            "place": "Schmidgaden",
+            "osm": "way/1346432629",
+            "file": "/maps/de/oberpfalz.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "de-green-mile",
+            "country": "DE",
+            "name": "The Green Mile",
+            "place": "Wittlich",
+            "website": "https://green-mile-wittlich.de/",
+            "file": "/maps/de/green-mile.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "de-harnekop",
+            "country": "DE",
+            "name": "RSA Harnekop",
+            "place": "Prötzel-Harnekop",
+            "website": "https://rsa-harnekop.de/",
+            "file": "/maps/de/harnekop.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "de-leese",
+            "country": "DE",
+            "name": "Woodlandpark Leese",
+            "place": "Leese",
+            "website": "https://woodlandpark-leese.de/",
+            "osm": "way/1170408236",
+            "file": "/maps/de/leese.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "fr-baerenkopf",
+            "country": "FR",
+            "name": "Bärenkopf · Fort de la Tête de l'Ours",
+            "place": "Haut-du-Them-Château-Lambert",
+            "osm": "way/32543811",
+            "file": "/maps/fr/baerenkopf.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "fr-cahors",
+            "country": "FR",
+            "name": "Black Reapers Cahors",
+            "place": "Pradines",
+            "website": "https://blackreaperscahors.fr/",
+            "osm": "way/1082825054",
+            "file": "/maps/fr/cahors.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "fr-freelance",
+            "country": "FR",
+            "name": "Freelance Paintball Airsoft",
+            "place": "Cerizay",
+            "osm": "way/1266569838",
+            "file": "/maps/fr/freelance.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "fr-sag28",
+            "country": "FR",
+            "name": "Grand Terrain SAG28",
+            "place": "Épernon",
+            "osm": "way/886163597",
+            "file": "/maps/fr/sag28.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "fr-lille",
+            "country": "FR",
+            "name": "Airsoft Lille",
+            "place": "Wavrin",
+            "osm": "way/349524301",
+            "file": "/maps/fr/lille.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "fr-force-51",
+            "country": "FR",
+            "name": "S.A.S Force 51",
+            "place": "Condé-sur-Marne",
+            "osm": "way/265354461",
+            "file": "/maps/fr/force-51.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "fr-sentinelle",
+            "country": "FR",
+            "name": "Sentinelle 07 Airsoft",
+            "place": "Vernoux-en-Vivarais",
+            "osm": "way/1464320662",
+            "file": "/maps/fr/sentinelle.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "fr-ardennes",
+            "country": "FR",
+            "name": "Terrain d'airsoft des Ardennes",
+            "place": "Ville-sur-Lumes",
+            "osm": "way/971927415",
+            "file": "/maps/fr/ardennes.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "ch-riedikon",
+            "country": "CH",
+            "name": "Ausbildungszentrum Riedikon",
+            "place": "Uster",
+            "website": "https://www.ausbildungszentrum-riedikon.ch/",
+            "osm": "way/797920825",
+            "file": "/maps/ch/riedikon.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "ch-steinmaur",
+            "country": "CH",
+            "name": "Steinbruch Dielsdorf",
+            "place": "Steinmaur",
+            "website": "https://www.milsim-events.ch/",
+            "osm": "way/11704559",
+            "file": "/maps/ch/steinmaur.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "at-rauchenwarth",
+            "country": "AT",
+            "name": "Actionbase Rauchenwarth",
+            "place": "Rauchenwarth",
+            "website": "https://www.actionbase.at/",
+            "osm": "way/105617314",
+            "file": "/maps/at/rauchenwarth.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "at-tirol",
+            "country": "AT",
+            "name": "Airsoft Park Tirol",
+            "place": "Patsch",
+            "osm": "way/419158594",
+            "file": "/maps/at/tirol.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "it-dynamico",
+            "country": "IT",
+            "name": "Softair Dynamico Camp",
+            "place": "Collebeato",
+            "osm": "way/392099798",
+            "file": "/maps/it/dynamico.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "it-sst",
+            "country": "IT",
+            "name": "SST Softair",
+            "place": "Vigolzone",
+            "osm": "way/738478307",
+            "file": "/maps/it/sst.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "be-fort-knox",
+            "country": "BE",
+            "name": "Fort Knox Playground",
+            "place": "Lier",
+            "osm": "way/209816202",
+            "file": "/maps/be/fort-knox.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "be-fullyloaded",
+            "country": "BE",
+            "name": "Fullyloaded",
+            "place": "Pecq",
+            "website": "https://www.fullyloaded.be/",
+            "osm": "way/510792302",
+            "file": "/maps/be/fullyloaded.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "nl-balls-arrows",
+            "country": "NL",
+            "name": "Balls & Arrows",
+            "place": "Lelystad",
+            "website": "https://ballsandarrows.nl/",
+            "osm": "way/945845813",
+            "file": "/maps/nl/balls-arrows.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "sk-chtelnica",
+            "country": "SK",
+            "name": "Airsoft Chtelnica",
+            "place": "Chtelnica",
+            "website": "https://www.airsoftchtelnica.sk/",
+            "osm": "way/1053888671",
+            "file": "/maps/sk/chtelnica.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "sk-jablonove",
+            "country": "SK",
+            "name": "Airsoft Jablonové",
+            "place": "Jablonové",
+            "website": "https://www.airsoftihriskojablonove.sk/",
+            "osm": "way/926646884",
+            "file": "/maps/sk/jablonove.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "sk-rastislavice",
+            "country": "SK",
+            "name": "Airsoft Rastislavice",
+            "place": "Rastislavice",
+            "osm": "way/1057873057",
+            "file": "/maps/sk/rastislavice.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "hu-firebase",
+            "country": "HU",
+            "name": "US Army Firebase",
+            "place": "Gyöngyös",
+            "osm": "way/275830303",
+            "file": "/maps/hu/firebase.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "pl-battleground",
+            "country": "PL",
+            "name": "ASG Arena Battleground",
+            "place": "Wrocław",
+            "osm": "way/1545471302",
+            "file": "/maps/pl/battleground.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "gb-black-hills",
+            "country": "GB",
+            "name": "Black Hills Airsoft",
+            "place": "Chesterfield",
+            "website": "https://blackhillsairsoft.co.uk/",
+            "osm": "way/377634441",
+            "file": "/maps/gb/black-hills.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "gb-hq",
+            "country": "GB",
+            "name": "HQ Airsoft",
+            "place": "Driffield",
+            "osm": "way/701918497",
+            "file": "/maps/gb/hq.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "gb-humber",
+            "country": "GB",
+            "name": "Humber Airsoft",
+            "place": "Barton-upon-Humber",
+            "osm": "way/669411682",
+            "file": "/maps/gb/humber.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "es-la-finca",
+            "country": "ES",
+            "name": "CQB La Finca",
+            "place": "Trespaderne",
+            "website": "https://airsoftland.es/Campo/cqb-la-finca-trespaderne",
+            "osm": "way/1231446602",
+            "file": "/maps/es/la-finca.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "bg-sofia",
+            "country": "BG",
+            "name": "Airsoft Sofia Field",
+            "place": "Sofia",
+            "website": "https://airsoftsofiafield.com/",
+            "osm": "way/1315915446",
+            "file": "/maps/bg/sofia.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        },
+        {
+            "id": "bg-boinopole",
+            "country": "BG",
+            "name": "Boinopole",
+            "place": "Sofia",
+            "website": "https://boinopole.bg/",
+            "osm": "way/1370789826",
+            "file": "/maps/bg/boinopole.geojson",
+            "bounds": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "bytes": 0,
+            "featureCount": 0,
+            "sha256": "",
+            "dataTimestamp": "",
+            "source": ""
+        }
+    ]
+}

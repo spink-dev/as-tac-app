@@ -425,6 +425,66 @@
     margin-top: 6px;
 }
 
+.area-row .badge,
+.area-row .btn {
+    flex: none;
+}
+
+/* Field names are long («Bärenkopf · Fort de la Tête de l'Ours»): two lines rather than cut off. */
+.area-list[data-testid='area-catalog'] .list-row__title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.area-row__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.area-row__link:hover,
+.area-row__link:focus-visible {
+    text-decoration: underline;
+}
+
+.lib__sub {
+    margin-top: var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--ink-3);
+}
+
+/* Country picker of the field catalogue: label and select on one line. */
+.country-select {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.country-select .field__label {
+    margin: 0;
+}
+
+.country-select .select {
+    flex: 1;
+    min-width: 0;
+}
+
+.field > .country-select {
+    margin-bottom: var(--sp-2);
+}
+
+.choice-list__label {
+    padding: var(--sp-2) var(--sp-3) var(--sp-1);
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--ink-3);
+}
+
 /* Choice list (radio cards) */
 .choice-list {
     display: flex;

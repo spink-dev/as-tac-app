@@ -10,6 +10,24 @@ export interface Release {
 
 export const RELEASES: readonly Release[] = [
     {
+        version: '1.0.0-alpha.3',
+        date: '2026-11-09',
+        items: [
+            [
+                'Neu mitgeliefert: 36 Airsoft-Felder in 13 Ländern mit OpenStreetMap-Grundkarte, darunter der Bärenkopf (Fort de la Tête de l’Ours), Riedikon und Steinmaur, Airsoft Park Tirol und Blackfield. Die Felder sind nach Land geordnet und werden erst beim ersten Gebrauch auf dem Gerät gespeichert.',
+                'Now included: 36 airsoft fields in 13 countries with an OpenStreetMap basemap, among them the Bärenkopf (Fort de la Tête de l’Ours), Riedikon and Steinmaur, Airsoft Park Tirol and Blackfield. Fields are sorted by country and saved to the device only when first used.',
+            ],
+            [
+                'Die Zürcher Testgebiete (Benglen, Zürich bis Benglen) sind nicht mehr dabei. Wer sie schon gespeichert hat, behält sie unter «Auf diesem Gerät».',
+                'The Zürich test areas (Benglen, Zürich to Benglen) are gone. If you saved them before, they stay under "On this device".',
+            ],
+            [
+                'Fehlt einem Plan die Grundkarte auf diesem Gerät, sagt die App das jetzt, statt still eine leere Karte zu zeigen. Gebietsdownloads haben einen dritten Ausweichserver.',
+                'When a plan’s basemap is missing on this device, the app now says so instead of quietly showing an empty map. Area downloads have a third fallback server.',
+            ],
+        ],
+    },
+    {
         version: '1.0.0-alpha.2',
         date: '2026-11-08',
         items: [
