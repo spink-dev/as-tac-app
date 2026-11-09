@@ -66,10 +66,13 @@ await page.getByTestId('create-plan').click();
 await page.waitForSelector('.maplibregl-canvas');
 await page.waitForTimeout(1500);
 const addImage = async (file) => {
+    // Wait for the palette instead of fixed pauses: typing before it has focus, or clicking while
+    // its backdrop is still there, made this step flaky.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })));
+    await page.waitForFunction(() => document.activeElement?.closest('.palette'));
     await page.keyboard.type('Karten');
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(300);
+    await page.locator('.palette-backdrop').waitFor({ state: 'detached' });
     const chooser = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: /Bildkarte hinzufügen/ }).click();
     await (await chooser).setFiles(file);
