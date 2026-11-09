@@ -119,7 +119,7 @@ await small.getByTestId('area-catalog').scrollIntoViewIfNeeded();
 check('phone-opens-on-germany', (await small.getByTestId('area-country').inputValue()) === 'DE');
 const link = small.getByTestId('area-catalog').getByRole('link').first();
 const linkBox = await link.boundingBox();
-check('website-link-tappable', Boolean(linkBox) && linkBox.width >= 44 && linkBox.height >= 44 && (await link.isVisible()), JSON.stringify(linkBox));
+check('website-link-tappable', Boolean(linkBox) && linkBox.width >= 48 && linkBox.height >= 48 && (await link.isVisible()), JSON.stringify(linkBox));
 await small.screenshot({ path: `${out}/fields-phone.png` });
 
 // Offline after the first visit: Mahlwinkel comes from the precache, other fields need the network.

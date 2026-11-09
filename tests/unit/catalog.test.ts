@@ -55,6 +55,8 @@ describe('field catalog', () => {
         const bytes = readFileSync('public/maps/mahlwinkel.geojson');
         expect(bytes.byteLength).toBe(manifest.byteSize);
         expect(createHash('sha256').update(bytes).digest('hex')).toBe(manifest.sha256);
+        // Exactly the data those versions have compiled in: never regenerated.
+        expect(manifest.sha256).toBe('c9a74fc7e9ca392be9b830f42239d53eb921e2e63c536c0db7e0ea3e62c3adc3');
     });
 
     it('no longer contains the Zürich test areas', () => {

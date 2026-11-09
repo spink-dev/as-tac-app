@@ -152,7 +152,7 @@ export const S = {
     'area.installNamed': ['{name} offline speichern', 'Save {name} offline'],
     'area.onFirstUse': ['{size}, wird beim ersten Gebrauch geladen', '{size}, loaded on first use'],
     'area.missingOption': ['«{id}» (nicht auf diesem Gerät)', '“{id}” (not on this device)'],
-    'area.missing': ['Die Grundkarte «{id}» ist auf diesem Gerät nicht vorhanden. Unter «Karten» ein anderes Gebiet wählen – oder ihre Gebietsdatei importieren und den Plan neu öffnen.', 'The basemap “{id}” is not on this device. Choose another area under “Maps”, or import its area file and reopen the plan.'],
+    'area.missing': ['Die Grundkarte «{id}» ist auf diesem Gerät nicht vorhanden. Unter «Karten» ein anderes Gebiet wählen.', 'The basemap “{id}” is not on this device. Choose another area under “Maps”.'],
     'area.remove': ['Vom Gerät entfernen', 'Remove from device'],
     'area.inUse': ['Wird von {n} Plänen verwendet', 'Used by {n} plans'],
     'area.importFile': ['Kartenpaket importieren', 'Import map package'],

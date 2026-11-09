@@ -40,7 +40,12 @@ export function NewPlanDialog() {
                 setAreaId(payload.areaId);
                 setCountry(defaultCountry(payload.areaId));
             } else if (payload?.country) {
-                pickCountry(payload.country);
+                // «Feld wählen»: a field of that country, whatever was chosen last time.
+                setCountry(payload.country);
+                const first = countries.find((group) => group.country === payload.country)?.areas[0];
+                if (first) {
+                    chooseArea(first.id);
+                }
             } else {
                 setCountry(defaultCountry(areaId));
             }
@@ -119,7 +124,7 @@ export function NewPlanDialog() {
             footer={(
                 <>
                     <Button variant="ghost" onClick={hide}>{t('common.cancel')}</Button>
-                    <Button variant="primary" onClick={() => void create()} disabled={busy !== null} data-testid="create-plan">
+                    <Button variant="primary" onClick={() => void create()} disabled={busy !== null || installed === null} data-testid="create-plan">
                         {busy !== null ? t('new.installing') : t('new.create')}
                     </Button>
                 </>

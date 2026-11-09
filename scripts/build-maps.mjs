@@ -50,7 +50,10 @@ try {
         const bytes = await readFile(fromFile);
         const text = (bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes, { maxOutputLength: MAX_RAW_BYTES }) : bytes).toString('utf8');
         for (const entry of JSON.parse(text).fields ?? []) {
-            responses.set(entry.id, { bounds: entry.bounds, endpoint: String(entry.endpoint), response: entry.response });
+            if (typeof entry.endpoint !== 'string' || !entry.endpoint.startsWith('https://')) {
+                throw new Error(`${entry.id}: Quelle (endpoint) fehlt in ${fromFile}`);
+            }
+            responses.set(entry.id, { bounds: entry.bounds, endpoint: entry.endpoint, response: entry.response });
         }
     }
     const unknown = only.filter((id) => !catalog.fields.some((field) => field.id === id));

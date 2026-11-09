@@ -5,6 +5,7 @@ import { useProject } from '../core/store/project';
 import { useUi } from '../core/store/ui';
 import { usePrefs } from '../core/store/prefs';
 import { getArea, ensureArea, isBundled } from '../core/areas/store';
+import { areaErrorText } from '../features/areas/areaErrors';
 import { kvGet, kvSet } from '../core/storage/db';
 import { utmGrid } from '../core/geo/mgrs';
 import type { Camera, Project } from '../core/model/schema';
@@ -154,8 +155,12 @@ async function loadArea(project: Project, fit: boolean) {
             toast(t('new.installing'));
             await ensureArea(project.areaId);
             row = await getArea(project.areaId);
-        } catch {
-            toast(t('area.needsNetwork'), { tone: 'warn' });
+        } catch (error) {
+            // Not the previous area's basemap under a plan that now names another one.
+            if (mapRef.current === map && useProject.getState().project?.areaId === project.areaId) {
+                setSourceData(map, 'osm', EMPTY_FC);
+            }
+            toast(areaErrorText(error), { tone: 'warn' });
         }
     }
     if (!row || mapRef.current !== map || useProject.getState().project?.areaId !== project.areaId) {
