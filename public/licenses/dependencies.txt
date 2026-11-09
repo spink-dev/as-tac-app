@@ -1,4 +1,4 @@
-AS-TAC 1.0.0-alpha.1 – Lizenzen der ausgelieferten Abhängigkeiten
+AS-TAC 1.0.0-alpha.3 – Lizenzen der ausgelieferten Abhängigkeiten
 
 Kartenschrift: siehe OFL-1.1.txt. Kartendaten: siehe ODbL-1.0.txt.
 

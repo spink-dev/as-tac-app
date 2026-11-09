@@ -15,7 +15,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "node tests/e2e/run.mjs",
-    "check": "npm run typecheck && npm run test && npm run build",
+    "check": "npm run typecheck && npm run test && npm run test:anti-ai && npm run build",
+    "anti-ai": "node anti-ai/bin/anti-ai.mjs build",
+    "test:anti-ai": "node anti-ai/bin/anti-ai.mjs check && node --test \"anti-ai/test/*.test.mjs\"",
     "map:build": "node scripts/build-maps.mjs",
     "licenses": "node scripts/licenses.mjs"
   },
@@ -41,6 +43,7 @@
     "@types/node": "26.6.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@vercel/functions": "3.11.0",
     "@vitejs/plugin-react": "6.2.1",
     "fake-indexeddb": "6.2.7",
     "jsdom": "31.0.0",

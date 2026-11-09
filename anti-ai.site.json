@@ -1,0 +1,46 @@
+{
+    "$comment": "anti-ai for as-tac.dev. After a change: npm run anti-ai (writes robots.txt, ai.txt, tdmrep.json, the nginx, fail2ban and logrotate files and anti-ai.policy.mjs for Vercel). trustedProxies: only the exact address of a proxy in front of the container (e.g. the Docker gateway when Caddy on the host forwards to 127.0.0.1:8080) – never whole private ranges, or anyone reaching the container from such an address chooses their own IP. See anti-ai/README.md.",
+    "name": "AS-TAC",
+    "origin": "https://as-tac.dev",
+    "infoPath": "/about/",
+    "infoAssets": [
+        "/icon.svg",
+        "/icon-192.png",
+        "/icon-512.png"
+    ],
+    "trapPath": "/_/t9q4x2/",
+    "search": "info",
+    "previews": "info",
+    "ai": "deny",
+    "requireAcceptLanguage": true,
+    "allowUserAgents": [],
+    "rateLimit": {
+        "documentsPerSecond": 20,
+        "burst": 300
+    },
+    "trustedProxies": [],
+    "nginx": {
+        "logFile": "/var/log/nginx/anti-ai/anti-ai.log",
+        "accessLogFormat": "main",
+        "headersInclude": "/etc/nginx/snippets/security-headers.conf"
+    },
+    "ban": {
+        "minutes": 15,
+        "chain": "INPUT",
+        "logPath": "/var/log/as-tac/anti-ai.log",
+        "denyJail": false
+    },
+    "outputs": {
+        "robots": "public/robots.txt",
+        "aiTxt": "public/ai.txt",
+        "tdmrep": "public/.well-known/tdmrep.json",
+        "nginxHttp": "docker/anti-ai/http.conf",
+        "nginxServer": "docker/anti-ai/server.conf",
+        "nginxHeaders": "docker/anti-ai/headers.conf",
+        "fail2banTrapFilter": "docker/anti-ai/fail2ban/filter.d/anti-ai-trap.conf",
+        "fail2banDenyFilter": "docker/anti-ai/fail2ban/filter.d/anti-ai-deny.conf",
+        "fail2banJail": "docker/anti-ai/fail2ban/jail.d/anti-ai.conf",
+        "vercelPolicy": "anti-ai.policy.mjs",
+        "logrotate": "docker/anti-ai/logrotate/as-tac-anti-ai"
+    }
+}

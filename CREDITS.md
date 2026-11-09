@@ -88,6 +88,10 @@ Neuentwicklung; Code eigens geschrieben. Übernommen bzw. neu verwendet:
 | Lenis 1.3 | Sanftes Scrollen (nur Rad/Trackpad) | MIT |
 | Supabase JS | optionale Live-Zusammenarbeit | MIT |
 
+### KI-Schutz (anti-ai)
+
+- `anti-ai/data/ai-robots.json`: Liste von KI-Crawlern und -Agenten aus [ai-robots-txt/ai.robots.txt](https://github.com/ai-robots-txt/ai.robots.txt) (`robots.json`, Commit `04e0048d7bf9`, abgerufen 2026-11-09), MIT-Lizenz, Text in `anti-ai/data/ai-robots.LICENSE`. Übernommen sind die Namen; Erkennung, Regeln und Erzeugung sind eigener Code.
+
 ### Mitgelieferte Felder (ab 1.0.0-alpha.3)
 
 - **Grundkarten:** OpenStreetMap-Daten © OpenStreetMap-Mitwirkende, ODbL 1.0, abgefragt am 2026-11-09 über `overpass.openstreetmap.fr` (Datenstand je Feld in `src/config/maps.json`, `dataTimestamp`), mit der App-eigenen Umwandlung (`toBasemap`, osmtogeojson) nach `public/maps/<land>/` geschrieben. Mahlwinkel unverändert aus 0.6.
