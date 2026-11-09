@@ -1,6 +1,7 @@
 // Field catalog by country: no Zürich areas, the catalog opens on the browser's region, a field
 // installs from the server and a plan on it opens there; a plan whose basemap is neither a
-// prepared field nor on the device says so instead of showing an empty map.
+// prepared field nor on the device says so instead of showing an empty map. Offline after the first
+// visit, Mahlwinkel still installs (precached), other fields ask for the network.
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 let playwright;
@@ -116,7 +117,38 @@ small.on('pageerror', (error) => errors.push(`phone: ${error.message}`));
 await small.goto(base);
 await small.getByTestId('area-catalog').scrollIntoViewIfNeeded();
 check('phone-opens-on-germany', (await small.getByTestId('area-country').inputValue()) === 'DE');
-await small.screenshot({ path: `${out}/fields-phone.png`, fullPage: true });
+const link = small.getByTestId('area-catalog').getByRole('link').first();
+const linkBox = await link.boundingBox();
+check('website-link-tappable', Boolean(linkBox) && linkBox.width >= 44 && linkBox.height >= 44 && (await link.isVisible()), JSON.stringify(linkBox));
+await small.screenshot({ path: `${out}/fields-phone.png` });
+
+// Offline after the first visit: Mahlwinkel comes from the precache, other fields need the network.
+const offline = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'de-CH', serviceWorkers: 'allow' });
+const away = await offline.newPage();
+away.on('pageerror', (error) => errors.push(`offline: ${error.message}`));
+await away.goto(base);
+await away.evaluate(() => navigator.serviceWorker.ready);
+await away.reload();
+await away.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 30000 });
+await offline.setOffline(true);
+await away.getByTestId('area-catalog').waitFor();
+await away.getByTestId('area-catalog').locator('.area-row').filter({ hasText: 'Riedikon' }).getByTestId('area-install').click();
+const refused = await away.getByText('Für den Download ist eine Internetverbindung nötig.').waitFor({ timeout: 15000 }).then(() => true, () => false);
+check('offline-field-needs-network', refused);
+await away.getByTestId('new-plan').click();
+check('offline-default-is-mahlwinkel', (await away.locator('.dialog').getByRole('radio', { name: /Mahlwinkel/ }).getAttribute('aria-checked')) === 'true');
+await away.getByTestId('create-plan').click();
+await away.waitForSelector('.maplibregl-canvas');
+const offlineArea = await away.waitForFunction(() => new Promise((resolve) => {
+    const request = indexedDB.open('as-tac-v2');
+    request.onsuccess = () => {
+        request.result.transaction('areaMeta').objectStore('areaMeta').get('mahlwinkel').onsuccess = (event) => {
+            resolve(Boolean(event.target.result));
+            request.result.close();
+        };
+    };
+}), null, { timeout: 30000 }).then(() => true, () => false);
+check('offline-mahlwinkel-from-precache', offlineArea);
 
 await browser.close();
 console.log(JSON.stringify(results, null, 1));

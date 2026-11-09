@@ -88,7 +88,7 @@ export function MapsPanel() {
     const editing = useUi((state) => state.imageEditId);
     useUi((state) => state.mode);
     useProject((state) => state.readOnly);
-    const [areas, setAreas] = useState<AreaMeta[]>([]);
+    const [areas, setAreas] = useState<AreaMeta[] | null>(null);
     useEffect(() => {
         void listAreas().then(setAreas);
     }, []);
@@ -96,7 +96,7 @@ export function MapsPanel() {
         return null;
     }
     const editable = canEdit();
-    const current = areas.find((area) => area.id === project.areaId);
+    const current = areas?.find((area) => area.id === project.areaId);
     const patchImage = (id: string, patch: Partial<ImageOverlay>, key: string) => mutate(t('maps.images'), (draft) => {
         const image = draft.images.find((i) => i.id === id);
         if (image) {
@@ -113,9 +113,10 @@ export function MapsPanel() {
                         draft.areaId = event.target.value || null;
                     })}>
                         <option value="">{t('new.noArea')}</option>
-                        <AreaOptions installed={areas} />
-                        {project.areaId && !isBundled(project.areaId) && !areas.some((area) => area.id === project.areaId) ? (
-                            <option value={project.areaId}>{t('area.missingOption', { id: project.areaId })}</option>
+                        <AreaOptions installed={areas ?? []} />
+                        {project.areaId && !isBundled(project.areaId) && !(areas ?? []).some((area) => area.id === project.areaId) ? (
+                            // Until the device's areas are read, the id alone: not yet «missing».
+                            <option value={project.areaId}>{areas ? t('area.missingOption', { id: project.areaId }) : project.areaId}</option>
                         ) : null}
                     </select>
                 </Field>

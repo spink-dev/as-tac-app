@@ -14,10 +14,15 @@ describe('field catalog', () => {
             expect(area.country).toMatch(/^[A-Z]{2}$/);
             expect(area.name.length).toBeGreaterThan(1);
             expect(area.place.length).toBeGreaterThan(1);
-            // New fields carry their country in id and folder; Mahlwinkel keeps its id and path.
+            // Files are named after their content, so a refreshed field never replaces a file an
+            // older app version still downloads. Mahlwinkel keeps its id and its pre-1.0 path.
+            const country = area.country.toLowerCase();
+            const name = area.id === 'mahlwinkel' ? area.id : area.id.slice(country.length + 1);
             if (area.id !== 'mahlwinkel') {
-                expect(area.id.startsWith(`${area.country.toLowerCase()}-`)).toBe(true);
-                expect(area.file).toBe(`/maps/${area.country.toLowerCase()}/${area.id.slice(3)}.geojson`);
+                expect(area.id.startsWith(`${country}-`)).toBe(true);
+            }
+            if (area.file !== '/maps/mahlwinkel.geojson') {
+                expect(area.file).toBe(`/maps/${country}/${name}.${area.sha256.slice(0, 8)}.geojson`);
             }
             validateBounds(area.bounds);
             expect(areaKm2(area.bounds)).toBeLessThanOrEqual(36);
@@ -43,6 +48,13 @@ describe('field catalog', () => {
                 expect(lon >= w - 0.02 && lon <= e + 0.02 && lat >= s - 0.02 && lat <= n + 0.02, area.id).toBe(true);
             }
         }
+    });
+
+    it('keeps the manifest that apps up to 1.0.0-alpha.2 read for Mahlwinkel', () => {
+        const manifest = JSON.parse(readFileSync('public/maps/mahlwinkel.json', 'utf8')) as { sha256: string; byteSize: number };
+        const bytes = readFileSync('public/maps/mahlwinkel.geojson');
+        expect(bytes.byteLength).toBe(manifest.byteSize);
+        expect(createHash('sha256').update(bytes).digest('hex')).toBe(manifest.sha256);
     });
 
     it('no longer contains the Zürich test areas', () => {

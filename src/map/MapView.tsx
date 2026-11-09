@@ -145,7 +145,9 @@ async function loadArea(project: Project, fit: boolean) {
     }
     let row = await getArea(project.areaId);
     if (!row && !isBundled(project.areaId)) {
-        // Downloaded or imported on another device, or a field no longer in the catalog.
+        // Downloaded or imported on another device, or a field no longer in the catalog: the old
+        // basemap must not stay under the plan as if it were this one.
+        setSourceData(map, 'osm', EMPTY_FC);
         toast(t('area.missing', { id: project.areaId }), { tone: 'warn' });
     } else if (!row) {
         try {
@@ -265,7 +267,9 @@ export function MapView() {
             if (state.project !== prev.project) {
                 schedulePlanRender();
                 if (state.project && state.project.areaId !== prev.project?.areaId) {
-                    void loadArea(state.project, false);
+                    // Another area for the same plan (Karten, undo, a live partner): show it. Fields lie
+                    // all over Europe, so the old view would show nothing of the new one.
+                    void loadArea(state.project, prev.project?.id === state.project.id);
                 }
                 if (state.project?.settings.grid !== prev.project?.settings.grid) {
                     renderGrid();

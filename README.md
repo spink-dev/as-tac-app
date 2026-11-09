@@ -22,7 +22,7 @@ Taktische Kartenplanung für Airsoft – auf echten OpenStreetMap-Karten, offlin
 
 ## Mitgelieferte Felder
 
-Katalog in `src/config/maps.json`, Daten unter `public/maps/<land>/` (OpenStreetMap, ODbL; Datenstand 2026-09-06, Mahlwinkel 2026-10-01). Ein Feld wird erst beim ersten Gebrauch auf dem Gerät gespeichert; nur Mahlwinkel liegt nach der Installation schon bereit. Aktualisieren oder ergänzen: Eintrag im Katalog, dann `npm run map:build -- <id>` (lädt aus Overpass) oder `npm run map:build -- --from antworten.json.gz`.
+Katalog in `src/config/maps.json`, Daten unter `public/maps/<land>/` (OpenStreetMap, ODbL; Datenstand 2026-09-06, Mahlwinkel 2026-10-01). Ein Feld wird erst beim ersten Gebrauch auf dem Gerät gespeichert; nur Mahlwinkel liegt nach der Installation der App schon bereit und lässt sich auch ohne Netz als Grundkarte wählen. Aktualisieren oder ergänzen: Eintrag im Katalog, dann `npm run map:build -- <id>` (lädt aus Overpass) oder `npm run map:build -- --from antworten.json.gz`. Die Dateien tragen die ersten acht Zeichen ihrer SHA-256 im Namen; ältere Dateien bleiben liegen, bis keine unterstützte Version sie mehr nennt.
 
 | Land | Feld | Ort | Grösse |
 | --- | --- | --- | --- |
@@ -39,8 +39,8 @@ Katalog in `src/config/maps.json`, Daten unter `public/maps/<land>/` (OpenStreet
 | Deutschland | The Green Mile | Wittlich | 103 KB |
 | Deutschland | Woodlandpark Leese | Leese | 85 KB |
 | Frankreich | Airsoft Lille | Beaucamps-Ligny | 139 KB |
-| Frankreich | Black Reapers Cahors | Douelle | 138 KB |
 | Frankreich | Bärenkopf · Fort de la Tête de l'Ours | Haut-du-Them-Château-Lambert | 200 KB |
+| Frankreich | Black Reapers Cahors | Douelle | 138 KB |
 | Frankreich | Freelance Paintball Airsoft | Cirières | 92 KB |
 | Frankreich | Grand Terrain SAG28 | Saint-Martin-de-Nigelles | 73 KB |
 | Frankreich | S.A.S Force 51 | Tours-sur-Marne | 447 KB |

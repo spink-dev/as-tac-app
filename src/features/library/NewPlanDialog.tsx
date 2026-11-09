@@ -23,7 +23,7 @@ export function NewPlanDialog() {
     const [name, setName] = useState('');
     const [areaId, setAreaId] = useState<string>('mahlwinkel');
     const [template, setTemplate] = useState<string>('');
-    const [installed, setInstalled] = useState<AreaMeta[]>([]);
+    const [installed, setInstalled] = useState<AreaMeta[] | null>(null);
     const countries = useCountries();
     const [country, setCountry] = useState(() => defaultCountry('mahlwinkel'));
     const [busy, setBusy] = useState<number | null>(null);
@@ -31,6 +31,7 @@ export function NewPlanDialog() {
 
     useEffect(() => {
         if (open) {
+            setInstalled(null);
             void listAreas().then(setInstalled);
             setName('');
             setTemplate('');
@@ -48,12 +49,23 @@ export function NewPlanDialog() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, payload]);
 
+    useEffect(() => {
+        // A remembered own area removed since: back to Mahlwinkel instead of an unseen, missing choice.
+        if (open && installed && areaId !== '__none' && !isBundled(areaId) && !installed.some((area) => area.id === areaId)) {
+            chooseArea('mahlwinkel');
+            setCountry(defaultCountry('mahlwinkel'));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, installed, areaId]);
+
+    const here = installed ?? [];
     const fields = (countries.find((group) => group.country === country)?.areas ?? []).map((area) => ({
         id: area.id,
         name: area.name,
-        meta: `${area.place} · ${installed.some((i) => i.id === area.id) ? t('area.installed') : `${t('area.bundled')} · ${formatBytes(area.bytes)}`}`,
+        meta: `${area.place} · ${here.some((i) => i.id === area.id) ? t('area.installed') : t('area.onFirstUse', { size: formatBytes(area.bytes) })}`,
     }));
-    const own = installed.filter((area) => !isBundled(area.id)).map((area) => ({ id: area.id, name: area.name, meta: `${t('area.installed')} · ${formatBytes(area.byteSize)}` }));
+    const own = here.filter((area) => !isBundled(area.id)).map((area) => ({ id: area.id, name: area.name, meta: `${t('area.installed')} · ${formatBytes(area.byteSize)}` }));
+    const ownLabel = useId();
     const templates = areaId === 'mahlwinkel' ? MAHLWINKEL_EVENTS : [];
 
     function chooseArea(id: string) {
@@ -61,11 +73,15 @@ export function NewPlanDialog() {
         setTemplate('');
     }
 
-    /** Another country: its first field is chosen, so the selection is always one you can see. */
+    /**
+     * Another country. A field chosen in the old one gives way to the new country's first field, so
+     * the choice stays visible; an own area or «Ohne Grundkarte» stays chosen (both are always shown).
+     */
     function pickCountry(next: string) {
         setCountry(next);
         const first = countries.find((group) => group.country === next)?.areas[0];
-        if (first && bundledArea(areaId)?.country !== next) {
+        const chosen = bundledArea(areaId);
+        if (first && chosen && chosen.country !== next) {
             chooseArea(first.id);
         }
     }
@@ -137,9 +153,9 @@ export function NewPlanDialog() {
                             </span>
                         </button>
                     ))}
-                    {own.length ? <div className="choice-list__label" role="presentation">{t('area.own')}</div> : null}
+                    {own.length ? <div className="choice-list__label" id={ownLabel} aria-hidden="true">{t('area.own')}</div> : null}
                     {own.map((area) => (
-                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} className="choice" onClick={() => chooseArea(area.id)}>
+                        <button key={area.id} type="button" role="radio" aria-checked={areaId === area.id} aria-describedby={ownLabel} className="choice" onClick={() => chooseArea(area.id)}>
                             <MapIcon {...ICON} />
                             <span className="choice__main">
                                 <span className="choice__title">{area.name}</span>

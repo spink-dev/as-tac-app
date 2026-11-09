@@ -3,11 +3,14 @@ import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import fieldCatalog from './src/config/maps.json';
 
-// Prepared fields (public/maps/<country>/) are installed into IndexedDB on demand, checked against
-// the SHA-256 in src/config/maps.json; only Mahlwinkel is precached. `maps/mahlwinkel.json` stays for
-// apps up to 1.0.0-alpha.2, which read the manifest before the data.
-const PRECACHED_MAPS = ['maps/mahlwinkel.json', 'maps/mahlwinkel.geojson'];
+// Prepared fields (public/maps/<country>/, named after their content) are installed into IndexedDB
+// on demand and checked against the SHA-256 in src/config/maps.json. Only Mahlwinkel is precached, so
+// a fresh install can start a plan there offline; `maps/mahlwinkel.{json,geojson}` stay for apps up
+// to 1.0.0-alpha.2, which read that manifest before the data.
+const mahlwinkelFile = (fieldCatalog.fields.find((field) => field.id === 'mahlwinkel')?.file ?? '/maps/mahlwinkel.geojson').slice(1);
+const PRECACHED_MAPS = [...new Set(['maps/mahlwinkel.json', 'maps/mahlwinkel.geojson', mahlwinkelFile])];
 
 /**
  * Identity of this build: package version, commit and build time. `BUILD_COMMIT` comes from the

@@ -317,26 +317,21 @@ export function Library() {
                                         <li key={field.id} className="area-row">
                                             <div className="list-row__main">
                                                 <span className="list-row__title">{field.name}</span>
-                                                <span className="list-row__meta">
-                                                    {field.place} · {formatBytes(field.bytes)}
-                                                    {field.website ? (
-                                                        <>
-                                                            {' · '}
-                                                            <a className="area-row__link" href={field.website} target="_blank" rel="noopener noreferrer" aria-label={t('area.website', { name: field.name })}>
-                                                                {t('area.websiteShort')}<ExternalLink size={12} aria-hidden="true" />
-                                                            </a>
-                                                        </>
-                                                    ) : null}
-                                                </span>
+                                                <span className="list-row__meta">{field.place} · {formatBytes(field.bytes)}</span>
                                                 {installing[field.id] !== undefined ? (
                                                     <div className="progress"><div className="progress__bar" style={{ transform: `scaleX(${Math.max(0.04, installing[field.id])})` }} /></div>
                                                 ) : null}
                                             </div>
+                                            {field.website ? (
+                                                <a className="icon-btn" href={field.website} target="_blank" rel="noopener noreferrer" aria-label={t('area.website', { name: field.name })} data-tip={t('area.website', { name: field.name })} data-tip-pos="left">
+                                                    <ExternalLink {...ICON} />
+                                                </a>
+                                            ) : null}
                                             {here ? (
                                                 <span className="badge badge--ok">{t('area.installed')}</span>
                                             ) : (
-                                                <Button small onClick={() => void install(field.id)} disabled={installing[field.id] !== undefined} data-testid="area-install">
-                                                    <HardDrive size={16} /> {t('area.install')}
+                                                <Button small onClick={() => void install(field.id)} disabled={installing[field.id] !== undefined} aria-label={t('area.installNamed', { name: field.name })} data-testid="area-install">
+                                                    <HardDrive size={16} /> {t('area.installShort')}
                                                 </Button>
                                             )}
                                         </li>

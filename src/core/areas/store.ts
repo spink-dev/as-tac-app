@@ -87,13 +87,11 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
         throw new Error('area-unknown');
     }
     // A weak link may drop the request or the transfer midway: the whole file, a few tries.
-    // Offline there is nothing to wait for.
+    // Offline the request still goes out (the service worker answers for precached Mahlwinkel);
+    // when it fails there is nothing to wait for.
     const getBytes = async (url: string, init?: RequestInit, report?: (received: number, total: number) => void): Promise<Uint8Array> => {
         let lastError: unknown = null;
         for (let attempt = 0; attempt < 3; attempt++) {
-            if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-                throw new Error('offline');
-            }
             // A transfer that stops moving for 30 s is cut and tried again (mobile links stall silently).
             const transfer = new AbortController();
             let stall = setTimeout(() => transfer.abort(), 60000);
@@ -135,6 +133,9 @@ export async function installBundled(id: string, onProgress?: Progress): Promise
                 }
             } catch (error) {
                 lastError = transfer.signal.aborted ? new Error('stalled') : error;
+                if (!transfer.signal.aborted && typeof navigator !== 'undefined' && navigator.onLine === false) {
+                    throw new Error('offline');
+                }
             } finally {
                 clearTimeout(stall);
             }

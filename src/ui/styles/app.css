@@ -430,23 +430,11 @@
     flex: none;
 }
 
-/* Field names are long («Bärenkopf · Fort de la Tête de l'Ours»): two lines rather than cut off. */
-.area-list[data-testid='area-catalog'] .list-row__title {
+/* Field names are long («Bärenkopf · Fort de la Tête de l'Ours»): wrapped rather than cut off. */
+.area-list[data-testid='area-catalog'] .list-row__title,
+.area-list[data-testid='area-catalog'] .list-row__meta {
     white-space: normal;
     overflow-wrap: anywhere;
-}
-
-.area-row__link {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    color: var(--accent);
-    text-decoration: none;
-}
-
-.area-row__link:hover,
-.area-row__link:focus-visible {
-    text-decoration: underline;
 }
 
 .lib__sub {
@@ -474,6 +462,10 @@
 
 .field > .country-select {
     margin-bottom: var(--sp-2);
+}
+
+.choice-list__label + .choice {
+    border-top: 0;
 }
 
 .choice-list__label {
